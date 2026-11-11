@@ -1,0 +1,30 @@
+{
+  "name": "festamate-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node tests/demoModel.test.js"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.1.0",
+    "rollup": "npm:@rollup/wasm-node@4.52.0",
+    "esbuild": "npm:esbuild-wasm@0.28.2"
+  },
+  "overrides": {
+    "rollup": "$rollup",
+    "esbuild": "$esbuild"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
