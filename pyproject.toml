@@ -1,0 +1,13 @@
+[project]
+name = "festamate-backend"
+version = "0.1.0"
+description = "FestaMate FastAPI application scaffold"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "pydantic-settings>=2.6,<3",
+    "uvicorn>=0.32,<1",
+]
+
+[tool.uv]
+package = false
