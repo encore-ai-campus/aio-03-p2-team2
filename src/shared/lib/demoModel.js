@@ -106,18 +106,25 @@ export function createDemoModel(
     const size = me.id === state.actor ? +pr.party : +me.party;
     const mbti = me.id === state.actor ? pr.mbti : [me.mbti];
     const start = me.id === state.actor ? pr.start : me.start;
+    // v4.4 · 비어 있는 선택 조건(관심사·예산·스타일·MBTI)은 null → 점수에서 제외 후 100점 환산
     const values = {
       일정:
         (p.available.includes(f.id) ? 1 : 0.4) *
-        (Math.abs(toMin(start) - toMin(p.start)) <= 180 ? 1 : 0.65),
+        (!start || Math.abs(toMin(start) - toMin(p.start)) <= 180 ? 1 : 0.65),
       관심사: myInterests.length
         ? myInterests.filter((x) => p.interests.includes(x)).length /
           myInterests.length
-        : 1,
-      예산: Math.max(0, 1 - Math.abs(budget - p.budget) / 10),
-      스타일: style === p.style ? 1 : 0.35,
+        : null,
+      예산:
+        budget == null || Number.isNaN(budget) || !budget
+          ? null
+          : Math.max(0, 1 - Math.abs(budget - p.budget) / 10),
+      스타일: !style ? null : style === p.style ? 1 : 0.35,
       MBTI: !mbti.length ? null : mbti.includes(p.mbti) ? 1 : 0.2,
-      인원: Math.max(0, 1 - Math.abs(size - p.party) / 5),
+      인원:
+        size == null || Number.isNaN(size) || !size
+          ? null
+          : Math.max(0, 1 - Math.abs(size - p.party) / 5),
     };
     const weights = {
       일정: 25,
@@ -277,7 +284,9 @@ export function createDemoModel(
   }) {
     let f = festival(festivalId),
       p = person(leader),
-      start = toMin(leader === "me" ? state.profile.start : p.start);
+      start = toMin(
+        leader === state.actor && state.profile.start ? state.profile.start : p.start,
+      );
     let meet = Math.max(10 * 60, start);
     let row = {
       id: newId("g"),
@@ -328,12 +337,25 @@ export function createDemoModel(
     state.groups.unshift(row);
     return row;
   }
+  // v4.4 · 필수 조건 확인 (축제 → 시작 시간 → 희망 인원 순서)
+  function requiredMissing(src = { festivalId: state.festivalId, ...state.profile }) {
+    const out = [];
+    const f = src.festivalId && state.festivals.find((x) => x.id === src.festivalId);
+    if (!f || !active(f)) out.push("festival");
+    if (!src.start) out.push("start");
+    if (!src.party) out.push("party");
+    return out;
+  }
+  const REQUIRED_LABEL = { festival: "축제", start: "시작 시간", party: "희망 인원" };
   function performMatch() {
-    const f = festival(state.festivalId);
-    if (!f || !active(f)) {
-      notify("참여할 수 있는 축제를 선택해 주세요.");
-      return;
+    const missing = requiredMissing();
+    if (missing.length) {
+      notify(
+        `필수 조건을 입력해 주세요: ${missing.map((k) => REQUIRED_LABEL[k]).join(", ")}`,
+      );
+      return false;
     }
+    const f = festival(state.festivalId);
     const candidates = Object.values(BASE_PROFILES)
       .filter((p) => p.id !== state.actor && p.available.includes(f.id))
       .map((p) => ({
@@ -357,6 +379,7 @@ export function createDemoModel(
     }
     state.matchGroupId = g.id;
     notify("AI 매칭 완료! 동행 모임방과 공개 게시글을 생성했어요.");
+    return true;
   }
   function joinRoom(id) {
     let g = group(id);
@@ -744,6 +767,7 @@ export function createDemoModel(
     clock,
     formatDate,
     calMonth,
+    requiredMissing,
     candidateScore,
     meetupScore,
     log,

@@ -634,7 +634,7 @@ export const INIT_GROUPS = [
     logs: [],
   },
 ];
-export const STORAGE_KEY = "festamate_v3_261111_demo";
+export const STORAGE_KEY = "festamate_v4_4_261112_demo";
 export const clone = (x) => JSON.parse(JSON.stringify(x));
 export const defaults = () => ({
   page: "discover",
@@ -645,18 +645,20 @@ export const defaults = () => ({
   region: "all",
   category: "all",
   keyword: "",
-  festivalId: "f21",
+  festivalId: null,
   selectedGroup: "g2",
   matchingDone: false,
   matchScores: [],
   matchFestivalId: null,
+  // v4.4 · 매칭 조건은 비운 상태로 시작 (입장 방식만 기본값 승인제)
+  // 필수: 축제·시작 시간·희망 인원 / 선택: 예산·관심사·여행 스타일·MBTI
   profile: {
-    interests: ["미식", "사진"],
-    budget: 8,
-    style: "여유롭게",
-    mbti: ["ENFP", "INFJ"],
-    party: 4,
-    start: "13:00",
+    interests: [],
+    budget: null,
+    style: "",
+    mbti: [],
+    party: null,
+    start: "",
     joinMode: "approval",
   },
   groups: clone(INIT_GROUPS),
@@ -671,6 +673,7 @@ export const defaults = () => ({
   aiChat: { open: false, busy: false, messages: [], draft: {} },
   discoverView: "list",
   calDay: null,
+  formOpen: false,
 });
 export const NAV = [
   ["discover", "🎪", "축제 탐색"],

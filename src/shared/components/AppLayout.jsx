@@ -148,7 +148,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
         <footer className="footer">
-          FESTA MATE V4.3 · 2026 Festival Discovery & AI Matching · 학습 및 시연용 예시 데이터
+          FESTA MATE V4.4 · 2026 Festival Discovery & AI Matching · 학습 및 시연용 예시 데이터
         </footer>
       </div>
       <nav className="tabbar" aria-label="주요 메뉴">

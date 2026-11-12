@@ -23,8 +23,8 @@ import {
 
 const RESET = /^(초기화|처음부터|새로\s*시작|리셋)/;
 
-// v4.1 · AI 매칭 도우미 패널 (떠 있는 버튼 + 대화 패널)
-export default function AiChatPanel({ showFab }) {
+// v4.4 · AI 매칭 도우미 (매칭 화면 메인 대화창, 페이지 안에 고정)
+export default function AiChatPanel() {
   const demo = useDemo();
   const { state, mutate, dispatch, notify, festival, period, person, group, pill, active, today } =
     demo;
@@ -34,29 +34,25 @@ export default function AiChatPanel({ showFab }) {
   const inputRef = useRef(null);
   const msgsRef = useRef(null);
 
+  const hasMessages = chat.messages.length > 0;
+
+  // 대화가 늘어나면 대화창 안에서만 아래로 스크롤 (페이지 전체는 움직이지 않음)
   useEffect(() => {
     if (msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
-  }, [chat.messages.length, chat.open]);
+  }, [chat.messages.length]);
+
+  // 대화 중일 때만 응답 후 입력창에 다시 포커스
+  useEffect(() => {
+    if (hasMessages && !chat.busy) inputRef.current?.focus({ preventScroll: true });
+  }, [hasMessages, chat.busy]);
 
   useEffect(() => {
-    if (chat.open && !chat.busy) inputRef.current?.focus();
-  }, [chat.open, chat.busy]);
-
-  useEffect(() => {
-    if (!chat.open) return;
     const id = setInterval(() => {
       if (!inputRef.current?.value && document.activeElement !== inputRef.current)
         setPlaceholder((i) => (i + 1) % AI_PLACEHOLDERS.length);
     }, 3500);
-    const onKey = (e) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      clearInterval(id);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [chat.open]);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -64,12 +60,6 @@ export default function AiChatPanel({ showFab }) {
     el.style.height = "22px";
     el.style.height = Math.min(120, el.scrollHeight - 10) + "px";
   }, [text]);
-
-  function setOpen(open) {
-    mutate((s) => {
-      s.aiChat.open = open;
-    });
-  }
 
   function later(ms, fn) {
     setTimeout(() => mutate(fn), ms);
@@ -143,7 +133,7 @@ export default function AiChatPanel({ showFab }) {
     mutate((s) => {
       aiApply(s);
       s.matchingDone = false;
-      s.aiChat.open = false;
+      s.formOpen = true;
     });
     requestAnimationFrame(() => {
       const el = document.querySelector(".match-form");
@@ -156,7 +146,6 @@ export default function AiChatPanel({ showFab }) {
   }
 
   function showResults() {
-    setOpen(false);
     requestAnimationFrame(() =>
       document.querySelector(".match-results")?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
@@ -169,48 +158,31 @@ export default function AiChatPanel({ showFab }) {
       s.aiChat.draft = {};
     });
     notify("새 대화를 시작했어요.");
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
   }
 
+  // 조건 행: [아이콘, 이름, 대화 값, 폼(직접 설정) 값, 필수 여부]
   function slotsRows(d) {
     const p = state.profile;
-    const f = d.festivalId ? festival(d.festivalId) : null;
+    const fd = d.festivalId ? festival(d.festivalId) : null;
+    const fp = state.festivalId ? festival(state.festivalId) : null;
+    const fl = (f) => (f ? `${f.emoji} ${f.name} · ${period(f)}` : null);
     return [
-      ["🎪", "축제", f ? `${f.emoji} ${f.name} · ${period(f)}` : null, "선택 필요"],
-      ["⏰", "시작 시간", d.start, p.start],
-      ["💰", "예산", d.budget != null ? d.budget + "만원" : null, p.budget + "만원"],
-      ["❤️", "관심사", d.interests?.length ? d.interests.join(" · ") : null, p.interests.join(" · ") || "없음"],
-      ["🚶", "스타일", d.style, p.style],
-      ["🧩", "선호 MBTI", d.mbti ? (d.mbti.length ? d.mbti.join(", ") : "상관없음") : null, p.mbti.join(", ") || "상관없음"],
-      ["👥", "희망 인원", d.party ? d.party + "명" : null, p.party + "명"],
-      ["🚪", "입장 방식", d.joinMode ? AI_JOIN[d.joinMode] : null, AI_JOIN[p.joinMode]],
+      ["🎪", "축제", fl(fd), fl(fp), true],
+      ["⏰", "시작 시간", d.start, p.start || null, true],
+      ["👥", "희망 인원", d.party ? d.party + "명" : null, p.party ? p.party + "명" : null, true],
+      ["💰", "예산", d.budget != null ? d.budget + "만원" : null, p.budget ? p.budget + "만원" : null, false],
+      ["❤️", "관심사", d.interests?.length ? d.interests.join(" · ") : null, p.interests.join(" · ") || null, false],
+      ["🚶", "스타일", d.style, p.style || null, false],
+      [
+        "🧩",
+        "선호 MBTI",
+        d.mbti ? (d.mbti.length ? d.mbti.join(", ") : "상관없음") : null,
+        p.mbti.length ? p.mbti.join(", ") : null,
+        false,
+      ],
+      ["🚪", "입장 방식", d.joinMode ? AI_JOIN[d.joinMode] : null, AI_JOIN[p.joinMode], false],
     ];
-  }
-
-  function quick(d) {
-    const set = !d.start
-      ? ["오전 11시부터", "오후 1시부터", "오후 3시부터"]
-      : !d.interests?.length
-        ? ["맛집·사진", "음악·공연", "산책·카페", "전시·전통"]
-        : d.budget == null
-          ? ["5만원", "8만원", "10만원", "15만원"]
-          : null;
-    if (!set) return null;
-    const label = !d.start
-      ? "⏰ 시작 시간을 알려주면 일정 점수가 정확해져요"
-      : !d.interests?.length
-        ? "❤️ 관심사를 알려주면 취향 점수가 정확해져요"
-        : "💰 예산을 알려주면 예산 점수가 정확해져요";
-    return (
-      <div className="ai-quick">
-        <span className="ai-quick-label">{label}</span>
-        {set.map((x) => (
-          <Button key={x} className="ai-chip" onClick={() => send(x)}>
-            {x}
-          </Button>
-        ))}
-      </div>
-    );
   }
 
   function botRow(inner, key) {
@@ -248,22 +220,28 @@ export default function AiChatPanel({ showFab }) {
             <div className="ai-card-title">
               📋 이해한 매칭 조건 {pill("6개 요소 점수화", "blue")}
             </div>
-            {slotsRows(m.draft).map(([ic, k, v, def], idx) => (
+            {slotsRows(m.draft).map(([ic, k, v, form, req]) => (
               <div className={`ai-slot ${v ? "" : "def"}`} key={k}>
                 <span>{ic}</span>
-                <span className="k">{k}</span>
-                <span className="v">{v || def}</span>
+                <span className="k">
+                  {k}
+                  {req ? " *" : ""}
+                </span>
+                <span className="v">{v || form || (req ? "입력 필요" : "미설정 · 점수 제외")}</span>
                 {v ? (
                   <span className="ai-badge ok">대화</span>
-                ) : idx === 0 ? (
+                ) : form ? (
+                  <span className="ai-badge">직접 설정</span>
+                ) : req ? (
                   <span className="ai-badge need">필요</span>
                 ) : (
-                  <span className="ai-badge">기본값</span>
+                  <span className="ai-badge">미설정</span>
                 )}
               </div>
             ))}
             <div className="ai-legend">
-              <b>대화</b> = 문장에서 인식 · <b>기본값</b> = 현재 매칭 폼 설정
+              <b>*</b> 필수 조건 · <b>대화</b> = 문장에서 인식 · <b>직접 설정</b> = 조건 설정 값 ·{" "}
+              <b>미설정</b> 선택 조건은 점수에서 제외해요.
               <br />
               매칭하면 공개 모집글과 모임방이 자동으로 만들어져요.
             </div>
@@ -284,7 +262,6 @@ export default function AiChatPanel({ showFab }) {
               </pre>
             </details>
           </div>
-          {!m.stale && quick(m.draft)}
         </>,
         i,
       );
@@ -317,6 +294,22 @@ export default function AiChatPanel({ showFab }) {
               </div>
             )}
           </div>
+        </>,
+        i,
+      );
+    if (m.type === "askText")
+      return botRow(
+        <>
+          {bubble}
+          {!m.stale && (
+            <div className="ai-quick">
+              {m.chips.map((x) => (
+                <Button key={x} className="ai-chip" onClick={() => send(x)}>
+                  {x}
+                </Button>
+              ))}
+            </div>
+          )}
         </>,
         i,
       );
@@ -390,60 +383,39 @@ export default function AiChatPanel({ showFab }) {
   }
 
   return (
-    <>
-      <button
-        type="button"
-        className={`ai-fab ${showFab && !chat.open ? "" : "hidden"}`}
-        aria-label="AI 매칭 도우미 열기"
-        onClick={() => setOpen(true)}
-      >
-        <span>💬</span>
-        <b>말로 매칭하기</b>
-      </button>
-      <section
-        className={`ai-panel ${chat.open ? "open" : ""}`}
-        role="dialog"
-        aria-label="AI 매칭 도우미"
-        aria-hidden={!chat.open}
-      >
+    <section className={`ai-inline ${hasMessages ? "active" : ""}`} aria-label="AI 매칭 도우미">
         <header className="ai-head">
           <span className="ai-ava">🤖</span>
           <div>
             <strong>AI 매칭 도우미</strong>
-            <small>문장으로 말하면 매칭 조건으로 바꿔드려요</small>
+            <small>가고 싶은 축제와 원하는 동행을 말하면 매칭 조건으로 정리해 드려요</small>
           </div>
           <div className="ai-tools">
-            <button type="button" title="대화와 인식한 조건 초기화" onClick={resetChat}>
-              ↺ 새 대화
-            </button>
-            <button type="button" aria-label="닫기" onClick={() => setOpen(false)}>
-              ✕
-            </button>
+            {hasMessages && (
+              <button type="button" title="대화와 인식한 조건 초기화" onClick={resetChat}>
+                ↺ 새 대화
+              </button>
+            )}
           </div>
         </header>
         <div className="ai-msgs" ref={msgsRef} aria-live="polite">
-          {botRow(
-            <>
-              <div className="ai-bubble">
-                안녕하세요! 페스타메이트 AI 매칭 도우미예요.{"\n"}가고 싶은 축제와 원하는 동행 조건을{" "}
-                <b>편하게 문장으로</b> 적어주세요. 매칭 조건으로 정리해 드릴게요.
-              </div>
-              <div className="ai-guide">
-                <div className="ai-guide-title">💡 이렇게 써보세요 · 누르면 바로 보내져요</div>
+          {!hasMessages && (
+            <div className="ai-welcome">
+              <div className="ai-welcome-ex">
+                <span className="ai-quick-label">💡 예시를 누르면 바로 보내져요</span>
                 {AI_EXAMPLES.map((x, idx) => (
-                  <Button key={idx} className="ai-example" onClick={() => send(x)}>
-                    {x}
+                  <Button key={idx} className="ai-chip" title={x} onClick={() => send(x)}>
+                    {AI_EXAMPLE_LABELS[idx]}
                   </Button>
                 ))}
-                <div className="ai-slots">
-                  알아듣는 조건{" "}
-                  {["축제·지역·날짜", "시작 시간", "예산", "관심사", "여행 스타일", "MBTI", "인원", "입장 방식"].map((x) => (
-                    <span key={x}>{x}</span>
-                  ))}
-                </div>
               </div>
-            </>,
-            "welcome",
+              <div className="ai-slots">
+                알아듣는 조건{" "}
+                {["축제·지역·날짜", "시작 시간", "예산", "관심사", "여행 스타일", "MBTI", "인원", "입장 방식"].map((x) => (
+                  <span key={x}>{x}</span>
+                ))}
+              </div>
+            </div>
           )}
           {chat.messages.map(message)}
         </div>
@@ -480,7 +452,6 @@ export default function AiChatPanel({ showFab }) {
             <span>{text.length}/300</span>
           </div>
         </form>
-      </section>
-    </>
+    </section>
   );
 }

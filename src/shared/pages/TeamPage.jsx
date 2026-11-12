@@ -5,14 +5,14 @@ export default function TeamPage() {
   return (
     <>
       {pageHead(
-        "PROJECT HANDOFF · V4.3 UI",
+        "PROJECT HANDOFF · V4.4 UI",
         "📋 팀 협업·노션 공유",
         "UI 기획 체크리스트와 팀원 초대 안내예요. 노션 초대 자체를 이 데모가 수행하지는 않아요.",
       )}
 
       <div className="two">
         <section className="box pad">
-          <h2>v4.3 UI 주요 구현 항목</h2>
+          <h2>v4.4 UI 주요 구현 항목</h2>
           <div className="request">
             <strong>✅ 축제 연간 탐색</strong>
             <span className="pill green">2026 기간 필터</span>
@@ -52,6 +52,10 @@ export default function TeamPage() {
           <div className="request">
             <strong>🆕 UI/UX 정리 (v4.3)</strong>
             <span className="pill green">데모 컨트롤 분리</span>
+          </div>
+          <div className="request">
+            <strong>🆕 챗봇 메인 매칭 화면 (v4.4)</strong>
+            <span className="pill green">조건 설정 접기·요약</span>
           </div>
           <div
             className="note warning"

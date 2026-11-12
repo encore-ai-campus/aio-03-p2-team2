@@ -27,6 +27,10 @@ export const paths = {
   team: "/team",
 };
 export const useDemo = () => useContext(Context);
+const model0Today = () => {
+  const d = new Date();
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+};
 function restore() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -108,16 +112,19 @@ export function DemoProvider({ children }) {
     "filter-status": state.status,
     "filter-region": state.region,
     "filter-category": state.category,
-    "match-festival": state.festivalId,
-    "match-start": state.profile.start,
-    "match-budget": state.profile.budget,
-    "match-style": state.profile.style,
-    "match-cap": state.profile.party,
+    "match-festival": state.festivalId || "",
+    "match-start": state.profile.start || "",
+    "match-budget": state.profile.budget ?? "",
+    "match-style": state.profile.style || "",
+    "match-cap": state.profile.party ?? "",
     "match-joinmode": state.profile.joinMode,
     "schedule-group": state.selectedGroup || state.groups[0]?.id || "",
     "weather-festival": state.weather.festivalId,
     "new-title": "주말 축제 같이 가실 분 🙌",
-    "new-festival": state.festivalId,
+    "new-festival":
+      state.festivalId ||
+      state.festivals.find((f) => f.end >= model0Today())?.id ||
+      state.festivals[0]?.id,
     "new-cap": 4,
     "new-mode": "approval",
     "new-post": "안녕하세요! 공개 댓글에서 먼저 인사하고, 함께 축제를 즐겨요.",
@@ -183,7 +190,9 @@ export function DemoProvider({ children }) {
             profile: {
               ...current.profile,
               [profileKeys[id]]: ["match-budget", "match-cap"].includes(id)
-                ? Number(value)
+                ? value === ""
+                  ? null
+                  : Number(value)
                 : value,
             },
           }));

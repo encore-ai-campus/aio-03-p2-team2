@@ -16,6 +16,16 @@ function setup() {
   });
   // Keep the 2026 prototype scenarios reproducible after the sample dates expire.
   for (const festival of state.festivals) festival.end = "2099-12-31";
+  // v4.4: 조건은 비운 상태로 시작하므로 기존 시나리오용 조건을 채운다.
+  state.festivalId = "f21";
+  Object.assign(state.profile, {
+    interests: ["미식", "사진"],
+    budget: 8,
+    style: "여유롭게",
+    mbti: ["ENFP", "INFJ"],
+    party: 4,
+    start: "13:00",
+  });
   return { state, model, notices, pages };
 }
 
