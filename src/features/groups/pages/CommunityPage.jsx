@@ -25,7 +25,7 @@ export default function CommunityPage() {
       <div className="note coral">
         <b>안전한 참여 규칙</b>
         {
-          " · 최초 게시글 작성자가 모임장이 됩니다. 공개 댓글은 누구나, 채팅은 승인된 참여자만 이용합니다. 정원 초과 시 자동 마감되지만 게시글은 삭제되지 않습니다."
+          " · 최초 게시글 작성자가 모임장이 돼요. 공개 댓글은 누구나, 채팅은 승인된 참여자만 이용해요. 정원 초과 시 자동 마감되지만 게시글은 삭제되지 않아요."
         }
       </div>
       <div className="section-head">
@@ -60,7 +60,7 @@ export default function CommunityPage() {
             ))
           ) : (
             <>
-              <div className="empty">해당 상태의 모임이 없습니다.</div>
+              <div className="empty">해당 상태의 모임이 없어요.</div>
             </>
           )}
         </div>

@@ -20,7 +20,7 @@ export function NewGroupModal({ demo }) {
           aria-label="새 모임 생성"
         >
           <div className="modal-head">
-            <h2>👑 공개 모임 직접 만들기</h2>
+            <h2>공개 모임 직접 만들기</h2>
             <Button
               className="close"
               data-action="closeModal"
@@ -33,8 +33,8 @@ export function NewGroupModal({ demo }) {
             </Button>
           </div>
           <p className="sm muted">
-            첫 게시글 작성자가 모임장이 됩니다. 채팅 입장은 선택한 방식에 따라
-            달라집니다.
+            첫 게시글 작성자가 모임장이 돼요. 채팅 입장은 선택한 방식에 따라
+            달라져요.
           </p>
           <div className="field">
             <label htmlFor="new-title">모임 제목</label>

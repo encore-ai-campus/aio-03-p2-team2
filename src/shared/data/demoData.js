@@ -668,13 +668,16 @@ export const defaults = () => ({
   source: "데모 샘플",
   festivals: clone(INITIAL_FESTIVALS),
   modal: false,
+  aiChat: { open: false, busy: false, messages: [], draft: {} },
+  discoverView: "list",
+  calDay: null,
 });
 export const NAV = [
   ["discover", "🎪", "축제 탐색"],
   ["match", "💞", "AI 동행 매칭"],
   ["community", "👥", "동행 커뮤니티"],
   ["room", "💬", "모임 채팅방"],
-  ["schedule", "🗓️", "일정 검증·조정"],
+  ["schedule", "🗓️", "일정 확인·조정"],
   ["alerts", "🔔", "AI 알림·대안"],
   ["team", "📋", "팀 협업 안내"],
 ];

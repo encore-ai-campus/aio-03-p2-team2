@@ -37,10 +37,14 @@ function restore() {
       Array.isArray(saved.festivals) &&
       saved.festivals.length
     ) {
+      const base = defaults();
+      const aiChat = { ...base.aiChat, ...(saved.aiChat || {}), open: false, busy: false };
+      aiChat.messages = (aiChat.messages || []).filter((m) => m.type !== "typing");
       return {
-        ...defaults(),
+        ...base,
         ...saved,
         modal: false,
+        aiChat,
       };
     }
   } catch (error) {
@@ -53,6 +57,8 @@ export function DemoProvider({ children }) {
   const [draftFields, setDraftFields] = useState({});
   const [message, setMessage] = useState("");
   const timer = useRef();
+  const latest = useRef(stored);
+  latest.current = stored;
   const uploadRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,7 +87,7 @@ export function DemoProvider({ children }) {
         }),
       );
     } catch (error) {
-      notify("브라우저 저장 공간이 부족하거나 저장이 제한되어 있습니다.");
+      notify("브라우저 저장 공간이 부족하거나 저장이 제한되어 있어요.");
       console.warn(error);
     }
   }, [stored, page, notify]);
@@ -136,6 +142,17 @@ export function DemoProvider({ children }) {
     setStored(next);
     if (["comment", "createGroup", "newGroup", "reset"].includes(action))
       setDraftFields({});
+  }
+  // 비동기 흐름(챗봇 응답 대기 등)용: 항상 최신 상태를 복제해 변경한다.
+  function mutate(fn) {
+    const current = latest.current;
+    const next = clone({
+      ...current,
+      selectedGroup: current.selectedGroup || current.groups[0]?.id || null,
+    });
+    fn(next, createDemoModel(next, options));
+    latest.current = next;
+    setStored(next);
   }
   function fieldProps(id) {
     return {
@@ -250,7 +267,7 @@ export function DemoProvider({ children }) {
         ? data
         : data.items || data.festivals || data.response?.body?.items?.item;
       if (!Array.isArray(list))
-        throw Error('JSON은 배열 또는 {"festivals":[...]} 형식이어야 합니다.');
+        throw Error('JSON은 배열 또는 {"festivals":[...]} 형식이어야 해요.');
       const festivals = [
         ...new Map(
           list
@@ -260,7 +277,7 @@ export function DemoProvider({ children }) {
         ).values(),
       ];
       if (!festivals.length)
-        throw Error("2026년의 유효한 축제 데이터가 없습니다.");
+        throw Error("2026년의 유효한 축제 데이터가 없어요.");
       if (
         !window.confirm(
           `2026년 축제 ${festivals.length}건을 불러오고 현재 데모 모임을 초기화할까요?`,
@@ -298,6 +315,8 @@ export function DemoProvider({ children }) {
     state,
     NAV,
     dispatch,
+    mutate,
+    notify,
     fieldProps,
     submitChat,
     btn: (text, action, cls = "btn") => (

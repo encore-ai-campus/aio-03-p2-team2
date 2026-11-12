@@ -40,6 +40,16 @@ export function createDemoModel(
       : status(f) === "live"
         ? pill("진행 중 · 참여 가능", "green")
         : pill("참여 가능", "green");
+  // v4.3 카드 D-day 표시
+  const dday = (f) => {
+    const st = status(f);
+    if (st === "past") return "지난 축제";
+    if (st === "live") return "진행 중";
+    const n = Math.round(
+      (new Date(f.start + "T00:00:00") - new Date(today() + "T00:00:00")) / 864e5,
+    );
+    return n <= 0 ? "D-DAY" : `D-${n}`;
+  };
   const dateShort = (v) => (v || "").slice(5).replace("-", ".");
   const period = (f) => `${dateShort(f.start)} ~ ${dateShort(f.end)}`;
   const groupClosed = (g) =>
@@ -81,6 +91,12 @@ export function createDemoModel(
           minute: "2-digit",
         }).format(d);
   };
+  // v4.2 캘린더: 선택한 달(전체 선택 시 오늘이 속한 달, 2026년 밖이면 1월)
+  function calMonth() {
+    if (state.month) return state.month;
+    const t = today();
+    return t.startsWith("2026-") ? +t.slice(5, 7) : 1;
+  }
   function candidateScore(p, f, me = BASE_PROFILES.me) {
     const pr = state.profile || defaults().profile;
     const myInterests =
@@ -158,7 +174,7 @@ export function createDemoModel(
       g.conflict = {
         required: hhmm(available),
         current: g.schedule[0].time,
-        reason: `새 참여자의 시작 가능 시각은 ${hhmm(available)}인데 기존 만남은 ${g.schedule[0].time}입니다.`,
+        reason: `새 참여자의 시작 가능 시각은 ${hhmm(available)}인데 기존 만남은 ${g.schedule[0].time}이에요.`,
         trigger,
       };
       g.proposal = null;
@@ -174,13 +190,13 @@ export function createDemoModel(
       );
       pushSystem(
         g,
-        "⚠️ 새 참여자 승인으로 일정 충돌이 감지되었습니다. 모임장 확인을 기다립니다.",
+        "⚠️ 새 참여자 승인으로 일정 충돌이 감지됐어요. 모임장 확인을 기다려요.",
       );
     } else {
       g.conflict = null;
       g.proposal = null;
       log(g, "done", "NODE validate_timeline · 모든 참여자 일정 검증 통과");
-      pushSystem(g, "✅ 새 참여자 포함 전체 일정 검증이 완료되었습니다.");
+      pushSystem(g, "✅ 새 참여자 포함 전체 일정 검증이 완료됐어요.");
     }
   }
   function pushSystem(g, text) {
@@ -212,10 +228,10 @@ export function createDemoModel(
       log(
         g,
         "warn",
-        "NODE verify_proposal · 축제 운영 예상 범위를 벗어나 다시 조정해야 합니다.",
+        "NODE verify_proposal · 축제 운영 예상 범위를 벗어나 다시 조정해야 해요.",
       );
       notify(
-        "제안이 늦은 밤을 초과합니다. 실서비스 운영시간 API 검증이 필요합니다.",
+        "제안이 늦은 밤을 초과해요. 실서비스 운영시간 API 검증이 필요해요.",
       );
       return false;
     }
@@ -278,7 +294,7 @@ export function createDemoModel(
       chat: [
         {
           type: "system",
-          text: "모임방과 공개 커뮤니티 게시글이 생성되었습니다.",
+          text: "모임방과 공개 커뮤니티 게시글이 생성됐어요.",
           at: new Date().toISOString(),
         },
       ],
@@ -336,11 +352,11 @@ export function createDemoModel(
         festivalId: f.id,
         max: state.profile.party,
         joinMode: state.profile.joinMode,
-        post: `AI 매칭으로 시작된 동행 모집입니다!\n🎪 ${f.name}\n📅 ${period(f)} · 👥 ${state.profile.party}명 정원\n함께 갈 분은 공개 댓글로 먼저 인사하고 참여를 신청해 주세요.`,
+        post: `AI 매칭으로 시작된 동행 모집이에요!\n🎪 ${f.name}\n📅 ${period(f)} · 👥 ${state.profile.party}명 정원\n함께 갈 분은 공개 댓글로 먼저 인사하고 참여를 신청해 주세요.`,
       });
     }
     state.matchGroupId = g.id;
-    notify("AI 매칭 완료! 동행 모임방과 공개 게시글을 생성했습니다.");
+    notify("AI 매칭 완료! 동행 모임방과 공개 게시글을 생성했어요.");
   }
   function joinRoom(id) {
     let g = group(id);
@@ -355,28 +371,28 @@ export function createDemoModel(
       return;
     }
     if (groupClosed(g)) {
-      notify("정원 또는 축제 기간으로 인해 모집이 마감되었습니다.");
+      notify("정원 또는 축제 기간으로 인해 모집이 마감됐어요.");
       return;
     }
     if (g.joinMode === "approval") {
       g.pending.push(state.actor);
       state.selectedGroup = id;
-      notify("모임장 승인 대기 중입니다. 승인 전 채팅방은 열리지 않습니다.");
+      notify("모임장 승인 대기 중이에요. 승인 전 채팅방은 열리지 않아요.");
       return;
     }
     if (g.members.length >= g.max) return;
     g.members.push(state.actor);
     pushSystem(
       g,
-      `${person(state.actor).name} 님이 즉시 참여했습니다. · ${g.members.length}/${g.max}명`,
+      `${person(state.actor).name} 님이 즉시 참여했어요. · ${g.members.length}/${g.max}명`,
     );
     checkSchedule(g, "즉시 참여");
     state.selectedGroup = id;
     nav(g.conflict ? "schedule" : "room");
     notify(
       g.conflict
-        ? "입장 완료 · 기존 일정에 충돌이 있어 검증 화면으로 이동합니다."
-        : "모임에 바로 참여했습니다. 이전 채팅 기록도 확인할 수 있어요.",
+        ? "입장 완료 · 기존 일정에 충돌이 있어 검증 화면으로 이동해요."
+        : "모임에 바로 참여했어요. 이전 채팅 기록도 확인할 수 있어요.",
     );
   }
   function approveMember(g, id) {
@@ -386,19 +402,19 @@ export function createDemoModel(
     }
     if (!g.pending.includes(id)) return;
     if (groupClosed(g)) {
-      notify("정원 또는 축제 기간이 마감되어 승인할 수 없습니다.");
+      notify("정원 또는 축제 기간이 마감되어 승인할 수 없어요.");
       return;
     }
     g.pending = g.pending.filter((x) => x !== id);
     g.members.push(id);
     pushSystem(
       g,
-      `👤 모임장이 ${person(id).name} 님의 참여를 승인했습니다. (${g.members.length}/${g.max}명)`,
+      `👤 모임장이 ${person(id).name} 님의 참여를 승인했어요. (${g.members.length}/${g.max}명)`,
     );
     if (g.members.length >= g.max) {
       pushSystem(
         g,
-        "🔒 정원이 충족되어 모집이 자동 마감되었습니다. 공개 게시글은 유지됩니다.",
+        "🔒 정원이 충족되어 모집이 자동 마감됐어요. 공개 게시글은 유지돼요.",
       );
     }
     checkSchedule(g, "신규 승인");
@@ -406,13 +422,13 @@ export function createDemoModel(
     nav(g.conflict ? "schedule" : "community");
     notify(
       g.conflict
-        ? "참여 승인이 완료되었습니다. 일정 충돌이 발견되었습니다!"
+        ? "참여 승인이 완료됐어요. 일정 충돌이 발견됐어요!"
         : "승인 및 일정 검증 완료 · 참여자가 채팅에 입장할 수 있어요.",
     );
   }
   function acceptProposal(g) {
     if (state.actor !== g.leader) {
-      notify("일정 최종 승인은 모임장에게만 허용됩니다.");
+      notify("일정 최종 승인은 모임장에게만 허용돼요.");
       return;
     }
     if (!g.proposal) {
@@ -426,14 +442,14 @@ export function createDemoModel(
     log(g, "done", "NODE commit_timeline · 신규 일정 반영");
     pushSystem(
       g,
-      `📅 공동 일정이 변경되었습니다. 모임장 승인 완료 · 만남 ${g.schedule[0].time}, 축제 입장 ${g.schedule[1].time}, 식사 ${g.schedule[2].time}`,
+      `📅 공동 일정이 변경됐어요. 모임장 승인 완료 · 만남 ${g.schedule[0].time}, 축제 입장 ${g.schedule[1].time}, 식사 ${g.schedule[2].time}`,
     );
     log(
       g,
       "done",
       "NODE send_message · 참여자 채팅방에 일정 변경 시스템 메시지 전송",
     );
-    notify("일정이 확정되었고 채팅방에 시스템 메시지가 등록되었습니다.");
+    notify("일정이 확정되었고 채팅방에 시스템 메시지가 등록됐어요.");
   }
   function resetScenario() {
     let current = state.groups.findIndex((x) => x.id === "g2");
@@ -443,7 +459,7 @@ export function createDemoModel(
     state.selectedGroup = "g2";
     state.actor = "me";
     nav("schedule");
-    notify("부산 음악축제 일정 충돌 시연 초기 상태로 복구했습니다.");
+    notify("부산 음악축제 일정 충돌 시연 초기 상태로 복구했어요.");
   }
   function handle(act) {
     let [kind, ...parts] = act.split(":"),
@@ -454,6 +470,17 @@ export function createDemoModel(
         break;
       case "month":
         state.month = +id;
+        state.calDay = null;
+        break;
+      case "view":
+        state.discoverView = id;
+        break;
+      case "calMove":
+        state.month = Math.max(1, Math.min(12, calMonth() + +id));
+        state.calDay = null;
+        break;
+      case "calDay":
+        state.calDay = state.calDay === id ? null : id;
         break;
       case "status":
         state.status = id;
@@ -465,7 +492,7 @@ export function createDemoModel(
         if (active(festival(id))) nav("match");
         else
           notify(
-            "지난 축제입니다. 아카이브 정보는 검색에서 계속 확인할 수 있습니다.",
+            "지난 축제예요. 아카이브 정보는 검색에서 계속 확인할 수 있어요.",
           );
         break;
       case "interest":
@@ -482,6 +509,18 @@ export function createDemoModel(
         break;
       case "runMatch":
         performMatch();
+        break;
+      case "clearFilter":
+        if (id === "month") state.month = 0;
+        else if (id === "keyword") state.keyword = "";
+        else state[id] = "all";
+        break;
+      case "clearFilters":
+        state.month = 0;
+        state.keyword = "";
+        state.status = "all";
+        state.region = "all";
+        state.category = "all";
         break;
       case "selectGroup":
         state.selectedGroup = id;
@@ -511,8 +550,8 @@ export function createDemoModel(
         let g = group(id);
         if (!g || g.leader !== state.actor) return;
         g.pending = g.pending.filter((x) => x !== parts[1]);
-        pushSystem(g, `해당 참여 신청이 처리되었습니다.`);
-        notify("신청을 거절했습니다.");
+        pushSystem(g, `해당 참여 신청이 처리됐어요.`);
+        notify("신청을 거절했어요.");
         break;
       }
       case "comment": {
@@ -529,7 +568,7 @@ export function createDemoModel(
           text,
           at: new Date().toISOString(),
         });
-        notify("공개 댓글이 게시되었습니다.");
+        notify("공개 댓글이 게시됐어요.");
         break;
       }
       case "propose": {
@@ -539,7 +578,7 @@ export function createDemoModel(
           return;
         }
         if (makeProposal(g))
-          notify("AI가 모든 참여자 가능한 일정으로 대안을 생성했습니다.");
+          notify("AI가 모든 참여자 가능한 일정으로 대안을 생성했어요.");
         break;
       }
       case "acceptSchedule":
@@ -586,7 +625,7 @@ export function createDemoModel(
         state.modal = false;
         state.selectedGroup = g.id;
         nav("community");
-        notify("공개글과 모임방이 생성되었습니다. 첫 작성자가 모임장입니다.");
+        notify("공개글과 모임방이 생성됐어요. 첫 작성자가 모임장이에요.");
         break;
       }
       case "simulate":
@@ -598,16 +637,16 @@ export function createDemoModel(
         };
         notify(
           id === "rain"
-            ? "가상 비 예보 알림을 생성했습니다."
-            : "가상 축제 취소·변경 알림을 생성했습니다.",
+            ? "가상 비 예보 알림을 생성했어요."
+            : "가상 축제 취소·변경 알림을 생성했어요.",
         );
         break;
       case "weatherAnswer":
         state.weather.choice = id;
         notify(
           id === "yes"
-            ? "여행 유지 의사를 확인했습니다."
-            : "축제 유형과 지역을 기준으로 대안을 찾았습니다.",
+            ? "여행 유지 의사를 확인했어요."
+            : "축제 유형과 지역을 기준으로 대안을 찾았어요.",
         );
         break;
       case "chooseAlternative":
@@ -623,14 +662,14 @@ export function createDemoModel(
           "축제 탐색 → AI 동행 매칭 → 모임방 및 공개 게시글 생성 → 공개 댓글/참여 신청 → 모임장 승인 → 채팅 내역 조회 → 일정 충돌 검증 → AI 대안 생성 → 모임장 승인 → 채팅 시스템 메시지 → 악천후/취소 대안";
         navigator.clipboard
           ?.writeText(text)
-          .then(() => notify("시연 단계가 복사되었습니다."))
-          .catch(() => notify("브라우저 복사가 제한되었습니다."));
+          .then(() => notify("시연 단계가 복사됐어요."))
+          .catch(() => notify("브라우저 복사가 제한됐어요."));
         break;
       }
       case "reset":
         if (
           window.confirm(
-            "현재 브라우저의 모임·댓글·채팅·축제 가져오기 데이터가 초기화됩니다. 계속할까요?",
+            "현재 브라우저의 모임·댓글·채팅·축제 가져오기 데이터가 초기화돼요. 계속할까요?",
           )
         ) {
           for (const key of Object.keys(state)) delete state[key];
@@ -694,6 +733,7 @@ export function createDemoModel(
     status,
     active,
     statusPill,
+    dday,
     dateShort,
     period,
     groupClosed,
@@ -703,6 +743,7 @@ export function createDemoModel(
     toMin,
     clock,
     formatDate,
+    calMonth,
     candidateScore,
     meetupScore,
     log,
