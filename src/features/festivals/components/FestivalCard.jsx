@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { Card } from "../../../shared/components/Primitives.jsx";
 export function FestivalCard({ demo, f }) {
-  const { btn, active, statusPill, period } = demo;
+  const { btn, active, status, dday, period } = demo;
   let past = !active(f);
   let gradient =
     {
@@ -21,12 +21,11 @@ export function FestivalCard({ demo, f }) {
           }}
         >
           <span className="symbol">{f.emoji || "🎪"}</span>
-          <span className={"" + "flag " + (past ? "past" : "")}>
-            {past ? "지난 축제" : "2026 FESTIVAL"}
+          <span className={`flag ${past ? "past" : status(f) === "live" ? "live" : ""}`}>
+            {dday(f)}
           </span>
         </div>
         <div className="fest-body">
-          {statusPill(f)}
           <h3>{f.name}</h3>
           <div className="metadata">
             {"📍 "}

@@ -17,7 +17,7 @@ export function GroupDetail({ demo, g }) {
   if (!g)
     return (
       <>
-        <div className="empty">모임이 없습니다.</div>
+        <div className="empty">모임이 없어요.</div>
       </>
     );
   const f = festival(g.festivalId),
@@ -106,15 +106,15 @@ export function GroupDetail({ demo, g }) {
           {leader
             ? pill("모임장 · 직접 참여 승인", "red")
             : member
-              ? btn("💬 채팅방 바로 입장", `openChat:${g.id}`, "btn primary")
+              ? btn("채팅방 입장 →", `openChat:${g.id}`, "btn primary")
               : pending
                 ? pill("⏳ 승인 대기 중", "purple")
                 : closed
-                  ? pill("모집이 마감되었습니다", "dark")
+                  ? pill("모집이 마감됐어요", "dark")
                   : btn(
                       g.joinMode === "instant"
-                        ? "⚡ 지금 참여하고 채팅 입장"
-                        : "🙋 모임장에게 참여 신청",
+                        ? "바로 참여하기"
+                        : "참여 신청하기",
                       `join:${g.id}`,
                       "btn primary",
                     )}
@@ -131,7 +131,7 @@ export function GroupDetail({ demo, g }) {
                 fontSize: "14px",
               }}
             >
-              {"📩 모임장 승인 대기 "}
+              {"모임장 승인 대기 "}
               {g.pending.length}명
             </h3>
             {g.pending.map((id, index) => (
@@ -169,15 +169,15 @@ export function GroupDetail({ demo, g }) {
           }}
         >
           <h2>
-            {"💬 공개 댓글 "}
+            {"공개 댓글 "}
             <span className="muted">({g.comments.length})</span>
           </h2>
           {pill("참여 전에도 공개", "blue")}
         </div>
         <p className="sm muted">
-          {"댓글은 누구나 작성할 수 있습니다. 각 작성자 오른쪽의 %는 "}
+          {"댓글은 누구나 작성할 수 있어요. 각 작성자 오른쪽의 %는 "}
           <b>현재 로그인한 사람과의 축제 동행 매칭 점수</b>
-          입니다.
+          예요.
         </p>
         {comments.length ? (
           comments
@@ -210,7 +210,7 @@ export function GroupDetail({ demo, g }) {
             marginTop: "12px",
           }}
         >
-          연락처는 공개하지 않습니다. 모임 입장은 정원·승인 상태로 제어됩니다.
+          연락처는 공개하지 않아요. 모임 입장은 정원·승인 상태로 제어돼요.
         </p>
       </Card>
     </>

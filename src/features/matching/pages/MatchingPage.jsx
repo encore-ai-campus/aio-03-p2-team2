@@ -78,27 +78,17 @@ export default function MatchingPage() {
       {pageHead(
         "AI TRAVEL MATCHING",
         "💞 AI 동행 매칭",
-        "선호 조건을 입력하면 6개 요소로 점수를 계산하고, 공개 모임방과 커뮤니티 게시글을 자동 생성합니다.",
+        "선호 조건을 입력하면 6개 요소로 점수를 계산하고, 공개 모임방과 커뮤니티 게시글을 자동 생성해요.",
       )}
 
-      <div className="workflow">
-        <div className="step">
-          <b>01</b>
-          매칭 조건 입력
-        </div>
-        <div className="step">
-          <b>02</b>
-          AI 점수 계산
-        </div>
-        <div className="step">
-          <b>03</b>
-          모임방 생성
-        </div>
-        <div className="step">
-          <b>04</b>
-          공개 게시글 등록
-        </div>
-      </div>
+      <ol className={`workflow ${state.matchingDone ? "done" : ""}`} aria-label="매칭 진행 단계">
+        {["조건 입력", "AI 점수 계산", "모임방 생성", "모집글 등록"].map((x, i) => (
+          <li className="step" key={x}>
+            <b>{state.matchingDone ? "✓" : i + 1}</b>
+            {x}
+          </li>
+        ))}
+      </ol>
       <AiEntry ref={entryRef} onOpen={openAi} />
 
       <div className="columns uneven">
@@ -108,7 +98,7 @@ export default function MatchingPage() {
               fontSize: "17px",
             }}
           >
-            🎯 나의 여행 조건
+            나의 여행 조건
           </h2>
           <div className="field">
             <label htmlFor="match-festival">참여할 축제</label>
@@ -175,9 +165,24 @@ export default function MatchingPage() {
             </select>
           </div>
 
-          <div className="field">
-            <label>선호 MBTI · 복수 선택 가능 (선택 사항)</label>
-            <div className="chips">
+          <details
+            className="field fold"
+            open={!!state.mbtiOpen}
+            onToggle={(e) => {
+              const open = e.currentTarget.open;
+              if (open !== !!state.mbtiOpen)
+                mutate((s) => {
+                  s.mbtiOpen = open;
+                });
+            }}
+          >
+            <summary>
+              선호 MBTI{" "}
+              <span className="muted" style={{ fontWeight: 650 }}>
+                (선택) · {pr.mbti.length ? pr.mbti.join(", ") : "상관없음"}
+              </span>
+            </summary>
+            <div className="chips" style={{ marginTop: "10px" }}>
               {mbtis.map((x, index) => (
                 <Fragment key={index}>
                   {btn(
@@ -189,10 +194,10 @@ export default function MatchingPage() {
               ))}
             </div>
             <div className="hint">
-              선택하지 않아도 됩니다. 미선택 시 MBTI 10%를 제외한 90% 가중치를
-              100점 기준으로 환산합니다.
+              선택하지 않아도 돼요. 미선택 시 MBTI 10%를 제외한 90% 가중치를
+              100점 기준으로 환산해요.
             </div>
-          </div>
+          </details>
 
           <div className="two">
             <div className="field">
@@ -225,11 +230,11 @@ export default function MatchingPage() {
               height: "13px",
             }}
           />
-          {btn(
-            "✨ AI 추천 + 모임방 자동 생성",
-            "runMatch",
-            "btn primary block",
-          )}
+          {btn("AI 추천 받고 모임 만들기", "runMatch", "btn primary block")}
+          <p className="run-hint">
+            실행하면 공개 모집글과 모임방이 자동으로 만들어져요. 추천된 사람이
+            자동으로 참여하지는 않아요.
+          </p>
         </section>
 
         <section className="box pad match-results">
@@ -238,8 +243,8 @@ export default function MatchingPage() {
               <div className="note good">
                 <strong>✅ AI 매칭 → 모임방 → 공개 게시글 생성 완료</strong>
                 <br />
-                추천 후보는 자동으로 참여하지 않습니다. 댓글·참여 신청 후 입장
-                방식에 따라 채팅방에 들어옵니다.
+                추천 후보는 자동으로 참여하지 않아요. 댓글·참여 신청 후 입장
+                방식에 따라 채팅방에 들어와요.
                 <div
                   style={{
                     height: "10px",
@@ -261,7 +266,7 @@ export default function MatchingPage() {
               marginTop: "10px",
             }}
           >
-            <h2>🤝 추천 동행 후보</h2>
+            <h2>추천 동행 후보</h2>
             {pill(
               state.matchingDone ? "가중치 적용 점수" : "매칭 대기",
               state.matchingDone ? "green" : "blue",
@@ -273,8 +278,8 @@ export default function MatchingPage() {
               <p className="sm muted">
                 {festival(state.matchFestivalId)?.name || f.name}
                 {" 참가를 기준으로 계산한 "}
-                <b>데모 추천 점수</b>
-                입니다.
+                <b>추천 점수</b>
+                예요.
               </p>
               {candidates.length ? (
                 candidates.map((o, index) => (
@@ -288,15 +293,19 @@ export default function MatchingPage() {
                           {" · "}
                           {o.p.interests.join(" · ")}
                         </div>
-                        <div className="ratio">
-                          {Object.entries(o.parts).map(([k, v], index) => (
-                            <Fragment key={index}>
-                              <span>
-                                {k} {v}
-                              </span>
-                            </Fragment>
-                          ))}
-                        </div>
+                        <ScoreWhy parts={o.parts} />
+                        <details className="ratio-detail">
+                          <summary>점수 상세 보기</summary>
+                          <div className="ratio">
+                            {Object.entries(o.parts).map(([k, v], index) => (
+                              <Fragment key={index}>
+                                <span>
+                                  {k} {v}
+                                </span>
+                              </Fragment>
+                            ))}
+                          </div>
+                        </details>
                         <div className="score-bar">
                           <div
                             style={{
@@ -314,7 +323,7 @@ export default function MatchingPage() {
                 ))
               ) : (
                 <>
-                  <div className="empty">추천 결과가 없습니다.</div>
+                  <div className="empty">추천 결과가 없어요.</div>
                 </>
               )}
               <div
@@ -323,8 +332,8 @@ export default function MatchingPage() {
                   marginTop: "15px",
                 }}
               >
-                점수는 MVP용 단순 규칙 계산입니다. 매칭 적합도·만족도를 실제로
-                검증한 예측 확률이 아닙니다.
+                추천 점수는 입력한 조건이 얼마나 겹치는지를 나타내요. 실제
+                만족도를 보장하지는 않아요.
               </div>
             </>
           ) : (
@@ -341,7 +350,7 @@ export default function MatchingPage() {
                 <h3>나와 잘 맞는 여행 동행을 찾아보세요</h3>
                 <p>
                   왼쪽에서 선호 조건을 설정하고 AI 매칭을 실행하세요. 실제로
-                  커뮤니티 모임이 생성됩니다.
+                  커뮤니티 모임이 생성돼요.
                 </p>
               </div>
             </>
@@ -350,5 +359,29 @@ export default function MatchingPage() {
       </div>
       <AiChatPanel showFab={!entryVisible} />
     </>
+  );
+}
+
+// v4.3 · 점수 요약: 잘 맞는 점(80% 이상)·다른 점(50% 미만)
+function ScoreWhy({ parts }) {
+  const r = Object.entries(parts)
+    .filter(([, v]) => v !== "미선택")
+    .map(([k, v]) => {
+      const [a, b] = String(v).split("/").map(Number);
+      return [k, a / b];
+    });
+  const good = r.filter((x) => x[1] >= 0.8).map((x) => x[0]);
+  const weak = r.filter((x) => x[1] < 0.5).map((x) => x[0]);
+  if (!good.length && !weak.length)
+    return (
+      <div className="why">
+        <span className="g">전반적으로 무난하게 맞아요</span>
+      </div>
+    );
+  return (
+    <div className="why">
+      {good.length > 0 && <span className="g">잘 맞는 점 · {good.slice(0, 3).join(", ")}</span>}
+      {weak.length > 0 && <span className="w">다른 점 · {weak.slice(0, 2).join(", ")}</span>}
+    </div>
   );
 }

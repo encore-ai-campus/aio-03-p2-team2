@@ -24,23 +24,21 @@ export default function AlertsPage() {
       {pageHead(
         "AI RISK MONITOR & FALLBACK",
         "🔔 AI 알림·대체 축제",
-        "악천후·취소·외부 변경 상황에서 사용자 의사를 먼저 확인하고 대안을 안내합니다.",
+        "악천후·취소·외부 변경 상황에서 사용자 의사를 먼저 확인하고 대안을 안내해요.",
       )}
 
-      <div className="note coral">
-        <strong>데모 데이터 안내</strong>
-        {
-          " · 비 예보·행사 취소 알림은 버튼으로 발생시키는 가상 시나리오입니다. 실제 기상청·축제 운영기관의 실시간 경보가 아닙니다."
-        }
-      </div>
       <div
         className="two"
         style={{
           marginTop: "16px",
         }}
       >
-        <div className="box pad">
-          <h2>🌧️ 위험 상황 시뮬레이션</h2>
+        <div className="box pad demo-card">
+          <span className="demo-tag">데모 시나리오</span>
+          <h2>위험 상황 만들어 보기</h2>
+          <p className="sm muted">
+            실제 서비스에서는 기상청·축제 운영기관 정보로 자동 감지돼요. 시연을 위해 상황을 직접 만들 수 있어요.
+          </p>
           <div className="field">
             <label htmlFor="weather-festival">영향을 받을 축제</label>
             <select id="weather-festival" {...fieldProps("weather-festival")}>
@@ -56,7 +54,7 @@ export default function AlertsPage() {
             {btn("🚫 축제 취소·변경 발생", "simulate:cancel", "btn")}
           </div>
           <div className="divider" />
-          <h3>에이전트 처리 순서</h3>
+          <h3>AI 알림 처리 순서</h3>
           <div
             className="how"
             style={{
@@ -109,7 +107,7 @@ export default function AlertsPage() {
                 <h2>현재 시연 중인 위험 알림이 없어요</h2>
                 <p className="sm muted">
                   왼쪽에서 비 예보 또는 축제 취소를 선택하면 확인 질문과 대안을
-                  볼 수 있습니다.
+                  볼 수 있어요.
                 </p>
               </div>
             </>
@@ -120,7 +118,7 @@ export default function AlertsPage() {
                   marginTop: "18px",
                 }}
               >
-                ☔ 강수 예보가 감지되었어요
+                강수 예보가 감지되었어요
               </h2>
               <p className="sm">
                 {ref.name}
@@ -148,8 +146,8 @@ export default function AlertsPage() {
                       marginTop: "14px",
                     }}
                   >
-                    참여 유지 의사를 확인했습니다. 변경된 실제 예보가 생기면
-                    추가 확인하도록 설계합니다.
+                    참여 유지 의사를 확인했어요. 변경된 실제 예보가 생기면
+                    추가 확인하도록 설계해요.
                   </div>
                 </>
               ) : (
@@ -163,13 +161,13 @@ export default function AlertsPage() {
                   marginTop: "18px",
                 }}
               >
-                🚨 축제 일정 변경·취소 상황
+                축제 일정 변경·취소 상황
               </h2>
               <p className="sm">
                 {ref.name}
                 {" 운영에 차질이 생겼다는 "}
                 <b>가상 시나리오</b>
-                입니다. 기존 모임은 자동 취소하지 않고 대체 축제를 안내합니다.
+                예요. 기존 모임은 자동 취소하지 않고 대체 축제를 안내해요.
               </p>
               {btn("가능한 다른 축제 보기", "weatherAnswer:no", "btn primary")}
             </>
@@ -181,7 +179,7 @@ export default function AlertsPage() {
         <>
           <div className="section-head">
             <div>
-              <h2>✨ AI 대체 축제 추천</h2>
+              <h2>AI 대체 축제 추천</h2>
               <p>같은 유형·지역·관심 태그를 우선 반영한 규칙 기반 후보</p>
             </div>
             {pill("모임 변경은 사용자·모임장 확인 필요", "purple")}
@@ -226,17 +224,6 @@ export default function AlertsPage() {
       ) : (
         ""
       )}
-      <div
-        className="note"
-        style={{
-          marginTop: "18px",
-        }}
-      >
-        <strong>실서비스 연결:</strong>
-        {
-          " 기상청 단기예보·특보와 한국관광공사 축제 정보 및 운영기관의 취소 공지, 중복 확인과 데이터 최신성 검사, 사용자 수신 동의가 필요합니다."
-        }
-      </div>
     </>
   );
 }

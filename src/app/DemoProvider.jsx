@@ -87,7 +87,7 @@ export function DemoProvider({ children }) {
         }),
       );
     } catch (error) {
-      notify("브라우저 저장 공간이 부족하거나 저장이 제한되어 있습니다.");
+      notify("브라우저 저장 공간이 부족하거나 저장이 제한되어 있어요.");
       console.warn(error);
     }
   }, [stored, page, notify]);
@@ -267,7 +267,7 @@ export function DemoProvider({ children }) {
         ? data
         : data.items || data.festivals || data.response?.body?.items?.item;
       if (!Array.isArray(list))
-        throw Error('JSON은 배열 또는 {"festivals":[...]} 형식이어야 합니다.');
+        throw Error('JSON은 배열 또는 {"festivals":[...]} 형식이어야 해요.');
       const festivals = [
         ...new Map(
           list
@@ -277,7 +277,7 @@ export function DemoProvider({ children }) {
         ).values(),
       ];
       if (!festivals.length)
-        throw Error("2026년의 유효한 축제 데이터가 없습니다.");
+        throw Error("2026년의 유효한 축제 데이터가 없어요.");
       if (
         !window.confirm(
           `2026년 축제 ${festivals.length}건을 불러오고 현재 데모 모임을 초기화할까요?`,

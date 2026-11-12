@@ -5,14 +5,14 @@ export default function TeamPage() {
   return (
     <>
       {pageHead(
-        "PROJECT HANDOFF · 3RD UI",
+        "PROJECT HANDOFF · V4.3 UI",
         "📋 팀 협업·노션 공유",
-        "UI 기획 체크리스트와 팀원 초대 안내입니다. 노션 초대 자체를 이 데모가 수행하지는 않습니다.",
+        "UI 기획 체크리스트와 팀원 초대 안내예요. 노션 초대 자체를 이 데모가 수행하지는 않아요.",
       )}
 
       <div className="two">
         <section className="box pad">
-          <h2>🧩 3차 UI 주요 구현 항목</h2>
+          <h2>v4.3 UI 주요 구현 항목</h2>
           <div className="request">
             <strong>✅ 축제 연간 탐색</strong>
             <span className="pill green">2026 기간 필터</span>
@@ -41,6 +41,18 @@ export default function TeamPage() {
             <strong>✅ 악천후 대안</strong>
             <span className="pill green">의사 확인·추천</span>
           </div>
+          <div className="request">
+            <strong>🆕 자연어 챗봇 매칭 (v4.1)</strong>
+            <span className="pill green">문장 → 조건 슬롯 변환</span>
+          </div>
+          <div className="request">
+            <strong>🆕 축제 캘린더형 보기 (v4.2)</strong>
+            <span className="pill green">리스트·캘린더 전환</span>
+          </div>
+          <div className="request">
+            <strong>🆕 UI/UX 정리 (v4.3)</strong>
+            <span className="pill green">데모 컨트롤 분리</span>
+          </div>
           <div
             className="note warning"
             style={{
@@ -49,13 +61,13 @@ export default function TeamPage() {
           >
             <strong>추가 백엔드 작업 필요</strong>
             {
-              " · 실제 축제 전체 데이터, 인증, DB/RLS, 실시간 채팅, LangGraph 실행, 기상 API 및 취소 공지"
+              " · 실제 축제 전체 데이터, 인증, DB/RLS(참여자 외 채팅 차단), 실시간 채팅, LangGraph 실행, 기상 API 및 취소 공지, 알림 수신 동의"
             }
           </div>
         </section>
 
         <section className="box pad">
-          <h2>👥 노션 팀원 초대 방법</h2>
+          <h2>노션 팀원 초대 방법</h2>
           <p className="sm muted">
             팀에서 정리한 요구사항과 현재 HTML을 같은 노션 페이지에 올려 공유해
             보세요.

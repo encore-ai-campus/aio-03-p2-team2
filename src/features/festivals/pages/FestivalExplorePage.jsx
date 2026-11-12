@@ -60,11 +60,12 @@ export default function FestivalExplorePage() {
           </h1>
           <p>
             지난 축제는 기록으로, 예정된 축제는 동행 매칭으로. 축제 선택부터
-            모임 운영까지 이어집니다.
+            모임 운영까지 이어져요.
           </p>
-          {btn("축제 참여 가능한 일정 보기", "status:available", "btn")}
-          {"\xA0"}
-          {btn("AI 동행 매칭", "nav:match", "btn")}
+          <div className="btnrow hero-cta">
+            {btn("AI 동행 매칭 시작하기", "nav:match", "btn hero-primary")}
+            {btn("참여 가능한 축제 보기", "status:available", "btn hero-ghost")}
+          </div>
         </div>
         <div className="hero-art">🎪</div>
       </section>
@@ -74,21 +75,21 @@ export default function FestivalExplorePage() {
           <div className="icon">🗓️</div>
           <div>
             <strong>{all.length}</strong>
-            <span>현재 불러온 2026 축제</span>
+            <span>올해 축제</span>
           </div>
         </div>
         <div className="stat">
           <div className="icon">✅</div>
           <div>
             <strong>{available}</strong>
-            <span>진행 중·참여 가능</span>
+            <span>지금 참여 가능</span>
           </div>
         </div>
         <div className="stat">
           <div className="icon">🕘</div>
           <div>
             <strong>{past}</strong>
-            <span>기간 종료 (기록 유지)</span>
+            <span>지난 축제</span>
           </div>
         </div>
         <div className="stat">
@@ -97,27 +98,17 @@ export default function FestivalExplorePage() {
             <strong>
               {state.groups.filter((g) => !groupClosed(g)).length}
             </strong>
-            <span>모집 가능한 커뮤니티 모임</span>
+            <span>모집 중인 동행 모임</span>
           </div>
         </div>
       </div>
 
-      <div className="note coral">
-        <strong>ℹ️ 데이터 범위:</strong> {state.source} {all.length}
-        {"건을 표시 중입니다. 기본 내장 목록은 "}
-        <b>실제 전체 축제가 아닌 가상 예시 데이터</b>
-        {
-          "입니다. 2026년 실제 전수 목록을 보여주려면 공식 축제 API를 전 기간·전체 페이지 수집하거나 JSON으로 불러오세요. "
-        }
-        {btn("2026 축제 JSON 가져오기", "upload", "btn small soft")}
-      </div>
-
       <div className="section-head">
         <div>
-          <h2>📅 2026 축제 캘린더</h2>
+          <h2>2026 축제 둘러보기</h2>
           <p>
-            {"1월부터 12월까지 탐색 · 참여 가능 여부 자동 판별 (오늘: "}
-            {today()})
+            {"1월~12월 · 참여 가능 여부 자동 표시 · 오늘 "}
+            {today()}
           </p>
         </div>
         <div className="section-actions">
@@ -201,6 +192,7 @@ export default function FestivalExplorePage() {
         </select>
       </div>
 
+      <FilterSummary demo={demo} />
       <div
         style={{
           height: "15px",
@@ -252,5 +244,37 @@ export default function FestivalExplorePage() {
         </div>
       </div>
     </>
+  );
+}
+
+// v4.3 · 적용 중인 필터 요약과 개별·전체 초기화
+function FilterSummary({ demo }) {
+  const { state, dispatch } = demo;
+  const items = [];
+  if (state.discoverView !== "calendar" && state.month) items.push(["month", state.month + "월"]);
+  if (state.status !== "all")
+    items.push(["status", state.status === "available" ? "참여 가능" : "기간 종료"]);
+  if (state.region !== "all") items.push(["region", state.region]);
+  if (state.category !== "all") items.push(["category", state.category]);
+  if (state.keyword.trim()) items.push(["keyword", `“${state.keyword.trim()}”`]);
+  if (!items.length) return null;
+  return (
+    <div className="filter-summary">
+      <span>적용 중</span>
+      {items.map(([k, l]) => (
+        <button
+          key={k}
+          type="button"
+          className="fchip"
+          aria-label={`${l} 필터 해제`}
+          onClick={() => dispatch(`clearFilter:${k}`)}
+        >
+          {l} ✕
+        </button>
+      ))}
+      <button type="button" className="btn text" onClick={() => dispatch("clearFilters")}>
+        필터 초기화
+      </button>
+    </div>
   );
 }
