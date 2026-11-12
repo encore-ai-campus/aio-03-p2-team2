@@ -1,5 +1,7 @@
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
+import AiEntry from "../components/AiEntry.jsx";
+import AiChatPanel from "../components/AiChatPanel.jsx";
 export default function MatchingPage() {
   const demo = useDemo();
   const {
@@ -12,7 +14,21 @@ export default function MatchingPage() {
     active,
     dateShort,
     pageHead,
+    mutate,
   } = demo;
+  const entryRef = useRef(null);
+  const [entryVisible, setEntryVisible] = useState(true);
+  useEffect(() => {
+    const el = entryRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setEntryVisible(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const openAi = () =>
+    mutate((s) => {
+      s.aiChat.open = true;
+    });
   const f =
       festival(state.festivalId) ||
       state.festivals.find(active) ||
@@ -83,14 +99,10 @@ export default function MatchingPage() {
           공개 게시글 등록
         </div>
       </div>
-      <div
-        style={{
-          height: "17px",
-        }}
-      />
+      <AiEntry ref={entryRef} onOpen={openAi} />
 
       <div className="columns uneven">
-        <section className="box pad">
+        <section className="box pad match-form">
           <h2
             style={{
               fontSize: "17px",
@@ -220,7 +232,7 @@ export default function MatchingPage() {
           )}
         </section>
 
-        <section className="box pad">
+        <section className="box pad match-results">
           {state.matchingDone && matchingGroup ? (
             <>
               <div className="note good">
@@ -336,6 +348,7 @@ export default function MatchingPage() {
           )}
         </section>
       </div>
+      <AiChatPanel showFab={!entryVisible} />
     </>
   );
 }

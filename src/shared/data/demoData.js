@@ -668,6 +668,7 @@ export const defaults = () => ({
   source: "데모 샘플",
   festivals: clone(INITIAL_FESTIVALS),
   modal: false,
+  aiChat: { open: false, busy: false, messages: [], draft: {} },
 });
 export const NAV = [
   ["discover", "🎪", "축제 탐색"],
