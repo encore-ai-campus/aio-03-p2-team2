@@ -1,8 +1,10 @@
 import { Fragment } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
+import CalendarView, { ViewToggle } from "../components/CalendarView.jsx";
 export default function FestivalExplorePage() {
   const demo = useDemo();
-  const { state, btn, fieldProps, today, active, groupClosed, fCard } = demo;
+  const { state, btn, fieldProps, today, active, groupClosed, fCard, calMonth } = demo;
+  const calendar = state.discoverView === "calendar";
   const all = state.festivals.filter(
     (f) => f.start <= "2026-12-31" && f.end >= "2026-01-01",
   );
@@ -30,6 +32,22 @@ export default function FestivalExplorePage() {
             .includes(q)),
     )
     .sort((a, b) => a.start.localeCompare(b.start));
+  // 캘린더형은 월 필터 대신 ‹ › 이동을 쓰므로 월 조건을 뺀 목록을 사용
+  const calList = all
+    .filter(
+      (f) =>
+        (state.status === "all" ||
+          (state.status === "available" && active(f)) ||
+          (state.status === "past" && !active(f))) &&
+        (state.region === "all" || f.region === state.region) &&
+        (state.category === "all" || f.category === state.category) &&
+        (!q ||
+          `${f.name} ${f.region} ${f.city} ${f.description} ${(f.tags || []).join(" ")}`
+            .toLowerCase()
+            .includes(q)),
+    )
+    .sort((a, b) => a.start.localeCompare(b.start));
+  const activeMonth = calendar ? calMonth() : state.month;
   return (
     <>
       <section className="hero">
@@ -102,10 +120,15 @@ export default function FestivalExplorePage() {
             {today()})
           </p>
         </div>
-        <span className="pill blue">
-          {"검색 결과 "}
-          {filtered.length}건
-        </span>
+        <div className="section-actions">
+          {!calendar && (
+            <span className="pill blue">
+              {"검색 결과 "}
+              {filtered.length}건
+            </span>
+          )}
+          <ViewToggle demo={demo} />
+        </div>
       </div>
 
       <div className="months">
@@ -122,7 +145,7 @@ export default function FestivalExplorePage() {
             {btn(
               m ? m + "월" : "전체",
               `month:${m}`,
-              `month-button ${m === state.month ? "active" : ""}`,
+              `month-button ${m === activeMonth ? "active" : ""}`,
             )}
           </Fragment>
         ))}
@@ -183,7 +206,9 @@ export default function FestivalExplorePage() {
           height: "15px",
         }}
       />
-      {filtered.length ? (
+      {calendar ? (
+        <CalendarView demo={demo} list={calList} />
+      ) : filtered.length ? (
         <>
           <div className="festival-grid">
             {filtered.map((item, index) => (

@@ -669,6 +669,8 @@ export const defaults = () => ({
   festivals: clone(INITIAL_FESTIVALS),
   modal: false,
   aiChat: { open: false, busy: false, messages: [], draft: {} },
+  discoverView: "list",
+  calDay: null,
 });
 export const NAV = [
   ["discover", "🎪", "축제 탐색"],

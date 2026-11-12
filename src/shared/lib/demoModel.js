@@ -81,6 +81,12 @@ export function createDemoModel(
           minute: "2-digit",
         }).format(d);
   };
+  // v4.2 캘린더: 선택한 달(전체 선택 시 오늘이 속한 달, 2026년 밖이면 1월)
+  function calMonth() {
+    if (state.month) return state.month;
+    const t = today();
+    return t.startsWith("2026-") ? +t.slice(5, 7) : 1;
+  }
   function candidateScore(p, f, me = BASE_PROFILES.me) {
     const pr = state.profile || defaults().profile;
     const myInterests =
@@ -454,6 +460,17 @@ export function createDemoModel(
         break;
       case "month":
         state.month = +id;
+        state.calDay = null;
+        break;
+      case "view":
+        state.discoverView = id;
+        break;
+      case "calMove":
+        state.month = Math.max(1, Math.min(12, calMonth() + +id));
+        state.calDay = null;
+        break;
+      case "calDay":
+        state.calDay = state.calDay === id ? null : id;
         break;
       case "status":
         state.status = id;
@@ -703,6 +720,7 @@ export function createDemoModel(
     toMin,
     clock,
     formatDate,
+    calMonth,
     candidateScore,
     meetupScore,
     log,
