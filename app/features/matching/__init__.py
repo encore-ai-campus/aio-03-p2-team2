@@ -1,1 +1,1 @@
-from .router import router
+"""Matching domain package."""

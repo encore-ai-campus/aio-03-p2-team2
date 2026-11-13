@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    database_url: str | None = None
+    database_required: bool = False
+    database_pool_min_size: int = 1
+    database_pool_max_size: int = 5
 
 
 @lru_cache

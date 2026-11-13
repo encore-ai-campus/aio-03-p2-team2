@@ -1,1 +1,1 @@
-from .router import router
+"""Alerts domain package."""

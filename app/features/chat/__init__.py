@@ -1,1 +1,1 @@
-from .router import router
+"""Group chat domain package."""
