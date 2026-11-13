@@ -1,97 +1,153 @@
 # FestaMate Backend
 
-FestaMate 팀 개발을 위한 FastAPI 초기 프로젝트입니다. 프론트엔드 레포는 `aio-03-p2-2team-Frontend`입니다.
+FestaMate 팀 개발용 FastAPI 백엔드입니다. React 프론트엔드(`aio-03-p2-2team-Frontend`)와 별도 레포로 관리하며, 프론트의 `DemoProvider → demoModel → localStorage` 목업 흐름을 향후 REST/WebSocket API로 교체할 수 있도록 API 계약을 구현합니다.
+
+## 아키텍처 검토
+
+현재 구조는 프론트와 백엔드를 기능별로 나눈 방향이 적절합니다.
+
+```text
+Frontend                                  Backend
+React Router / DemoProvider               FastAPI /api/v1
+  ├─ features/*                             ├─ features/auth
+  ├─ shared/components                       ├─ features/festivals
+  ├─ shared/data                             ├─ features/matching
+  └─ shared/lib/demoModel                    ├─ features/groups
+       ↕ localStorage                        ├─ features/chat
+                                             ├─ features/schedules
+                                             └─ features/alerts
+```
+
+향후 연결 구조는 다음 순서로 확장합니다.
+
+```text
+React
+  ├─ Supabase Auth
+  └─ FastAPI
+       ├─ Supabase PostgreSQL / RLS
+       ├─ 공식 축제·날씨 외부 API
+       ├─ LangGraph + OpenAI
+       └─ WebSocket 채팅
+```
+
+현재 프론트와 백엔드는 아직 자동 연결하지 않습니다. 이번 백엔드 MVP는 프론트가 API 계약을 확인할 수 있도록 데모 사용자와 인메모리 샘플 데이터를 제공합니다. 따라서 프로세스를 재시작하면 데이터가 초기화됩니다. Supabase Auth, PostgreSQL, 외부 API 수집, OpenAI/LangGraph 연동은 다음 단계입니다.
 
 ## 기술 스택
 
-Python 3.12 이상, FastAPI, Uvicorn, pydantic-settings, uv를 사용합니다. 의존성은 `pyproject.toml`과 `uv.lock`으로 관리합니다.
-
-Supabase, OpenAI, LangGraph, WebSocket 구현과 관련 라이브러리는 아직 추가하지 않았습니다.
+- Python 3.12+
+- FastAPI, Uvicorn, WebSockets
+- pydantic-settings
+- uv (`pyproject.toml`, `uv.lock`)
+- asyncpg (Supabase PostgreSQL 연결)
 
 ## 실행
-
-Python 3.12와 uv를 준비한 뒤 이 레포의 루트에서 실행합니다.
 
 ```powershell
 uv sync
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-기본값으로 실행할 때 `.env`는 없어도 됩니다. 설정을 변경하려면 **기존 `.env`가 없는 경우에만** 예시를 복사한 뒤 편집합니다.
+기본 설정에서는 `.env`가 없어도 실행됩니다. 설정을 바꿀 때만, 기존 `.env`를 덮어쓰지 않도록 파일이 없는 경우에 복사합니다.
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-macOS/Linux에서는 `cp .env.example .env`를 사용합니다. 실제 `.env`는 Git에 올리지 않습니다.
+macOS/Linux:
 
-## 현재 엔드포인트
+```bash
+test -f .env || cp .env.example .env
+```
 
-기본 주소는 `http://127.0.0.1:8000`입니다.
+실제 `.env`, `.venv/`, `__pycache__/`는 Git에 포함하지 않습니다.
 
-| 경로 | 용도 |
+## PostgreSQL 연결
+
+`.env`에 Supabase PostgreSQL 연결 문자열을 설정하면 FastAPI startup 때 asyncpg pool을 엽니다.
+
+```dotenv
+# Local persistent FastAPI backend: use Direct or Session pooler (port 5432).
+DATABASE_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres
+DATABASE_REQUIRED=true
+DATABASE_POOL_MIN_SIZE=1
+DATABASE_POOL_MAX_SIZE=5
+```
+
+연결 확인은 `GET /health/db`에서 합니다. 응답이 `disabled`이면 `DATABASE_URL`이 없는 인메모리 데모 모드이고, `connected`이면 연결과 필수 핵심 테이블 확인까지 통과한 상태입니다. `schema_missing`이면 연결은 됐지만 DB 설계서의 필수 테이블이 아직 생성되지 않은 상태입니다.
+
+Supabase SQL Editor에는 제공된 `festamate_schema_v4.3.txt`를 먼저 실행해야 합니다. 이 SQL은 `auth.users`, RLS, 승인 트랜잭션 함수를 포함하므로 운영 환경에서는 service-role 키와 RLS 정책을 함께 관리해야 합니다. API·DB 상세 불일치 검토는 [`docs/api-db-review.md`](docs/api-db-review.md)에 기록했습니다.
+
+## 기본 엔드포인트
+
+| 경로 | 설명 |
 | --- | --- |
-| `GET /health` | HTTP 200, `{"status":"ok"}` |
+| `GET /health` | `{"status":"ok"}` |
 | `/docs` | Swagger UI |
-| `/openapi.json` | OpenAPI 명세 |
+| `/openapi.json` | OpenAPI 3.1 명세 |
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
+API 기능 경로의 기본 접두어는 `/api/v1`입니다. 성공 응답은 `{ "data": ..., "meta": { "requestId": ... } }` 형식이며, 목록은 `items`, `page`, `pageSize`, `total`을 사용합니다. 오류는 `{ "error": { "code", "message", "details", "requestId" } }` 형식입니다.
+
+## 구현된 MVP API
+
+- 사용자: `/users/{userId}`, 프로필·알림 동의 PATCH
+- 축제: 목록/검색, 캘린더, 상세, 대체 축제, 개발용 sync/import
+- 매칭: 자연어 슬롯 추출, 후보 점수, 매칭 실행 조회, 필요 시 모임 생성
+- 모임: 생성·조회·수정, 공개 댓글, 참여 신청/즉시 참여, 승인·거절, 탈퇴
+- 채팅: 참여자 전용 메시지 조회·등록, 이벤트 폴백, WebSocket
+- 일정: 참여 가능 시간 검증, 일정 제안 생성·승인·거절
+- 알림: 목록, 읽음, 의사 응답, 대체 축제, 개발용 날씨/공지 sync
+
+### 개발용 사용자 식별
+
+인증 기능은 아직 구현하지 않습니다. 데모 사용자가 필요한 REST 요청은 다음 헤더를 사용합니다.
+
+```http
+X-Demo-User-Id: usr_demo_01
 ```
 
-**실제 기능용 엔드포인트는 아직 없습니다.** 기능별 APIRouter의 접두어와 태그만 등록했습니다. `/api/v1/auth`, `/api/v1/festivals` 등은 내부 경로가 비어 있어 현재 404를 반환합니다. Swagger에는 사용자 정의 기능 API로 `/health`만 표시됩니다. 프론트엔드는 아직 이 서버를 호출하지 않습니다.
+기본 데모 사용자는 `usr_demo_01`, `usr_demo_02`, `usr_demo_03`입니다. WebSocket은 브라우저 제약으로 다음 쿼리를 사용합니다.
+
+```text
+/api/v1/ws/groups/{groupId}/chat?demoUserId=usr_demo_01
+```
+
+이 식별자는 신원 확인이나 공개 서비스 보안 수단이 아닙니다. 실제 배포 전 Supabase Auth와 RLS로 교체해야 합니다.
+
+### 상태 전이와 권한
+
+- 공개 축제·모임·댓글 조회는 사용자 ID 없이 가능합니다.
+- 프로필 변경, 참여 신청, 알림은 대상 데모 사용자와 헤더 ID가 일치해야 합니다.
+- 채팅·일정 조회는 모임 멤버만 가능합니다.
+- 참여 신청 승인·거절과 일정 제안·확정은 모임장만 가능합니다.
+- 정원이 차면 모임 상태가 `full`이 되며, 멤버 추가는 원자적 저장소 구역에서 정원을 다시 확인합니다.
+- 모임·일정 변경은 `version` 또는 `If-Match`를 검사하여 `409 RESOURCE_VERSION_CONFLICT`를 반환합니다.
+- `/admin/*`는 `development`, `local`, `test` 환경에서만 활성화됩니다.
 
 ## 폴더 구조
 
 ```text
 app/
-├── __init__.py
-├── main.py                   # 앱·CORS·health·라우터 등록
+├── main.py                         # 앱, CORS, 오류 형식, 라우터 등록
 ├── core/
-│   └── config.py             # 환경 설정
+│   ├── api.py                       # 표준 응답·오류
+│   ├── config.py                    # 환경 설정
+│   ├── schemas.py                   # 공통 요청 모델
+│   └── store.py                     # 현재 MVP 인메모리 저장소·샘플 데이터
 └── features/
-    ├── auth/
+    ├── auth/                        # 현재 /users 계약, 인증은 별도 과제
     ├── festivals/
     ├── matching/
     ├── groups/
     ├── chat/
     ├── schedules/
     └── alerts/
-.env.example
-.python-version
-pyproject.toml
-uv.lock
 ```
 
-각 기능 폴더에는 `router.py`와 라우터를 내보내는 `__init__.py`가 있습니다. 현재 필요하지 않은 service/repository 빈 파일은 만들지 않았습니다.
+## 다음 작업
 
-## 환경 설정
-
-`app/core/config.py`에서 다음 값을 읽습니다.
-
-| 변수 | 기본값 |
-| --- | --- |
-| `APP_NAME` | `FestaMate API` |
-| `APP_ENV` | `development` |
-| `API_PREFIX` | `/api/v1` |
-| `CORS_ORIGINS` | `["http://localhost:5173","http://127.0.0.1:5173"]` |
-
-`CORS_ORIGINS`는 JSON 배열입니다. 프론트엔드의 포트나 origin을 변경하면 허용 목록도 맞춰야 합니다. CORS는 사용자 인증을 제공하지 않습니다.
-
-## 팀 개발과 문서 분담
-
-향후 작업은 다음과 같습니다.
-
-1. 기능별 요청·응답·오류·권한 API 계약 합의
-2. Supabase PostgreSQL 스키마, Auth와 RLS
-3. 사용자·축제·모임·댓글·일정의 실제 API와 CRUD
-4. 참여 승인·정원 동시성·채팅 접근 권한의 서버 검증
-5. 외부 축제·기상 데이터 연동
-6. OpenAI·LangGraph와 모임장 일정 승인 흐름
-7. WebSocket 채팅과 시스템 공지
-
-라이브러리와 service/repository 계층은 실제 구현에 필요해질 때 추가합니다.
-
-이 레포에는 **백엔드 실행법·환경 변수·API 계약·향후 DB/인증 문서**를 둡니다. API를 추가하면 FastAPI 스키마와 `/docs`를 함께 갱신합니다. 화면·프론트엔드 실행 문서는 프론트엔드 레포에, 전체 기획·역할 분담·일정은 팀 공용 문서에 둡니다.
-
-`.venv/`, `__pycache__/`, 실제 `.env`는 Git에 포함하지 않습니다. 배포 구성은 아직 없습니다.
+1. 프론트 API client와 `X-Demo-User-Id` 연결
+2. Supabase PostgreSQL 스키마와 RLS 도입
+3. 외부 축제·날씨 수집 worker 및 job 상태 조회 API 추가
+4. OpenAI/LangGraph 기반 매칭·일정 제안으로 교체
+5. WebSocket 브로커/Redis와 rate limit, 감사 로그, 콘텐츠 sanitizing 보강
+6. Supabase Auth 도입 후 데모 헤더 제거
