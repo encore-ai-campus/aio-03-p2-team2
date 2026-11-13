@@ -19,6 +19,7 @@ database = Database(settings)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await database.connect()
+    _app.state.database = database
     yield
     await database.close()
 

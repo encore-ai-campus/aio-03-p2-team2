@@ -5,21 +5,21 @@ import re
 from fastapi import APIRouter, Header, Query, Request
 
 from app.core.api import APIError, success
+from app.core.repositories import SupabaseRepository, get_repository
 from app.core.schemas import MatchingParseRequest, MatchingRunRequest
-from app.core.store import new_id, store
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
 
-def require_demo(value: str | None) -> str:
-    if not value or not store.user(value):
+async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
+    if not value or not await repository.user(value):
         raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
     return value
 
 
-def parse_slots(text: str) -> dict:
+def parse_slots(text: str, festivals: list[dict]) -> dict:
     draft = {"festivalId": None, "startTime": None, "budgetManwon": None, "interests": [], "travelStyle": None, "preferredMbti": [], "partySize": None, "joinMode": None}
-    for festival in store.festivals.values():
+    for festival in festivals:
         if festival["name"] in text or festival["region"] in text or festival["category"] in text:
             draft["festivalId"] = festival["id"]
             break
@@ -29,15 +29,15 @@ def parse_slots(text: str) -> dict:
         if "오후" in text and hour < 12:
             hour += 12
         draft["startTime"] = f"{hour:02d}:00"
-    budget_match = re.search(r"(\d+)\s*만(?:원|원)", text)
+    budget_match = re.search(r"(\d+)\s*만\s*원", text)
     if budget_match:
         draft["budgetManwon"] = int(budget_match.group(1))
-    for interest in {tag for festival in store.festivals.values() for tag in festival.get("tags", [])} | {"미식", "사진", "문화", "공연"}:
-        if interest in text:
-            draft["interests"].append(interest)
-    for style in ("여유롭게", "활기차게"):
-        if style in text:
-            draft["travelStyle"] = style
+    interests = {tag for festival in festivals for tag in festival.get("tags", [])} | {"미식", "사진", "문화", "공연"}
+    draft["interests"] = [interest for interest in interests if interest in text]
+    if "여유롭게" in text:
+        draft["travelStyle"] = "여유롭게"
+    elif "활동적으로" in text:
+        draft["travelStyle"] = "활동적으로"
     if "즉시" in text:
         draft["joinMode"] = "instant"
     elif "승인" in text:
@@ -46,14 +46,13 @@ def parse_slots(text: str) -> dict:
     return {"draft": draft, "missingSlots": missing, "confidence": round(max(0.4, 1 - len(missing) * 0.12), 2), "parserVersion": "match-slot-v1"}
 
 
-def candidate(current_id: str, conditions: dict, user: dict) -> dict:
+def candidate(conditions: dict, user: dict) -> dict:
     profile = user["profile"]
     weights = {"schedule": 25, "interests": 20, "budget": 20, "style": 15, "mbti": 10, "partySize": 10}
     parts = {}
     available = profile.get("availableFrom") or "23:59"
     desired = conditions.get("startTime") or "00:00"
-    schedule_score = weights["schedule"] if available <= desired else round(weights["schedule"] * 0.4)
-    parts["schedule"] = {"score": schedule_score, "max": weights["schedule"]}
+    parts["schedule"] = {"score": weights["schedule"] if available <= desired else round(weights["schedule"] * 0.4), "max": weights["schedule"]}
     matches = set(conditions.get("interests") or []) & set(profile.get("interests") or [])
     parts["interests"] = {"score": round(weights["interests"] * len(matches) / max(1, len(conditions.get("interests") or []))), "max": weights["interests"]}
     budget = conditions.get("budgetManwon")
@@ -61,10 +60,9 @@ def candidate(current_id: str, conditions: dict, user: dict) -> dict:
     parts["budget"] = {"score": budget_score, "max": weights["budget"]}
     parts["style"] = {"score": weights["style"] if not conditions.get("travelStyle") or conditions["travelStyle"] == profile.get("travelStyle") else 0, "max": weights["style"]}
     preferred = set(conditions.get("preferredMbti") or [])
-    if preferred and profile.get("mbti"):
-        parts["mbti"] = {"score": weights["mbti"] if preferred & set(profile["mbti"]) else 0, "max": weights["mbti"]}
-    else:
-        parts["mbti"] = {"score": 0, "max": 0, "excluded": True}
+    parts["mbti"] = {"score": weights["mbti"] if preferred and preferred & set(profile.get("mbti") or []) else 0, "max": weights["mbti"] if preferred and profile.get("mbti") else 0}
+    if parts["mbti"]["max"] == 0:
+        parts["mbti"]["excluded"] = True
     party = conditions.get("partySize")
     parts["partySize"] = {"score": weights["partySize"] if not party or party == profile.get("preferredPartySize") else max(0, weights["partySize"] - 4), "max": weights["partySize"]}
     score = round(sum(part["score"] for part in parts.values()) / max(1, sum(part["max"] for part in parts.values())) * 100)
@@ -77,52 +75,49 @@ def candidate(current_id: str, conditions: dict, user: dict) -> dict:
 
 
 @router.post("/parse", operation_id="parseMatchingText")
-def parse_matching(payload: MatchingParseRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
-    require_demo(x_demo_user_id)
-    return success(parse_slots(payload.text), request)
+async def parse_matching(payload: MatchingParseRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
+    repository = get_repository(request)
+    await require_demo(x_demo_user_id, repository)
+    return success(parse_slots(payload.text, await repository.festivals()), request)
 
 
 @router.post("/runs", operation_id="createMatchingRun", status_code=201)
-def create_run(payload: MatchingRunRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
-    user_id = require_demo(x_demo_user_id)
-    festival = store.festival(payload.festival_id)
+async def create_run(payload: MatchingRunRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
+    repository = get_repository(request)
+    user_id = await require_demo(x_demo_user_id, repository)
+    festival = await repository.festival(payload.festival_id)
     if not festival or festival["riskStatus"] == "cancelled":
         raise APIError(422, "FESTIVAL_NOT_AVAILABLE", "매칭할 수 없는 축제입니다.")
-    candidates = [candidate(user_id, payload.conditions.model_dump(by_alias=True), user) for uid, user in store.users.items() if uid != user_id]
-    candidates.sort(key=lambda item: item["score"], reverse=True)
-    candidates = candidates[: payload.top_k]
-    group_data = None
+    users = await repository.users(exclude_id=user_id)
+    conditions = payload.conditions.model_dump(by_alias=True)
+    candidates = sorted([candidate(conditions, user) for user in users], key=lambda item: item["score"], reverse=True)[: payload.top_k]
+    group_id = None
     if payload.create_group:
         if not payload.group:
-            raise APIError(400, "MATCHING_CONDITION_INVALID", "모임 생성 시 group 정보가 필요합니다.")
-        group_payload = {"festivalId": payload.festival_id, "title": payload.group.title, "postBody": payload.group.post_body, "capacity": payload.conditions.party_size or 4, "joinMode": payload.conditions.join_mode or "approval"}
-        with store.lock:
-            group_data = {"id": store.create_group(user_id, group_payload)["id"], "created": True}
-    run_id = new_id("mat")
-    run = {"runId": run_id, "festivalId": payload.festival_id, "userId": user_id, "conditions": payload.conditions.model_dump(by_alias=True), "candidates": candidates, "group": group_data}
-    store.matching_runs[run_id] = run
-    return success({"runId": run_id, "festivalId": payload.festival_id, "candidates": candidates, "group": group_data}, request, status_code=201)
+            raise APIError(400, "MATCHING_CONDITION_INVALID", "모임 생성 정보가 필요합니다.")
+        group = await repository.create_group(user_id, {"festivalId": payload.festival_id, "title": payload.group.title, "postBody": payload.group.post_body, "capacity": payload.conditions.party_size or 4, "joinMode": payload.conditions.join_mode or "approval"})
+        group_id = group["id"]
+    run = await repository.create_matching_run(user_id, payload.festival_id, conditions, candidates, payload.top_k, payload.create_group, group_id)
+    return success({"runId": run["runId"], "festivalId": payload.festival_id, "candidates": run["candidates"], "group": run["group"]}, request, status_code=201)
 
 
 @router.get("/runs/{run_id}", operation_id="getMatchingRun")
-def get_run(run_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
-    user_id = require_demo(x_demo_user_id)
-    run = store.matching_runs.get(run_id)
+async def get_run(run_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+    repository = get_repository(request)
+    user_id = await require_demo(x_demo_user_id, repository)
+    run = await repository.matching_run(run_id, user_id)
     if not run:
         raise APIError(404, "MATCHING_RUN_NOT_FOUND", "매칭 실행을 찾을 수 없습니다.")
-    if run["userId"] != user_id:
-        raise APIError(403, "MATCHING_RUN_FORBIDDEN", "해당 매칭 실행을 조회할 수 없습니다.")
     return success(run, request)
 
 
 @router.get("/runs/{run_id}/candidates", operation_id="listMatchingCandidates")
-def list_candidates(run_id: str, request: Request, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"), x_demo_user_id: str | None = Header(default=None)):
-    user_id = require_demo(x_demo_user_id)
-    run = store.matching_runs.get(run_id)
+async def list_candidates(run_id: str, request: Request, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"), x_demo_user_id: str | None = Header(default=None)):
+    repository = get_repository(request)
+    user_id = await require_demo(x_demo_user_id, repository)
+    run = await repository.matching_run(run_id, user_id)
     if not run:
         raise APIError(404, "MATCHING_RUN_NOT_FOUND", "매칭 실행을 찾을 수 없습니다.")
-    if run["userId"] != user_id:
-        raise APIError(403, "MATCHING_RUN_FORBIDDEN", "해당 매칭 실행을 조회할 수 없습니다.")
     start = (page - 1) * page_size
     items = run["candidates"][start : start + page_size]
     return success({"items": items, "page": page, "pageSize": page_size, "total": len(run["candidates"])}, request)

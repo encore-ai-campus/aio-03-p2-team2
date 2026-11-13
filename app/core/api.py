@@ -4,6 +4,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 
@@ -14,7 +15,7 @@ def request_id(request: Request) -> str:
 def success(data: Any, request: Request, *, status_code: int = 200) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
-        content={"data": data, "meta": {"requestId": request_id(request)}},
+        content={"data": jsonable_encoder(data), "meta": {"requestId": request_id(request)}},
     )
 
 

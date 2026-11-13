@@ -13,14 +13,18 @@ REQUIRED_TABLES = (
     "user_profiles",
     "notification_consents",
     "festivals",
+    "festival_operating_hours",
     "groups",
     "group_members",
+    "group_join_requests",
+    "group_comments",
     "group_messages",
     "group_schedules",
     "schedule_proposals",
     "matching_runs",
     "matching_candidates",
     "alerts",
+    "alert_answers",
     "external_sync_runs",
 )
 
