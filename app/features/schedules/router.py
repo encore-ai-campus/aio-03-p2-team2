@@ -4,7 +4,7 @@ from fastapi import APIRouter, Header, Request
 
 from app.core.api import APIError, success
 from app.core.repositories import RepositoryError, SupabaseRepository, get_repository
-from app.core.schemas import ProposalAction, ProposalCreate, ScheduleValidateRequest
+from .schemas import ProposalAction, ProposalCreate, ScheduleValidateRequest
 
 router = APIRouter(tags=["schedules"])
 

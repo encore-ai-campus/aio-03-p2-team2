@@ -4,7 +4,7 @@ from fastapi import APIRouter, Header, Request
 
 from app.core.api import APIError, success
 from app.core.repositories import SupabaseRepository, get_repository
-from app.core.schemas import NotificationConsentPatch, ProfilePatch
+from .schemas import NotificationConsentPatch, ProfilePatch
 
 router = APIRouter(tags=["users"])
 

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Header, Query, Request
 from app.core.api import APIError, success
 from app.core.config import get_settings
 from app.core.repositories import SupabaseRepository, get_repository
-from app.core.schemas import FestivalImportRequest
+from .schemas import FestivalImportRequest
 
 router = APIRouter(prefix="/festivals", tags=["festivals"])
 admin_router = APIRouter(prefix="/admin", tags=["admin"])

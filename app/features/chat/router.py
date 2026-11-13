@@ -7,7 +7,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from app.core.api import APIError, success
 from app.core.repositories import SupabaseRepository, get_repository
-from app.core.schemas import MessageCreate
+from .schemas import MessageCreate
 
 router = APIRouter(tags=["chat"])
 connections: dict[str, set[WebSocket]] = defaultdict(set)

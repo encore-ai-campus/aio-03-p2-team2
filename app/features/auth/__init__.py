@@ -1,1 +1,1 @@
-from .router import router
+"""Authentication and user profile domain package."""

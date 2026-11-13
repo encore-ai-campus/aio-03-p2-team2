@@ -1,1 +1,1 @@
-from .router import admin_router, router
+"""Festival domain package."""

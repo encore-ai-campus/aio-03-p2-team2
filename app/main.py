@@ -10,7 +10,13 @@ from fastapi.responses import JSONResponse
 from app.core.api import APIError, error_response
 from app.core.config import get_settings
 from app.core.database import Database, database_status
-from app.features import alerts, auth, chat, festivals, groups, matching, schedules
+from app.features.alerts.router import admin_router as alerts_admin_router, router as alerts_router
+from app.features.auth.router import router as auth_router
+from app.features.chat.router import router as chat_router
+from app.features.festivals.router import admin_router as festivals_admin_router, router as festivals_router
+from app.features.groups.router import router as groups_router
+from app.features.matching.router import router as matching_router
+from app.features.schedules.router import router as schedules_router
 
 settings = get_settings()
 database = Database(settings)
@@ -74,8 +80,8 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     )
 
 
-for feature in (auth, festivals, matching, groups, chat, schedules, alerts):
-    app.include_router(feature.router, prefix=settings.api_prefix)
+for feature in (auth_router, festivals_router, matching_router, groups_router, chat_router, schedules_router, alerts_router):
+    app.include_router(feature, prefix=settings.api_prefix)
 
-app.include_router(festivals.admin_router, prefix=settings.api_prefix)
-app.include_router(alerts.admin_router, prefix=settings.api_prefix)
+app.include_router(festivals_admin_router, prefix=settings.api_prefix)
+app.include_router(alerts_admin_router, prefix=settings.api_prefix)

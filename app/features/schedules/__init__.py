@@ -1,1 +1,1 @@
-from .router import router
+"""Group schedule domain package."""

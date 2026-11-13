@@ -6,7 +6,7 @@ from fastapi import APIRouter, Header, Query, Request, Response
 
 from app.core.api import APIError, success
 from app.core.repositories import RepositoryError, SupabaseRepository, get_repository
-from app.core.schemas import CommentCreate, GroupCreate, GroupUpdate, JoinRequestCreate, RejectRequest, VersionRequest
+from .schemas import CommentCreate, GroupCreate, GroupUpdate, JoinRequestCreate, RejectRequest, VersionRequest
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 

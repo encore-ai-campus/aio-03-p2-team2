@@ -6,7 +6,7 @@ from fastapi import APIRouter, Header, Query, Request
 
 from app.core.api import APIError, success
 from app.core.repositories import SupabaseRepository, get_repository
-from app.core.schemas import MatchingParseRequest, MatchingRunRequest
+from .schemas import MatchingParseRequest, MatchingRunRequest
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
