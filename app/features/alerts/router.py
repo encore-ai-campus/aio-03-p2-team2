@@ -2,21 +2,16 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.api import APIError, success
+from app.core.auth import current_user_id, require_admin, require_current_user
 from app.core.config import get_settings
 from app.core.repositories import SupabaseRepository, get_repository
 from .schemas import AlertAnswer
 
-router = APIRouter(prefix="/alerts", tags=["alerts"])
-admin_router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
+router = APIRouter(prefix="/alerts", tags=["alerts"], dependencies=[Depends(require_current_user)])
+admin_router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 def require_development() -> None:
@@ -40,36 +35,36 @@ async def get_sync_job(job_id: str, request: Request):
 
 
 @router.get("", operation_id="listAlerts")
-async def list_alerts(request: Request, status: str | None = None, type: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"), x_demo_user_id: str | None = Header(default=None)):
+async def list_alerts(request: Request, status: str | None = None, type: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize")):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     items = await repository.alerts(user_id, status, type)
     start = (page - 1) * page_size
     return success({"items": items[start : start + page_size], "page": page, "pageSize": page_size, "total": len(items)}, request)
 
 
 @router.patch("/{alert_id}/read", operation_id="markAlertRead")
-async def mark_read(alert_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def mark_read(alert_id: str, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     await own_alert(alert_id, user_id, repository)
     alert = await repository.update_alert(alert_id, user_id, status="read")
     return success(alert, request)
 
 
 @router.post("/{alert_id}/answer", operation_id="answerAlert")
-async def answer_alert(alert_id: str, payload: AlertAnswer, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def answer_alert(alert_id: str, payload: AlertAnswer, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     await own_alert(alert_id, user_id, repository)
     alert = await repository.update_alert(alert_id, user_id, choice=payload.answer)
     return success(alert, request)
 
 
 @router.get("/{alert_id}/alternatives", operation_id="getAlertAlternatives")
-async def alert_alternatives(alert_id: str, request: Request, limit: int = Query(default=5, ge=1, le=20), x_demo_user_id: str | None = Header(default=None)):
+async def alert_alternatives(alert_id: str, request: Request, limit: int = Query(default=5, ge=1, le=20)):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     alert = await own_alert(alert_id, user_id, repository)
     source = await repository.festival(alert["festivalId"])
     if not source:

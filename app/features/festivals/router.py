@@ -2,21 +2,16 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.api import APIError, success
+from app.core.auth import current_user_id, require_admin, require_current_user
 from app.core.config import get_settings
-from app.core.repositories import SupabaseRepository, get_repository
+from app.core.repositories import get_repository
 from .schemas import FestivalImportRequest
 
 router = APIRouter(prefix="/festivals", tags=["festivals"])
-admin_router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
+admin_router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 def require_development() -> None:
@@ -72,9 +67,9 @@ async def get_festival(festival_id: str, request: Request):
 
 
 @router.get("/{festival_id}/alternatives", operation_id="getFestivalAlternatives")
-async def alternatives(festival_id: str, request: Request, group_id: str | None = Query(default=None, alias="groupId"), limit: int = Query(default=5, ge=1, le=20), x_demo_user_id: str | None = Header(default=None)):
+async def alternatives(festival_id: str, request: Request, group_id: str | None = Query(default=None, alias="groupId"), limit: int = Query(default=5, ge=1, le=20), _auth: object = Depends(require_current_user)):
     repository = get_repository(request)
-    await require_demo(x_demo_user_id, repository)
+    current_user_id(request)
     source = await repository.festival(festival_id)
     if not source:
         raise APIError(404, "FESTIVAL_NOT_FOUND", "축제를 찾을 수 없습니다.")

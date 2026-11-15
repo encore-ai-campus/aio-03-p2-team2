@@ -2,21 +2,16 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from app.core.api import APIError, success
+from app.core.auth import authenticate_websocket, current_user_id, require_current_user
 from app.core.repositories import SupabaseRepository, get_repository
 from .schemas import MessageCreate
 
-router = APIRouter(tags=["chat"])
+router = APIRouter(tags=["chat"], dependencies=[Depends(require_current_user)])
 connections: dict[str, set[WebSocket]] = defaultdict(set)
-
-
-async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
 
 
 async def member_group(group_id: str, user_id: str, repository: SupabaseRepository) -> dict:
@@ -40,18 +35,18 @@ async def broadcast(group_id: str, message: dict) -> None:
 
 
 @router.get("/groups/{group_id}/messages", operation_id="listMessages")
-async def list_messages(group_id: str, request: Request, before: str | None = None, after: str | None = None, limit: int = Query(default=50, ge=1, le=100), x_demo_user_id: str | None = Header(default=None)):
+async def list_messages(group_id: str, request: Request, before: str | None = None, after: str | None = None, limit: int = Query(default=50, ge=1, le=100)):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     await member_group(group_id, user_id, repository)
     items = await repository.messages(group_id, before=before, after=after, limit=limit)
     return success({"items": items, "nextCursor": items[0]["id"] if items else None}, request)
 
 
 @router.post("/groups/{group_id}/messages", operation_id="createMessage", status_code=201)
-async def create_message(group_id: str, payload: MessageCreate, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def create_message(group_id: str, payload: MessageCreate, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     await member_group(group_id, user_id, repository)
     message = await repository.add_message(group_id, user_id, payload.text, payload.client_message_id)
     await broadcast(group_id, message)
@@ -59,9 +54,9 @@ async def create_message(group_id: str, payload: MessageCreate, request: Request
 
 
 @router.get("/groups/{group_id}/events", operation_id="listGroupEvents")
-async def list_events(group_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def list_events(group_id: str, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     await member_group(group_id, user_id, repository)
     messages = await repository.messages(group_id, before=None, after=None, limit=100)
     return success({"items": [{"event": "chat.message.created", "data": message} for message in messages], "nextCursor": None}, request)
@@ -70,10 +65,14 @@ async def list_events(group_id: str, request: Request, x_demo_user_id: str | Non
 @router.websocket("/ws/groups/{group_id}/chat")
 async def chat_socket(websocket: WebSocket, group_id: str):
     repository = get_repository(websocket)
-    user_id = websocket.query_params.get("demoUserId")
-    if not user_id or not await repository.user(user_id):
-        await websocket.close(code=1008, reason="DEMO_USER_INVALID")
+    database = websocket.app.state.database
+    context_token = None
+    try:
+        current_user, context_token = await authenticate_websocket(websocket)
+    except APIError as error:
+        await websocket.close(code=1008, reason=error.code)
         return
+    user_id = current_user.id
     group = await repository.group(group_id, include_comments=False)
     if not group:
         await websocket.close(code=1008, reason="GROUP_NOT_FOUND")
@@ -97,3 +96,5 @@ async def chat_socket(websocket: WebSocket, group_id: str):
         pass
     finally:
         connections[group_id].discard(websocket)
+        if context_token is not None:
+            database.reset_auth_claims(context_token)

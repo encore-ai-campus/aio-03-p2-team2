@@ -1,5 +1,19 @@
 # FestaMate Backend
 
+## 현재 인증 방식
+
+보호된 REST API는 Supabase Auth access token을 요구합니다.
+
+```http
+Authorization: Bearer <supabase-access-token>
+```
+
+백엔드는 JWT의 `sub`를 `public.users.auth_user_id`와 연결해 애플리케이션 사용자를 결정합니다. `X-Demo-User-Id`와 WebSocket의 `demoUserId`는 더 이상 인증 수단으로 사용하지 않습니다. WebSocket은 `Authorization: Bearer ...` 헤더 또는 브라우저 환경을 위한 단기 `access_token` 쿼리 토큰을 사용합니다.
+
+DB에는 [`db/supabase_auth_rls.sql`](db/supabase_auth_rls.sql)을 base schema 이후 실행해야 합니다. 이 마이그레이션은 Auth 사용자 매핑, 신규 사용자 생성 트리거, RLS 정책을 추가합니다. 백엔드의 asyncpg 연결은 요청 JWT를 `request.jwt.claims`에 전달하고 `authenticated`/`anon` 역할로 전환한 뒤, 연결 반환 전에 역할을 복원합니다.
+
+필수 환경변수는 `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_JWT_ISSUER`입니다. 비대칭 Supabase signing key를 사용할 때는 JWKS를 사용하므로 `SUPABASE_JWT_SECRET`은 비워 둡니다. 기존 HS256 프로젝트에서만 JWT secret을 별도로 설정합니다.
+
 FestaMate 팀 개발용 FastAPI 백엔드입니다. React 프론트엔드(`aio-03-p2-2team-Frontend`)와 별도 레포로 관리하며, 프론트의 `DemoProvider → demoModel → localStorage` 목업 흐름을 향후 REST/WebSocket API로 교체할 수 있도록 API 계약을 구현합니다.
 
 ## 아키텍처 검토
@@ -30,7 +44,7 @@ React
        └─ WebSocket 채팅
 ```
 
-현재 프론트와 백엔드는 아직 자동 연결하지 않습니다. 이번 백엔드 MVP는 프론트가 API 계약을 확인할 수 있도록 데모 사용자와 인메모리 샘플 데이터를 제공합니다. 따라서 프로세스를 재시작하면 데이터가 초기화됩니다. Supabase Auth, PostgreSQL, 외부 API 수집, OpenAI/LangGraph 연동은 다음 단계입니다.
+기능 API는 `get_repository()`를 통해 도메인별 Repository를 사용하며, `DATABASE_URL`이 설정되면 Supabase PostgreSQL의 실제 CRUD 쿼리를 실행합니다. `app/core/store.py`의 인메모리 데이터는 이전 데모 구현을 위한 레거시 샘플이며 현재 라우터에서는 호출하지 않습니다. 보호 API는 Supabase Auth JWT와 RLS를 사용합니다.
 
 ## 기술 스택
 
@@ -73,7 +87,7 @@ DATABASE_POOL_MIN_SIZE=1
 DATABASE_POOL_MAX_SIZE=5
 ```
 
-연결 확인은 `GET /health/db`에서 합니다. 응답이 `disabled`이면 `DATABASE_URL`이 없는 인메모리 데모 모드이고, `connected`이면 연결과 필수 핵심 테이블 확인까지 통과한 상태입니다. `schema_missing`이면 연결은 됐지만 DB 설계서의 필수 테이블이 아직 생성되지 않은 상태입니다.
+연결 확인은 `GET /health/db`에서 합니다. `connected`이면 연결과 필수 테이블 확인까지 통과한 상태이며, `schema_missing`이면 연결은 됐지만 DB 설계서의 필수 테이블이 아직 생성되지 않은 상태입니다. `DATABASE_URL`이 없으면 기능 API는 자동으로 인메모리로 전환되지 않고 `503 DATABASE_UNAVAILABLE`을 반환합니다. 로컬에서도 실제 CRUD를 검증하려면 Supabase/PostgreSQL 연결을 설정해야 합니다.
 
 Supabase SQL Editor에는 제공된 `festamate_schema_v4.3.txt`를 먼저 실행해야 합니다. 이 SQL은 `auth.users`, RLS, 승인 트랜잭션 함수를 포함하므로 운영 환경에서는 service-role 키와 RLS 정책을 함께 관리해야 합니다. API·DB 상세 불일치 검토는 [`docs/api-db-review.md`](docs/api-db-review.md)에 기록했습니다.
 
@@ -99,24 +113,24 @@ API 기능 경로의 기본 접두어는 `/api/v1`입니다. 성공 응답은 `{
 
 ### 개발용 사용자 식별
 
-인증 기능은 아직 구현하지 않습니다. 데모 사용자가 필요한 REST 요청은 다음 헤더를 사용합니다.
+보호 API는 Supabase Auth access token이 필요합니다. REST 요청은 다음 헤더를 사용합니다.
 
 ```http
-X-Demo-User-Id: usr_demo_01
+Authorization: Bearer <supabase-access-token>
 ```
 
-기본 데모 사용자는 `usr_demo_01`, `usr_demo_02`, `usr_demo_03`입니다. WebSocket은 브라우저 제약으로 다음 쿼리를 사용합니다.
+WebSocket은 `Authorization` 헤더를 우선 사용하고, 브라우저 native WebSocket에서 헤더를 설정할 수 없는 경우에만 `access_token` 쿼리를 사용합니다.
 
 ```text
-/api/v1/ws/groups/{groupId}/chat?demoUserId=usr_demo_01
+/api/v1/ws/groups/{groupId}/chat?access_token=<supabase-access-token>
 ```
 
-이 식별자는 신원 확인이나 공개 서비스 보안 수단이 아닙니다. 실제 배포 전 Supabase Auth와 RLS로 교체해야 합니다.
+JWT 서명과 RLS가 신원 및 데이터 접근 범위를 검증합니다. `X-Demo-User-Id`와 `demoUserId`는 지원하지 않습니다.
 
 ### 상태 전이와 권한
 
 - 공개 축제·모임·댓글 조회는 사용자 ID 없이 가능합니다.
-- 프로필 변경, 참여 신청, 알림은 대상 데모 사용자와 헤더 ID가 일치해야 합니다.
+- 프로필 변경, 참여 신청, 알림은 JWT로 확인된 현재 사용자만 수행할 수 있습니다.
 - 채팅·일정 조회는 모임 멤버만 가능합니다.
 - 참여 신청 승인·거절과 일정 제안·확정은 모임장만 가능합니다.
 - 정원이 차면 모임 상태가 `full`이 되며, 멤버 추가는 원자적 저장소 구역에서 정원을 다시 확인합니다.
@@ -132,7 +146,10 @@ app/
 │   ├── api.py                       # 표준 응답·오류
 │   ├── config.py                    # 환경 설정
 │   ├── schemas.py                   # 공통 요청 모델
-│   └── store.py                     # 현재 MVP 인메모리 저장소·샘플 데이터
+│   ├── database.py                   # Supabase PostgreSQL pool 및 스키마 health check
+│   ├── repository.py                 # 공통 DB 오류·타입 변환
+│   ├── repositories.py               # 도메인 Repository facade
+│   └── store.py                      # 레거시 데모 샘플(기능 API에서 미사용)
 └── features/
     ├── auth/                        # 현재 /users 계약, 인증은 별도 과제
     ├── festivals/
@@ -145,9 +162,9 @@ app/
 
 ## 다음 작업
 
-1. 프론트 API client와 `X-Demo-User-Id` 연결
+1. 프론트 API client에 Supabase Auth access token 연결
 2. Supabase PostgreSQL 스키마와 RLS 도입
 3. 외부 축제·날씨 수집 worker 및 job 상태 조회 API 추가
 4. OpenAI/LangGraph 기반 매칭·일정 제안으로 교체
 5. WebSocket 브로커/Redis와 rate limit, 감사 로그, 콘텐츠 sanitizing 보강
-6. Supabase Auth 도입 후 데모 헤더 제거
+6. Supabase Auth/RLS 운영 키와 정책 검증, 사용자 매핑 데이터 backfill

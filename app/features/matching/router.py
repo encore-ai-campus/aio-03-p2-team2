@@ -2,19 +2,14 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.api import APIError, success
-from app.core.repositories import SupabaseRepository, get_repository
+from app.core.auth import current_user_id, require_current_user
+from app.core.repositories import get_repository
 from .schemas import MatchingParseRequest, MatchingRunRequest
 
-router = APIRouter(prefix="/matching", tags=["matching"])
-
-
-async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
+router = APIRouter(prefix="/matching", tags=["matching"], dependencies=[Depends(require_current_user)])
 
 
 def parse_slots(text: str, festivals: list[dict]) -> dict:
@@ -75,16 +70,16 @@ def candidate(conditions: dict, user: dict) -> dict:
 
 
 @router.post("/parse", operation_id="parseMatchingText")
-async def parse_matching(payload: MatchingParseRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def parse_matching(payload: MatchingParseRequest, request: Request):
     repository = get_repository(request)
-    await require_demo(x_demo_user_id, repository)
+    current_user_id(request)
     return success(parse_slots(payload.text, await repository.festivals()), request)
 
 
 @router.post("/runs", operation_id="createMatchingRun", status_code=201)
-async def create_run(payload: MatchingRunRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def create_run(payload: MatchingRunRequest, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     festival = await repository.festival(payload.festival_id)
     if not festival or festival["riskStatus"] == "cancelled":
         raise APIError(422, "FESTIVAL_NOT_AVAILABLE", "매칭할 수 없는 축제입니다.")
@@ -102,9 +97,9 @@ async def create_run(payload: MatchingRunRequest, request: Request, x_demo_user_
 
 
 @router.get("/runs/{run_id}", operation_id="getMatchingRun")
-async def get_run(run_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def get_run(run_id: str, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     run = await repository.matching_run(run_id, user_id)
     if not run:
         raise APIError(404, "MATCHING_RUN_NOT_FOUND", "매칭 실행을 찾을 수 없습니다.")
@@ -112,12 +107,11 @@ async def get_run(run_id: str, request: Request, x_demo_user_id: str | None = He
 
 
 @router.get("/runs/{run_id}/candidates", operation_id="listMatchingCandidates")
-async def list_candidates(run_id: str, request: Request, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"), x_demo_user_id: str | None = Header(default=None)):
+async def list_candidates(run_id: str, request: Request, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize")):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
-    run = await repository.matching_run(run_id, user_id)
-    if not run:
+    user_id = current_user_id(request)
+    if not await repository.matching_run_exists(run_id, user_id):
         raise APIError(404, "MATCHING_RUN_NOT_FOUND", "매칭 실행을 찾을 수 없습니다.")
     start = (page - 1) * page_size
-    items = run["candidates"][start : start + page_size]
-    return success({"items": items, "page": page, "pageSize": page_size, "total": len(run["candidates"])}, request)
+    items, total = await repository.matching_candidates(run_id, user_id, offset=start, limit=page_size)
+    return success({"items": items, "page": page, "pageSize": page_size, "total": total}, request)

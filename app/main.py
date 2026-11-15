@@ -30,7 +30,7 @@ async def lifespan(_app: FastAPI):
     await database.close()
 
 
-app = FastAPI(title="FestaMate MVP API (No Auth)", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="FestaMate MVP API", version="1.2.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,

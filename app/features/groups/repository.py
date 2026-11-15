@@ -55,6 +55,53 @@ class GroupRepositoryMixin(RepositoryBase):
         rows = await self._pool().fetch(f"select id from groups where {' and '.join(clauses)} order by created_at desc", *args)
         return [await self.group(row["id"], include_comments=False) for row in rows]  # type: ignore[misc]
 
+    async def comments(self, group_id: str, *, offset: int = 0, limit: int = 20) -> tuple[list[dict], int]:
+        """Read comments from PostgreSQL with server-side pagination."""
+        pool = self._pool()
+        total = await pool.fetchval(
+            "select count(*) from group_comments where group_id=$1 and deleted_at is null",
+            group_id,
+        )
+        rows = await pool.fetch(
+            """
+            select c.id, c.group_id, c.author_id, c.text, c.created_at, u.display_name
+            from group_comments c
+            join users u on u.id = c.author_id
+            where c.group_id=$1 and c.deleted_at is null
+            order by c.created_at asc, c.id asc
+            offset $2 limit $3
+            """,
+            group_id,
+            offset,
+            limit,
+        )
+        return [self._comment_view(row) for row in rows], int(total or 0)
+
+    async def join_requests(
+        self,
+        group_id: str,
+        *,
+        status: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[dict], int]:
+        """Read join requests from PostgreSQL with server-side pagination."""
+        clauses = ["group_id=$1"]
+        args: list[Any] = [group_id]
+        if status:
+            args.append(status)
+            clauses.append(f"status=${len(args)}")
+        where = " and ".join(clauses)
+        pool = self._pool()
+        total = await pool.fetchval(f"select count(*) from group_join_requests where {where}", *args)
+        args.extend([offset, limit])
+        rows = await pool.fetch(
+            f"select id, group_id, user_id, message, status, reason, decided_by, decided_at, created_at, updated_at "
+            f"from group_join_requests where {where} order by created_at asc, id asc offset ${len(args)-1} limit ${len(args)}",
+            *args,
+        )
+        return [self._join_request_view(row) for row in rows], int(total or 0)
+
     async def create_group(self, user_id: str, payload: dict) -> dict:
         group_id = f"grp_{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S%f')}"
         async with self._pool().acquire() as connection:
@@ -77,10 +124,14 @@ class GroupRepositoryMixin(RepositoryBase):
         for index, (key, value) in enumerate(fields, start=3):
             assignments.append(f"{mapping[key]} = ${index}"); args.append(value)
         assignments.extend(["version = version + 1", "updated_at = now()"])
-        row = await self._pool().fetchrow(f"update groups set {', '.join(assignments)} where id = $1 and version = $2 returning id", *args)
+        assignments.append("status = case when member_count >= capacity then 'full' else 'open' end")
+        row = await self._pool().fetchrow(
+            f"update groups set {', '.join(assignments)} where id = $1 and version = $2 "
+            "and (capacity >= member_count) and status not in ('closed','cancelled') returning id",
+            *args,
+        )
         if not row:
             return None
-        await self._pool().execute("update groups set status = case when member_count >= capacity then 'full' else 'open' end where id = $1 and status not in ('closed','cancelled')", group_id)
         return await self.group(group_id)
 
     async def add_comment(self, group_id: str, user_id: str, text: str) -> dict:
@@ -157,14 +208,25 @@ class GroupRepositoryMixin(RepositoryBase):
         return {"membership": member, "group": group_view}
 
     async def reject_join_request(self, group_id: str, request_id: str, leader_id: str, version: int, reason: str | None) -> dict | None:
-        group = await self._pool().fetchrow("select leader_id, version from groups where id=$1", group_id)
-        if not group:
-            raise RepositoryError("GROUP_NOT_FOUND", "모임을 찾을 수 없습니다.", 404)
-        if group["leader_id"] != leader_id:
-            raise RepositoryError("LEADER_ONLY", "모임장만 수행할 수 있습니다.", 403)
-        if group["version"] != version:
-            raise RepositoryError("RESOURCE_VERSION_CONFLICT", "리소스 버전이 변경되었습니다.", 409)
-        row = await self._pool().fetchrow("update group_join_requests set status='rejected', reason=$1, decided_by=$2, decided_at=now(), updated_at=now() where id=$3 and group_id=$4 and status='pending' returning *", reason, leader_id, request_id, group_id)
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                group = await connection.fetchrow("select leader_id, version from groups where id=$1 for update", group_id)
+                if not group:
+                    raise RepositoryError("GROUP_NOT_FOUND", "모임을 찾을 수 없습니다.", 404)
+                if group["leader_id"] != leader_id:
+                    raise RepositoryError("LEADER_ONLY", "모임장만 수행할 수 있습니다.", 403)
+                if group["version"] != version:
+                    raise RepositoryError("RESOURCE_VERSION_CONFLICT", "리소스 버전이 변경되었습니다.", 409)
+                row = await connection.fetchrow(
+                    "update group_join_requests set status='rejected', reason=$1, decided_by=$2, decided_at=now(), updated_at=now() "
+                    "where id=$3 and group_id=$4 and status='pending' returning *",
+                    reason,
+                    leader_id,
+                    request_id,
+                    group_id,
+                )
+                if row:
+                    await connection.execute("update groups set version=version+1, updated_at=now() where id=$1", group_id)
         return self._join_request_view(row) if row else None
 
     async def leave_group(self, group_id: str, user_id: str) -> None:
