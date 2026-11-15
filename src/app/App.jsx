@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { DemoProvider, paths, useDemo } from "./DemoProvider.jsx";
+import { AuthProvider } from "../features/auth/AuthProvider.jsx";
+import RequireAuth from "../features/auth/components/RequireAuth.jsx";
+import LoginPage from "../features/auth/pages/LoginPage.jsx";
 import AppLayout from "../shared/components/AppLayout.jsx";
 import FestivalExplorePage from "../features/festivals/pages/FestivalExplorePage.jsx";
 import MatchingPage from "../features/matching/pages/MatchingPage.jsx";
@@ -14,20 +17,27 @@ function HomeRedirect() {
 }
 export default function App() {
   return (
-    <DemoProvider>
-      <Routes>
-        <Route element={<AppLayout />}>
-          <Route index element={<HomeRedirect />} />
-          <Route path="festivals" element={<FestivalExplorePage />} />
-          <Route path="matching" element={<MatchingPage />} />
-          <Route path="groups" element={<CommunityPage />} />
-          <Route path="chat" element={<ChatPage />} />
-          <Route path="schedules" element={<SchedulePage />} />
-          <Route path="alerts" element={<AlertsPage />} />
-          <Route path="team" element={<TeamPage />} />
-          <Route path="*" element={<Navigate to="/festivals" replace />} />
-        </Route>
-      </Routes>
-    </DemoProvider>
+    <AuthProvider>
+      <DemoProvider>
+        <Routes>
+          {/* 로그인 없이 볼 수 있는 화면 */}
+          <Route path="login" element={<LoginPage />} />
+          {/* 로그인해야 볼 수 있는 화면 */}
+          <Route element={<RequireAuth />}>
+            <Route element={<AppLayout />}>
+              <Route index element={<HomeRedirect />} />
+              <Route path="festivals" element={<FestivalExplorePage />} />
+              <Route path="matching" element={<MatchingPage />} />
+              <Route path="groups" element={<CommunityPage />} />
+              <Route path="chat" element={<ChatPage />} />
+              <Route path="schedules" element={<SchedulePage />} />
+              <Route path="alerts" element={<AlertsPage />} />
+              <Route path="team" element={<TeamPage />} />
+              <Route path="*" element={<Navigate to="/festivals" replace />} />
+            </Route>
+          </Route>
+        </Routes>
+      </DemoProvider>
+    </AuthProvider>
   );
 }

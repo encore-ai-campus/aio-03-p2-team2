@@ -1,0 +1,18 @@
+/* 로그인 화면 전용 스타일 (웹 기준, 가운데 카드) */
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--bg); }
+.auth-card { width: 100%; max-width: 420px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 32px; display: grid; gap: 20px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand b { display: block; font-size: 18px; }
+.auth-brand small { color: var(--sub); font-size: 11px; letter-spacing: 0.04em; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; background: #f1f4f8; border-radius: 12px; padding: 4px; }
+.auth-tabs button { border: 0; background: transparent; padding: 9px; border-radius: 9px; font-weight: 800; color: var(--sub); }
+.auth-tabs button.active { background: var(--white); color: var(--ink); box-shadow: 0 2px 8px rgba(35, 48, 70, 0.08); }
+.auth-form { display: grid; gap: 14px; }
+.auth-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 800; color: #4a5d73; }
+.auth-form input { border: 1px solid #dfe5ed; border-radius: 10px; padding: 11px 12px; background: var(--white); color: var(--ink); font-size: 14px; font-weight: 400; }
+.auth-form .btn { padding: 12px; margin-top: 4px; }
+.auth-msg { margin: 0; font-size: 12.5px; padding: 10px 12px; border-radius: 10px; }
+.auth-msg.error { background: #fff1ed; color: #d34a41; }
+.auth-msg.notice { background: #eaf8f2; color: var(--green); }
+.auth-loading { min-height: 100vh; display: grid; place-items: center; color: var(--sub); }
+.auth-user { font-size: 12px; color: var(--sub); white-space: nowrap; }
