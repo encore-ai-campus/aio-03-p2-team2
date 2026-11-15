@@ -115,9 +115,8 @@ async def get_run(run_id: str, request: Request, x_demo_user_id: str | None = He
 async def list_candidates(run_id: str, request: Request, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"), x_demo_user_id: str | None = Header(default=None)):
     repository = get_repository(request)
     user_id = await require_demo(x_demo_user_id, repository)
-    run = await repository.matching_run(run_id, user_id)
-    if not run:
+    if not await repository.matching_run_exists(run_id, user_id):
         raise APIError(404, "MATCHING_RUN_NOT_FOUND", "매칭 실행을 찾을 수 없습니다.")
     start = (page - 1) * page_size
-    items = run["candidates"][start : start + page_size]
-    return success({"items": items, "page": page, "pageSize": page_size, "total": len(run["candidates"])}, request)
+    items, total = await repository.matching_candidates(run_id, user_id, offset=start, limit=page_size)
+    return success({"items": items, "page": page, "pageSize": page_size, "total": total}, request)

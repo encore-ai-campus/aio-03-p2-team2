@@ -90,10 +90,12 @@ async def update_group(group_id: str, payload: GroupUpdate, request: Request, x_
 
 @router.get("/{group_id}/comments", operation_id="listComments")
 async def list_comments(group_id: str, request: Request, cursor: str | None = None, limit: int = Query(default=20, ge=1, le=100)):
-    group = await get_group(group_id, get_repository(request))
+    repository = get_repository(request)
+    if not await repository.group(group_id, include_comments=False):
+        raise APIError(404, "GROUP_NOT_FOUND", "모임을 찾을 수 없습니다.")
     start = int(cursor) if cursor and cursor.isdigit() else 0
-    items = group["comments"][start : start + limit]
-    next_cursor = str(start + limit) if start + limit < len(group["comments"]) else None
+    items, total = await repository.comments(group_id, offset=start, limit=limit)
+    next_cursor = str(start + limit) if start + limit < total else None
     return success({"items": items, "nextCursor": next_cursor}, request)
 
 
@@ -124,9 +126,9 @@ async def list_join_requests(group_id: str, request: Request, status: str | None
     user_id = await require_demo(x_demo_user_id, repository)
     group = await get_group(group_id, repository)
     require_leader(group, user_id)
-    items = [item for item in group["joinRequests"] if not status or item["status"] == status]
     start = (page - 1) * page_size
-    return success({"items": items[start : start + page_size], "page": page, "pageSize": page_size, "total": len(items)}, request)
+    items, total = await repository.join_requests(group_id, status=status, offset=start, limit=page_size)
+    return success({"items": items, "page": page, "pageSize": page_size, "total": total}, request)
 
 
 @router.post("/{group_id}/join-requests", operation_id="createJoinRequest", status_code=201)

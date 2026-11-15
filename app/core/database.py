@@ -30,11 +30,11 @@ REQUIRED_TABLES = (
 
 
 class Database:
-    """Optional PostgreSQL pool used by the API process.
+    """Supabase PostgreSQL connection pool used by the API process.
 
-    The MVP remains runnable without DATABASE_URL. Once it is configured, the
-    pool is opened during FastAPI startup and can be used by repositories and
-    transaction functions backed by the supplied Supabase schema.
+    The pool is opened during FastAPI startup. Repositories fail explicitly
+    with a 503 when it is not configured instead of silently switching to the
+    legacy in-memory demo fixture.
     """
 
     def __init__(self, settings: Settings) -> None:

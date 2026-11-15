@@ -62,6 +62,8 @@ class AuthRepositoryMixin(RepositoryBase):
         }
 
     async def update_profile(self, user_id: str, values: dict[str, Any]) -> dict | None:
+        if not await self.user(user_id):
+            return None
         if not values:
             return await self.user(user_id)
         mapping = {
@@ -81,25 +83,39 @@ class AuthRepositoryMixin(RepositoryBase):
         for index, (column, value) in enumerate(fields, start=2):
             assignments.append(f"{column} = ${index}")
             args.append(_time(value) if column == "available_from" else value)
-        await self._pool().execute(
-            f"update user_profiles set {', '.join(assignments)}, updated_at = now() where user_id = $1",
-            *args,
-        )
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "insert into user_profiles (user_id) values ($1) on conflict (user_id) do nothing",
+                    user_id,
+                )
+                await connection.execute(
+                    f"update user_profiles set {', '.join(assignments)}, updated_at = now() where user_id = $1",
+                    *args,
+                )
         return await self.user(user_id)
 
     async def update_consents(self, user_id: str, values: dict[str, Any]) -> dict | None:
+        if not await self.user(user_id):
+            return None
         mapping = {"push": "push", "email": "email", "riskAlert": "risk_alert"}
         fields = [(mapping[key], value) for key, value in values.items() if key in mapping]
-        if fields:
-            assignments = []
-            args: list[Any] = [user_id]
-            for index, (column, value) in enumerate(fields, start=2):
-                assignments.append(f"{column} = ${index}")
-                args.append(value)
-            await self._pool().execute(
-                f"update notification_consents set {', '.join(assignments)}, updated_at = now() where user_id = $1",
-                *args,
-            )
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                await connection.execute(
+                    "insert into notification_consents (user_id) values ($1) on conflict (user_id) do nothing",
+                    user_id,
+                )
+                if fields:
+                    assignments = []
+                    args: list[Any] = [user_id]
+                    for index, (column, value) in enumerate(fields, start=2):
+                        assignments.append(f"{column} = ${index}")
+                        args.append(value)
+                    await connection.execute(
+                        f"update notification_consents set {', '.join(assignments)}, updated_at = now() where user_id = $1",
+                        *args,
+                    )
         row = await self._pool().fetchrow(
             "select push, email, risk_alert from notification_consents where user_id = $1",
             user_id,

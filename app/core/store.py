@@ -15,7 +15,11 @@ def new_id(prefix: str) -> str:
 
 
 class InMemoryStore:
-    """MVP storage used until the Supabase/PostgreSQL layer is introduced."""
+    """Legacy demo fixture kept for isolated UI/mock experiments.
+
+    Runtime feature routers do not import this store; they use the domain
+    repositories backed by the Supabase PostgreSQL pool.
+    """
 
     def __init__(self) -> None:
         self.lock = RLock()

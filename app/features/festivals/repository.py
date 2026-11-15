@@ -80,13 +80,17 @@ class FestivalRepositoryMixin(RepositoryBase):
     async def upsert_festival(self, data: dict[str, Any]) -> dict:
         festival_id = data.get("id") or f"fst_{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S%f')}"
         venue = data.get("venue") or {}
+        source_updated_at = data.get("sourceUpdatedAt")
+        if isinstance(source_updated_at, str):
+            source_updated_at = datetime.fromisoformat(source_updated_at.replace("Z", "+00:00"))
+        source_updated_at = source_updated_at or datetime.now(timezone.utc)
         async with self._pool().acquire() as connection:
             async with connection.transaction():
                 await connection.execute(
                     """
                     insert into festivals (id, name, region, city, start_date, end_date, category, description,
                         tags, venue_name, venue_address, latitude, longitude, risk_status, source_updated_at)
-                    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,now())
+                    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
                     on conflict (id) do update set name=excluded.name, region=excluded.region,
                         city=excluded.city, start_date=excluded.start_date, end_date=excluded.end_date,
                         category=excluded.category, description=excluded.description, tags=excluded.tags,
@@ -95,7 +99,7 @@ class FestivalRepositoryMixin(RepositoryBase):
                         risk_status=excluded.risk_status, source_updated_at=now(), updated_at=now()
                     """,
                     festival_id, data["name"], data["region"], data.get("city"), date.fromisoformat(data["startDate"]), date.fromisoformat(data["endDate"]),
-                    data["category"], data.get("description", ""), data.get("tags", []), venue.get("name"), venue.get("address"), venue.get("latitude"), venue.get("longitude"), data.get("riskStatus", "normal"),
+                    data["category"], data.get("description", ""), data.get("tags", []), venue.get("name"), venue.get("address"), venue.get("latitude"), venue.get("longitude"), data.get("riskStatus", "normal"), source_updated_at,
                 )
                 await connection.execute("delete from festival_operating_hours where festival_id = $1", festival_id)
                 for item in data.get("operatingHours", []):
@@ -135,5 +139,6 @@ class FestivalRepositoryMixin(RepositoryBase):
         return {
             "jobId": row["id"], "status": row["status"], "kind": row["kind"],
             "accepted": row["accepted"], "rejected": row["rejected"], "rejections": row["rejections"],
-            "error": row["error"], "acceptedAt": _iso(row["created_at"]),
+            "error": row["error"], "createdAt": _iso(row["created_at"]),
+            "startedAt": _iso(row["started_at"]), "finishedAt": _iso(row["finished_at"]),
         }
