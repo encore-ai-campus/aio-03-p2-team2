@@ -44,7 +44,8 @@ class AgentService:
             await self.model.close()
 
     def config(self, run_id):
-        return {"configurable":{"thread_id":run_id},"recursion_limit":150}
+        limit = max(150, (self.settings.agent_max_iterations+1)*(self.settings.agent_max_tool_rounds*2+8)+30)
+        return {"configurable":{"thread_id":run_id},"recursion_limit":limit}
 
     async def user(self, user_id):
         if not user_id or not await self.repository.user(user_id):

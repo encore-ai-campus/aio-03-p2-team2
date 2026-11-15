@@ -10,16 +10,20 @@ flowchart TD
     B --> C[parse_request: 조건·의도 해석]
     C -->|누락| D[ask_user: 입력 대기]
     D -->|응답 후 재개| C
-    C -->|충분| E[plan_tools: 도구 조합 선택]
-    E --> F[execute_tools: 조회·통신 재시도]
-    F --> G[generate_candidate: 후보 생성]
+    C -->|충분| E[plan_tools: 조회 상태 초기화]
+    E --> T[choose_tools: OpenAI 도구 선택]
+    T -->|도구 요청| F[execute_tools: 인자 검증·조회·결과 반환]
+    F -->|조회 결과·인자 오류 피드백| T
+    T -->|필수 근거 조회 완료| G[generate_candidate: 후보 생성]
+    T -->|필수 조회 누락| T
+    T -->|선택 한도·모델 오류| Z[finalize: 결과·요약 저장]
     F -->|도구 오류| I[reflect_and_repair: 원인별 수정 전략]
     G --> H[validate_candidate: 독립 규칙 검증]
     H -->|조건 위반| I
     I -->|재생성| G
     I -->|최신 데이터 재조회| E
     I -->|추가 질문| D
-    I -->|한도·설정 오류| Z[finalize: 결과·요약 저장]
+    I -->|한도·설정 오류| Z
     H -->|추천 결과 정상| Z
     H -->|일정 정상| J[save_proposal: 초안 저장]
     J --> K[await_approval: 모임장 승인 대기]
@@ -39,15 +43,18 @@ flowchart TD
 | `schemas.py` | 실행·재개·조건·일정 출력 스키마 |
 | `state.py` | 노드 사이에 전달할 TypedDict |
 | `graph.py` | 노드, 조건 분기, 성찰 루프, 승인 및 재검증 |
-| `policy.py` | 도구 선택 정책, 날짜·시간·참여자·운영시간 검증 |
-| `providers.py` | rules와 OpenAI Structured Outputs 구현 |
+| `policy.py` | 최소 필수 조회, 날짜·시간·참여자·운영시간 검증 |
+| `tool_registry.py` | 읽기 도구 정의·인자 스키마·현재 요청 범위 검증 |
+| `providers.py` | OpenAI Function Calling·Structured Outputs, 규칙 기반 시험 모드 |
 | `tools.py` | 저장소 조회, Open-Meteo, TourAPI 어댑터 |
 | `memory.py` | 사용자 선호, 세션 요약, 실행 소유권 |
 | `service.py` | 그래프 생명주기, 시작·조회·재개, 동시 승인 방지 |
 | `router.py` | 에이전트 REST API |
 | `features/schedules/repository.py` | 검증된 초안·승인 결과의 DB 트랜잭션 |
 
-모델은 사용자 ID, SQL, 호출 URL, 승인 권한을 정하지 않습니다. 도구 선택은 서버 정책으로 제한하며 LLM Function Calling으로 도구를 자유 선택하는 구현은 아닙니다.
+OpenAI 모드는 Responses API Function Calling으로 도구와 인자를 선택합니다. 서버가 조회 결과 또는 인자 검증 오류를 `function_call_output`으로 돌려주면 모델이 다음 도구를 선택합니다. 모델이 조회를 끝내겠다고 해도 필수 근거가 없으면 누락 목록을 전달하고 다시 선택하게 합니다.
+
+모델은 허용된 읽기 도구만 요청할 수 있습니다. 서버가 스키마와 현재 festival_id·group_id·date를 대조하며 사용자 ID, SQL, 임의 URL, 승인·저장 도구를 모델에 제공하지 않습니다. 승인 후 재검증은 모델 선택과 별개로 축제·참여자·날씨를 반드시 새로 조회합니다.
 
 ## 상태와 기억
 
@@ -57,7 +64,9 @@ flowchart TD
 | `message`, `intent`, `conditions` | str/str/dict, 현재 요청 | parse_request, ask_user |
 | `explicit_conditions` | dict, 구조화 입력 우선순위 보존 | service, ask_user |
 | `context` | dict, 확인된 선호·대화 요약·최근 메시지 | load_context |
-| `tools`, `tool_results`, `tool_calls` | list/dict/list, 선택·결과·호출 기록 | plan_tools, execute_tools |
+| `tools`, `tool_results`, `tool_calls` | list/dict/list, 선택·결과·호출 기록 | choose_tools, execute_tools |
+| `tool_requests`, `tool_dialogue` | list, 함수 호출 요청·응답 연결 기록 | choose_tools, execute_tools |
+| `tool_round`, `tool_call_count`, `tool_ready` | int/int/bool, 선택 한도·호출 한도·근거 충족 | plan_tools, choose_tools, execute_tools |
 | `candidate`, `errors`, `repair` | dict/list/dict, 후보·위반·수정 전략 | generate, validate, reflect |
 | `iteration`, `tool_attempts` | int, 판단 수정과 통신 재시도 분리 | reflect, execute_tools |
 | `proposal_id`, `base_version`, `base_group_version` | 초안과 생성 기준 버전 | save_proposal |
@@ -73,16 +82,18 @@ flowchart TD
 
 ## 도구와 실행 모드
 
-| 의도 | 선택 도구 | 결과 |
+| 의도 | 최소 필수 도구 | 결과 |
 | --- | --- | --- |
 | scheduling | get_festival, get_availability, get_weather | 일정 초안 → 승인 → 반영 |
 | matching | get_festival, get_candidates, 우천 회피 시 get_weather | 가능 시간 필터 + 기존 점수 기반 후보 |
 | risk_response | get_festival, get_weather, search_festivals | 대체 축제 후보 안내, 자동 모임·축제 변경 없음 |
 
+모델은 허용된 도구 중 다음 조회를 선택하고 결과에 따라 추가 조회할 수 있습니다. 매칭에서 날씨 조회는 우천 회피 조건이 없으면 선택 사항이며, 대체 축제 검색은 관련 요청에서 추가로 선택할 수 있습니다.
+
 각 조회에 `source`, `mode`, `fetchedAt`, 공개 API URL을 붙입니다. 비밀 키를 포함한 요청 URL은 기록하지 않습니다.
 
 - `AGENT_MODEL_PROVIDER=rules`: 명시적인 오프라인 규칙 모델. LLM 호출이 아닙니다.
-- `AGENT_MODEL_PROVIDER=openai`: 자연어 해석·일정 생성·성찰에 OpenAI Responses Structured Outputs를 사용합니다. 모델명과 키가 필요합니다. 매칭 점수와 대체 후보 정렬은 이 모드에서도 결정적 규칙입니다.
+- `AGENT_MODEL_PROVIDER=openai`: 도구 선택은 OpenAI Responses Function Calling, 자연어 해석·일정 생성·성찰은 Structured Outputs를 사용합니다. 모델명과 키가 필요합니다. 매칭 점수와 대체 후보 정렬은 이 모드에서도 결정적 규칙입니다.
 - `AGENT_WEATHER_PROVIDER=demo`: 강수확률 20% 고정 시험 데이터.
 - `AGENT_WEATHER_PROVIDER=openmeteo`: 지정 날짜·좌표의 실제 일별 강수확률·날씨 코드를 조회합니다. 기상청 API와 다릅니다. 예보 범위 밖은 사용자에게 날짜 확인을 요청합니다.
 - `TOUR_API_SERVICE_KEY`가 있으면 대체 축제 검색에 한국관광공사 TourAPI를 사용합니다. 없으면 기존 축제 저장소를 조회합니다. 상세 운영시간이 없는 대체 후보는 확정 일정으로 취급하지 않습니다.
@@ -98,8 +109,11 @@ flowchart TD
 | 네트워크 오류·응답 불일치 | 통신 재시도 후 도구 재조회 전략 |
 | 그룹·일정 버전 변경 | 기존 제안 폐기, 최신 조건 재조회, 새 초안과 새 승인 |
 | 날씨 충돌·실내 정보 불명·운영시간 누락 | 사용자 추가 확인 |
-| 모델·API 설정 오류·이용 불가 축제 | 실패 종료 |
+| 모델·API 설정 오류·이용 불가 축제·도구 선택/호출 한도 | 실패 종료 |
+| 도구 인자·허용 범위·선행 조회 오류 | 함수 호출 오류를 모델에 반환해 다음 선택에서 수정 |
 | 수정 횟수 초과 | 실패 종료, 확정 일정 변경 없음 |
+
+도구 선택은 계획 주기당 기본 8회(`AGENT_MAX_TOOL_ROUNDS`), 논리적 도구 요청은 기본 12개(`AGENT_MAX_TOOL_CALLS`)로 제한합니다. 필수 조회를 계속 누락하거나 잘못된 인자를 반복하면 한도 내에서 오류를 모델에 전달하고, 한도 초과 시 실패 종료합니다. 통신 재시도는 논리적 도구 요청과 별도로 셉니다. 재조회 전략은 새 계획 주기를 시작하며 전체 수정 횟수 상한을 함께 적용합니다.
 
 통신 재시도 기본 2회는 동일 도구의 추가 호출 횟수입니다. 판단 수정 기본 3회는 성찰 후 다음 행동을 선택할 수 있는 횟수입니다. 환경변수로 상한을 조정합니다. 오류가 해결되지 않으면 성공으로 처리하지 않습니다.
 

@@ -35,16 +35,20 @@ DB 담당자가 기존 스키마를 준비한 뒤 `db/supabase_auth_rls.sql`과 
 
 일반 repository는 요청 claims와 `anon`/`authenticated` 역할을 사용합니다. 에이전트 체크포인트·기억은 서버 전용 `agent_storage`에 저장합니다. 서버는 테이블을 자동 생성하지 않으며 SQLite·인메모리로 자동 전환하지 않습니다.
 
+도구 선택 한도는 `AGENT_MAX_TOOL_ROUNDS=8`, 논리적 호출 한도는 `AGENT_MAX_TOOL_CALLS=12`가 기본값입니다. `.env`에 추가하지 않아도 기본값을 사용합니다.
+
 자세한 안내: [인증 전환](docs/auth-migration.md), [에이전트 DB 설정](docs/agent-postgres.md).
 
 ## 에이전트 흐름
 
 ```text
-요청 → 기억·조건 확인 → 도구 조회 → 후보 생성 → 독립 검증
+요청 → 기억·조건 확인 → OpenAI 도구 선택 ⇄ 도구 실행·결과 전달 → 후보 생성 → 독립 검증
                              ↑                ↓ 오류
                              └─ 재조회·수정 ──┘
 정상 일정 → 초안 → 모임장 승인 대기 → 최신 조건 재검증 → 트랜잭션 반영
 ```
+
+OpenAI 모드에서는 `choose_tools`가 Function Calling으로 다음 도구를 선택하고 결과를 확인하며 반복합니다. 서버는 필수 조회·인자·접근 범위·호출 한도를 검증합니다. 승인 단계의 최신 정보 조회는 기존대로 서버가 강제합니다.
 
 입력·승인 대기는 LangGraph interrupt/resume과 PostgreSQL 체크포인트를 사용합니다. 승인 전 확정 일정은 유지하고, 조건이 달라지면 새 초안으로 다시 승인받습니다. 기존 일정 API도 같은 그래프를 호출하며 생성·승인 응답은 실행 객체입니다.
 
@@ -53,7 +57,7 @@ DB 담당자가 기존 스키마를 준비한 뒤 `db/supabase_auth_rls.sql`과 
 | 설정 | 동작 |
 | --- | --- |
 | `AGENT_MODEL_PROVIDER=rules` | LLM 호출 없는 규칙 기반 생성 |
-| `AGENT_MODEL_PROVIDER=openai` | OpenAI로 조건 해석·일정 생성·수정 전략 생성 |
+| `AGENT_MODEL_PROVIDER=openai` | OpenAI로 조건 해석·도구 선택·일정 생성·수정 전략 생성 |
 | `AGENT_WEATHER_PROVIDER=demo` | 고정 시험 날씨 |
 | `AGENT_WEATHER_PROVIDER=openmeteo` | 실제 예보 조회 |
 | `TOUR_API_SERVICE_KEY` 설정 | TourAPI 대체 축제 검색 |
@@ -82,6 +86,24 @@ scripts/                       # HTTP 시연·격리 평가
 tests/                         # 그래프·인증·저장소 테스트
 ```
 
+## 터미널 대화형 LangGraph 시험 (Auth 불필요)
+
+```powershell
+uv run python -m scripts.agent_console
+```
+
+`.env`의 모델 설정을 사용합니다. OpenAI 모드는 실제 API를 호출하며 비용이 발생합니다. 서버나 로그인 토큰은 필요하지 않습니다. API 호출 없이 연습하려면 다음 명령을 사용합니다.
+
+```powershell
+uv run python -m scripts.agent_console --provider rules
+```
+
+`일정 만들어줘` 입력 → 모임은 Enter로 `demo` 선택 → 표시된 시험 날짜 선택 → 시작 `15:00`, 종료 `18:00` 입력 → 초안 확인 후 `approve` 입력으로 중단·재개·승인 흐름을 확인합니다. `reject`는 거절, `cancel`은 취소입니다. `/memory`로 세션 기억 확인, `/new`로 새 세션, `/exit`로 종료합니다.
+
+실제 AgentService·StateGraph를 사용하되 사용자·축제·날씨·저장소는 시험용으로 주입합니다. 공유 Supabase와 실제 일정은 변경하지 않습니다. 실행 기록·기억은 프로세스 종료 시 사라집니다. API 서버의 JWT·PostgreSQL 설정은 그대로 유지합니다. 실제 로그인·RLS·외부 축제/날씨 연동을 검증하는 명령은 아닙니다.
+
+대화형 입력 시험: 규칙 모드에서 추가 질문 후 승인, 거절, 취소, 잘못된 시간 수정, 입력 종료(EOF) 처리 5개 시나리오를 확인했습니다.
+
 ## 테스트·시연
 
 ```powershell
@@ -102,5 +124,7 @@ DB 통합 테스트는 별도로 준비한 시험 DB의 `TEST_AGENT_DATABASE_URL
 - 백엔드: 실제 로그인 통합 검증, 참여·위험 이벤트의 실행 연결, API 계약 조율.
 - DB: 인증·에이전트 SQL 검토 및 적용, 역할 권한·RLS 검증, 기억 보존 정책.
 - 에이전트: 실제 모델·축제 데이터 시험, 이동시간·비용 검증 확장.
+
+OpenAI 도구 선택 변경·시험 결과: [Function Calling 통합](docs/agent-tool-calling.md).
 
 상세 노드·API 계약: [에이전트 워크플로우](docs/agent-workflow.md).

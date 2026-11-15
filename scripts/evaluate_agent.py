@@ -53,8 +53,8 @@ async def measure(root,repair):
             state=snapshot.values
             # Completion means a VALID proposal ready for human approval; no automatic write.
             completed=result["status"] == "waiting_approval"
-            plan_events=[event for event in result["trace"] if event["node"] == "plan_tools"]
-            correct_tools=all(event["tools"] == ["get_festival","get_availability","get_weather"] for event in plan_events)
+            plan_events=[event for event in result["trace"] if event["node"] == "choose_tools" and event.get("tools")]
+            correct_tools=bool(plan_events) and all(event["tools"] == ["get_festival","get_availability","get_weather"] for event in plan_events)
             consistent=not validate_plan(state.get("candidate"),state["conditions"],state["tool_results"],"scheduling") if state.get("candidate") else False
             candidate_events=sum(event["node"] == "generate_candidate" for event in result["trace"])
             rows.append(dict(case=fault,status=result["status"],completed=completed,correctTools=correct_tools,consistent=consistent,reasoningReruns=max(0,candidate_events-1),toolRetries=sum(call["attempt"] > 1 for call in result["toolCalls"]),trace=result["trace"],toolCalls=result["toolCalls"]))

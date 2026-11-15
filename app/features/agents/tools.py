@@ -31,6 +31,8 @@ class AgentTools:
             await self.http.aclose()
 
     async def invoke(self, name: str, state: dict):
+        if name not in {"get_festival", "get_availability", "get_candidates", "get_weather", "search_festivals"}:
+            raise ToolFailure("TOOL_NOT_ALLOWED", "허용되지 않은 조회 도구입니다.")
         try:
             return await getattr(self, name)(state)
         except ToolFailure:

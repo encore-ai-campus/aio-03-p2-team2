@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     tour_api_service_key: SecretStr | None = None
     agent_max_iterations: int = Field(default=3,ge=1,le=8)
     agent_tool_retries: int = Field(default=2,ge=0,le=4)
+    agent_max_tool_rounds: int = Field(default=8,ge=2,le=16)
+    agent_max_tool_calls: int = Field(default=12,ge=3,le=32)
     database_url: str | None = None
     database_required: bool = False
     database_pool_min_size: int = 1

@@ -16,6 +16,12 @@ class AgentState(TypedDict, total=False):
     group: dict | None
     tools: list[str]
     tool_results: dict[str, Any]
+    tool_dialogue: list[dict]
+    tool_requests: list[dict]
+    tool_round: int
+    tool_call_count: int
+    tool_ready: bool
+    tool_selected_by: str
     candidate: dict | None
     errors: list[dict]
     repair: dict

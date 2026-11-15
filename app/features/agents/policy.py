@@ -60,7 +60,8 @@ def infer_intent(message: str) -> str:
     return "scheduling"
 
 
-def select_tools(state: dict) -> list[str]:
+def required_tools(state: dict) -> list[str]:
+    """Minimum evidence required before generation, not the OpenAI execution plan."""
     if state["intent"] == "risk_response":
         return ["get_festival", "get_weather", "search_festivals"]
     if state["intent"] == "matching":

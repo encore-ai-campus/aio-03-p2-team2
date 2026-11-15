@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from copy import deepcopy
 from datetime import datetime, timezone
 
@@ -8,10 +9,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from app.core.repository import RepositoryError
-from .policy import error, infer_intent, select_tools, validate_plan
+from .policy import error, infer_intent, required_tools, validate_plan
 from .schemas import Conditions
 from .state import AgentState
 from .tools import ToolFailure
+from .tool_registry import bound_arguments, validate_tool_request
 
 
 class AgentNodes:
@@ -80,29 +82,87 @@ class AgentNodes:
         group = await self.repository.group(state["group_id"]) if state.get("group_id") else None
         if group and group["leaderId"] != state["user_id"]:
             raise RepositoryError("LEADER_ONLY","모임장만 실행을 계속할 수 있습니다.",403)
-        return self.update(state,"plan_tools",tools=select_tools(state),tool_results={},tool_attempts=0,group=group)
+        return self.update(state, "plan_tools", tools=[], tool_results={}, tool_attempts=0,
+                           tool_dialogue=[], tool_requests=[], tool_round=0, tool_call_count=0,
+                           tool_ready=False, group=group)
+
+    async def choose_tools(self, state):
+        if state.get("tool_round", 0) >= self.settings.agent_max_tool_rounds:
+            return self.update(state, "choose_tools", status="failed", tool_requests=[],
+                               errors=[error("TOOL_SELECTION_LIMIT", "도구 선택 반복 한도에 도달했습니다.")])
+        try:
+            decision = await self.model.choose_tools(state)
+        except Exception:
+            return self.update(state, "choose_tools", status="failed", tool_requests=[],
+                               errors=[error("MODEL_UNAVAILABLE", "도구 선택 응답을 확인할 수 없습니다.")])
+        requests = decision["calls"]
+        dialogue = decision["dialogue"]
+        missing = [name for name in required_tools(state) if name not in state.get("tool_results", {})]
+        ready = not requests and not missing
+        feedback = []
+        if not requests and missing:
+            feedback = [error("TOOL_REQUIRED_MISSING", "필수 근거 조회가 누락됐습니다.", missing=missing)]
+            dialogue = dialogue + [{"role": "developer", "content": json.dumps({"validation_errors": feedback}, ensure_ascii=False)}]
+        trace = {"node": "choose_tools", "at": datetime.now(timezone.utc).isoformat(),
+                 "iteration": state.get("iteration", 0), "round": state.get("tool_round", 0)+1,
+                 "selectedBy": self.model.selection_mode, "tools": [item["name"] for item in requests],
+                 "missingRequired": missing, "summary": decision.get("summary", "")[:500]}
+        return {"tool_requests": requests, "tools": trace["tools"], "tool_dialogue": dialogue,
+                "tool_round": trace["round"], "tool_ready": ready, "errors": [],
+                "trace": state.get("trace", [])+[trace]}
 
     async def execute_tools(self, state):
-        results, attempts = {}, 0
-        calls = []
-        for name in state["tools"]:
-            for attempt in range(self.settings.agent_tool_retries + 1):
-                try:
-                    results[name] = await self.tools.invoke(name,{**state,"tool_results":results})
-                    calls.append({"tool":name,"attempt":attempt+1,"status":"ok","source":results[name]["source"],"mode":results[name]["mode"]})
-                    break
-                except ToolFailure as exc:
-                    calls.append({"tool":name,"attempt":attempt+1,"status":"error","code":exc.code})
-                    if exc.retryable and attempt < self.settings.agent_tool_retries:
-                        attempts += 1
-                        await asyncio.sleep(0.05 * (attempt+1))
-                        continue
-                    return self.update(state,"execute_tools",tool_results=results,tool_attempts=attempts,tool_calls=state.get("tool_calls",[])+calls,errors=[error(exc.code,exc.message,tool=name,attempts=attempt+1)])
-                except RepositoryError:
-                    raise
-                except Exception:
-                    return self.update(state,"execute_tools",tool_results=results,tool_attempts=attempts,errors=[error("TOOL_RESPONSE_INVALID",f"{name} 도구 실행에 실패했습니다.",tool=name)])
-        return self.update(state,"execute_tools",tool_results=results,tool_attempts=attempts,tool_calls=state.get("tool_calls",[])+calls,errors=[])
+        results = dict(state.get("tool_results", {}))
+        attempts = state.get("tool_attempts", 0)
+        count = state.get("tool_call_count", 0)
+        dialogue = list(state.get("tool_dialogue", []))
+        calls, errors = [], []
+        selected_by = state.get("tool_selected_by") or self.model.selection_mode
+        for request in state.get("tool_requests", []):
+            name = request["name"]
+            arguments = None
+            observation = None
+            failure = None
+            count += 1
+            try:
+                if count > self.settings.agent_max_tool_calls:
+                    raise ToolFailure("TOOL_CALL_LIMIT", "도구 호출 한도에 도달했습니다.")
+                arguments = validate_tool_request(request, state, results)
+                for attempt in range(self.settings.agent_tool_retries + 1):
+                    try:
+                        observation = await self.tools.invoke(name, {**state, "tool_results": results})
+                        calls.append({"tool": name, "callId": request["call_id"], "arguments": arguments,
+                                      "selectedBy": selected_by, "round": state.get("tool_round", 0),
+                                      "attempt": attempt+1, "status": "ok", "source": observation["source"],
+                                      "mode": observation["mode"], "fetchedAt": observation["fetchedAt"]})
+                        results[name] = observation
+                        break
+                    except ToolFailure as exc:
+                        calls.append({"tool": name, "callId": request["call_id"], "arguments": arguments,
+                                      "selectedBy": selected_by, "round": state.get("tool_round", 0),
+                                      "attempt": attempt+1, "status": "error", "code": exc.code})
+                        if exc.retryable and attempt < self.settings.agent_tool_retries:
+                            attempts += 1
+                            await asyncio.sleep(0.05 * (attempt+1))
+                            continue
+                        raise
+            except RepositoryError:
+                raise
+            except ToolFailure as exc:
+                failure = error(exc.code, exc.message, tool=name)
+                if not calls or calls[-1].get("callId") != request["call_id"]:
+                    calls.append({"tool": name, "callId": request["call_id"], "selectedBy": selected_by,
+                                  "round": state.get("tool_round", 0), "attempt": 1, "status": "error", "code": exc.code})
+                if exc.code not in {"TOOL_NOT_ALLOWED", "TOOL_ARGUMENTS_INVALID", "TOOL_SCOPE_MISMATCH", "TOOL_DEPENDENCY_MISSING"}:
+                    errors.append(failure)
+            except Exception:
+                failure = error("TOOL_RESPONSE_INVALID", "도구 결과 형식을 확인해야 합니다.", tool=name)
+                errors.append(failure)
+            dialogue.append({"type": "function_call_output", "call_id": request["call_id"],
+                             "output": json.dumps({"error": failure} if failure else observation, ensure_ascii=False)})
+        return self.update(state, "execute_tools", tool_results=results, tool_attempts=attempts,
+                           tool_calls=state.get("tool_calls", [])+calls, tool_dialogue=dialogue,
+                           tool_call_count=count, tool_requests=[], errors=errors)
 
     async def generate_candidate(self, state):
         try:
@@ -156,7 +216,13 @@ class AgentNodes:
         if group["version"] != state["base_group_version"] or group["schedule"]["version"] != state["base_version"]:
             await self.repository.reject_agent_proposal(state["group_id"],state["proposal_id"],state["user_id"])
             return self.update(state,"revalidate_and_commit",errors=[error("RESOURCE_VERSION_CONFLICT","참여자 또는 일정이 변경되어 새 제안과 승인이 필요합니다.")])
-        refreshed = await self.execute_tools({**state,"group":group})
+        # Approval uses mandatory fresh reads independently of model tool decisions.
+        required = required_tools(state)
+        refresh_requests = [{"call_id": f"approval_{name}", "name": name,
+                             "arguments": json.dumps(bound_arguments(name, state))} for name in required]
+        refreshed = await self.execute_tools({**state, "group": group, "tool_results": {},
+            "tool_dialogue": [], "tool_requests": refresh_requests, "tool_call_count": 0,
+            "tool_attempts": 0, "tool_selected_by": "server_approval_revalidation"})
         if refreshed.get("errors"):
             return self.update(state,"revalidate_and_commit",tool_calls=refreshed.get("tool_calls",[]),errors=refreshed["errors"])
         errors = validate_plan(state["candidate"],state["conditions"],refreshed["tool_results"],state["intent"])
@@ -184,15 +250,18 @@ class AgentNodes:
 
 def build_graph(nodes: AgentNodes, checkpointer):
     graph = StateGraph(AgentState)
-    names = ["load_context","parse_request","ask_user","plan_tools","execute_tools","generate_candidate","validate_candidate","reflect_and_repair","save_proposal","await_approval","revalidate_and_commit","finalize"]
+    names = ["load_context","parse_request","ask_user","plan_tools","choose_tools","execute_tools","generate_candidate","validate_candidate","reflect_and_repair","save_proposal","await_approval","revalidate_and_commit","finalize"]
     for name in names:
         graph.add_node(name,getattr(nodes,name))
     graph.add_edge(START,"load_context")
     graph.add_edge("load_context","parse_request")
     graph.add_conditional_edges("parse_request",lambda s: "finalize" if s["status"] == "failed" else "ask_user" if s["missing"] else "plan_tools",path_map=['finalize', 'ask_user', 'plan_tools'])
     graph.add_conditional_edges("ask_user",lambda s: "finalize" if s["status"] == "cancelled" else "parse_request",path_map=['finalize', 'parse_request'])
-    graph.add_edge("plan_tools","execute_tools")
-    graph.add_conditional_edges("execute_tools",lambda s: "reflect_and_repair" if s["errors"] else "generate_candidate",path_map=['reflect_and_repair', 'generate_candidate'])
+    graph.add_edge("plan_tools", "choose_tools")
+    graph.add_conditional_edges("choose_tools", lambda s: "finalize" if s["status"] == "failed" else
+        "execute_tools" if s.get("tool_requests") else "generate_candidate" if s.get("tool_ready") else "choose_tools",
+        path_map=["finalize", "execute_tools", "generate_candidate", "choose_tools"])
+    graph.add_conditional_edges("execute_tools",lambda s: "reflect_and_repair" if s["errors"] else "choose_tools",path_map=['reflect_and_repair', 'choose_tools'])
     graph.add_conditional_edges("generate_candidate",lambda s: "reflect_and_repair" if not s.get("candidate") else "validate_candidate",path_map=['reflect_and_repair', 'validate_candidate'])
     graph.add_conditional_edges("validate_candidate",lambda s: "reflect_and_repair" if s["errors"] else "save_proposal" if s["intent"] == "scheduling" else "finalize",path_map=['reflect_and_repair', 'save_proposal', 'finalize'])
     graph.add_conditional_edges("reflect_and_repair",lambda s: {"stop":"finalize","ask_user":"ask_user","refresh_tools":"plan_tools","regenerate":"generate_candidate"}[s["repair"]["action"]],path_map=['finalize', 'ask_user', 'plan_tools', 'generate_candidate'])
