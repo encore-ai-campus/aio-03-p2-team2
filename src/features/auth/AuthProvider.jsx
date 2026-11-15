@@ -38,6 +38,8 @@ export function AuthProvider({ children }) {
         },
       }),
     signOut: () => supabase.auth.signOut(),
+    // 온보딩을 한 번 거쳤다는 표시 (저장하든 "나중에"를 누르든) — Supabase 계정 정보(user_metadata)에 저장
+    markOnboarded: () => supabase.auth.updateUser({ data: { onboarded: true } }),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

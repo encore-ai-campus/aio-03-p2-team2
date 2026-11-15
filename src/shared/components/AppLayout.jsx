@@ -92,6 +92,9 @@ export default function AppLayout() {
             <span className="auth-user" title={user?.email}>
               {user?.user_metadata?.display_name || user?.email}
             </span>
+            <NavLink to="/profile" className="btn small">
+              내 프로필
+            </NavLink>
             <Button className="btn small" onClick={signOut}>
               로그아웃
             </Button>
