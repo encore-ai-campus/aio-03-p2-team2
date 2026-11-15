@@ -1,32 +1,36 @@
 from __future__ import annotations
 
-from datetime import date
-
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 
 from app.core.api import APIError, success
 from app.core.auth import current_user_id, require_current_user
-from app.core.repositories import RepositoryError, get_repository
+from app.core.repositories import RepositoryError, SupabaseRepository, get_repository
+from app.core.service import ServiceError
 from .schemas import CommentCreate, GroupCreate, GroupUpdate, JoinRequestCreate, RejectRequest, VersionRequest
+from .service import GroupService
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 
 async def get_group(group_id: str, repository: SupabaseRepository) -> dict:
-    group = await repository.group(group_id)
-    if not group:
-        raise APIError(404, "GROUP_NOT_FOUND", "모임을 찾을 수 없습니다.")
-    return group
+    try:
+        return await GroupService(repository).get(group_id)
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
 
 
 def require_leader(group: dict, user_id: str) -> None:
-    if group["leaderId"] != user_id:
-        raise APIError(403, "LEADER_ONLY", "모임장만 수행할 수 있습니다.")
+    try:
+        GroupService.require_leader(group, user_id)
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
 
 
 def require_member(group: dict, user_id: str) -> None:
-    if not any(item["userId"] == user_id for item in group["members"]):
-        raise APIError(403, "GROUP_MEMBER_ONLY", "모임 참여자만 수행할 수 있습니다.")
+    try:
+        GroupService.require_member(group, user_id)
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
 
 
 def repository_error(error: RepositoryError) -> APIError:
@@ -52,11 +56,10 @@ async def list_groups(request: Request, festival_id: str | None = Query(default=
 async def create_group(payload: GroupCreate, request: Request):
     repository = get_repository(request)
     user_id = current_user_id(request)
-    festival = await repository.festival(payload.festival_id)
-    if not festival or festival["riskStatus"] == "cancelled" or festival["endDate"] < date.today().isoformat():
-        raise APIError(422, "FESTIVAL_NOT_AVAILABLE", "종료되었거나 이용할 수 없는 축제입니다.")
     try:
-        group = await repository.create_group(user_id, payload.model_dump(by_alias=True))
+        group = await GroupService(repository).create(user_id, payload.model_dump(by_alias=True))
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
     except RepositoryError as error:
         raise repository_error(error) from error
     return success(group, request, status_code=201)
@@ -71,15 +74,12 @@ async def get_group_detail(group_id: str, request: Request):
 async def update_group(group_id: str, payload: GroupUpdate, request: Request, if_match: str | None = Header(default=None)):
     repository = get_repository(request)
     user_id = current_user_id(request)
-    group = await get_group(group_id, repository)
-    require_leader(group, user_id)
     version = int(if_match.strip('"')) if if_match and if_match.strip('"').isdigit() else payload.version
     values = payload.model_dump(by_alias=True, exclude_none=True)
-    if values.get("capacity", group["capacity"]) < group["memberCount"]:
-        raise APIError(409, "GROUP_CAPACITY_EXCEEDED", "현재 멤버 수보다 작은 정원은 설정할 수 없습니다.")
-    updated = await repository.update_group(group_id, values, version)
-    if not updated:
-        raise APIError(409, "RESOURCE_VERSION_CONFLICT", "리소스 버전이 변경되었습니다.", {"latest": await repository.group(group_id)})
+    try:
+        updated = await GroupService(repository).update(group_id, user_id, values, version)
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
     return success(updated, request)
 
 
@@ -131,7 +131,7 @@ async def create_join_request(group_id: str, payload: JoinRequestCreate, request
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        result = await repository.create_join_request(group_id, user_id, payload.message)
+        result = await GroupService(repository).create_join_request(group_id, user_id, payload.message)
     except RepositoryError as error:
         raise repository_error(error) from error
     if result["request"]:
@@ -145,7 +145,7 @@ async def approve_join_request(group_id: str, request_id: str, payload: VersionR
     user_id = current_user_id(request)
     version = int(if_match.strip('"')) if if_match and if_match.strip('"').isdigit() else payload.version
     try:
-        result = await repository.approve_join_request(group_id, request_id, user_id, version)
+        result = await GroupService(repository).approve_join_request(group_id, request_id, user_id, version)
     except RepositoryError as error:
         raise repository_error(error) from error
     return success(result, request)
@@ -156,7 +156,7 @@ async def reject_join_request(group_id: str, request_id: str, payload: RejectReq
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        result = await repository.reject_join_request(group_id, request_id, user_id, payload.version, payload.reason)
+        result = await GroupService(repository).reject_join_request(group_id, request_id, user_id, payload.version, payload.reason)
     except RepositoryError as error:
         raise repository_error(error) from error
     if not result:
@@ -169,7 +169,7 @@ async def leave_group(group_id: str, request: Request):
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        await repository.leave_group(group_id, user_id)
+        await GroupService(repository).leave(group_id, user_id)
     except RepositoryError as error:
         raise repository_error(error) from error
     return Response(status_code=204)

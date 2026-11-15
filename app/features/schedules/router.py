@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, Request
 from app.core.api import APIError, success
 from app.core.auth import current_user_id, require_current_user
 from app.core.repositories import RepositoryError, SupabaseRepository, get_repository
+from app.core.service import ServiceError
 from .schemas import ProposalAction, ProposalCreate, ScheduleValidateRequest
+from .service import ScheduleService
 
 router = APIRouter(tags=["schedules"], dependencies=[Depends(require_current_user)])
 
@@ -35,9 +37,11 @@ def repository_error(error: RepositoryError) -> APIError:
 async def get_schedule(group_id: str, request: Request):
     repository = get_repository(request)
     user_id = current_user_id(request)
-    group = await get_group(group_id, repository)
-    require_member(group, user_id)
-    return success(group["schedule"], request)
+    try:
+        schedule = await ScheduleService(repository).get_for_member(group_id, user_id)
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
+    return success(schedule, request)
 
 
 @router.post("/groups/{group_id}/schedule/validate", operation_id="validateGroupSchedule")
@@ -45,7 +49,7 @@ async def validate_schedule(group_id: str, payload: ScheduleValidateRequest, req
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        result = await repository.validate_schedule(group_id, user_id, payload.trigger, payload.version)
+        result = await ScheduleService(repository).validate(group_id, user_id, payload.trigger, payload.version)
     except RepositoryError as error:
         raise repository_error(error) from error
     return success(result, request)
@@ -56,14 +60,11 @@ async def create_proposal(group_id: str, payload: ProposalCreate, request: Reque
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        proposal = await repository.create_proposal(group_id, user_id, payload.strategy, payload.version)
+        proposal = await ScheduleService(repository).create_proposal(group_id, user_id, payload.strategy, payload.version)
+    except ServiceError as error:
+        raise APIError(error.status_code, error.code, error.message, error.details) from error
     except RepositoryError as error:
         raise repository_error(error) from error
-    festival_id = (await get_group(group_id, repository))["festivalId"]
-    festival = await repository.festival(festival_id)
-    operating = next((item for item in (festival or {}).get("operatingHours", []) if item["date"] == proposal["schedule"]["date"]), None)
-    if operating and not (operating["open"] <= proposal["schedule"]["time"] <= operating["close"]):
-        raise APIError(422, "OUTSIDE_FESTIVAL_OPERATING_HOURS", "참여자 가능 시간이 축제 운영시간 밖입니다.", {"requestedTime": proposal["schedule"]["time"], "open": operating["open"], "close": operating["close"]})
     return success(proposal, request, status_code=201)
 
 
@@ -72,7 +73,7 @@ async def approve_proposal(group_id: str, proposal_id: str, payload: ProposalAct
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        result = await repository.decide_proposal(group_id, proposal_id, user_id, payload.version, True, payload.reason)
+        result = await ScheduleService(repository).decide(group_id, proposal_id, user_id, payload.version, True, payload.reason)
     except RepositoryError as error:
         raise repository_error(error) from error
     return success(result, request)
@@ -83,7 +84,7 @@ async def reject_proposal(group_id: str, proposal_id: str, payload: ProposalActi
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        result = await repository.decide_proposal(group_id, proposal_id, user_id, payload.version, False, payload.reason)
+        result = await ScheduleService(repository).decide(group_id, proposal_id, user_id, payload.version, False, payload.reason)
     except RepositoryError as error:
         raise repository_error(error) from error
     return success(result, request)
