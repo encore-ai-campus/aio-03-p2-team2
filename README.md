@@ -1,170 +1,106 @@
 # FestaMate Backend
 
-## 현재 인증 방식
-
-보호된 REST API는 Supabase Auth access token을 요구합니다.
-
-```http
-Authorization: Bearer <supabase-access-token>
-```
-
-백엔드는 JWT의 `sub`를 `public.users.auth_user_id`와 연결해 애플리케이션 사용자를 결정합니다. `X-Demo-User-Id`와 WebSocket의 `demoUserId`는 더 이상 인증 수단으로 사용하지 않습니다. WebSocket은 `Authorization: Bearer ...` 헤더 또는 브라우저 환경을 위한 단기 `access_token` 쿼리 토큰을 사용합니다.
-
-DB에는 [`db/supabase_auth_rls.sql`](db/supabase_auth_rls.sql)을 base schema 이후 실행해야 합니다. 이 마이그레이션은 Auth 사용자 매핑, 신규 사용자 생성 트리거, RLS 정책을 추가합니다. 백엔드의 asyncpg 연결은 요청 JWT를 `request.jwt.claims`에 전달하고 `authenticated`/`anon` 역할로 전환한 뒤, 연결 반환 전에 역할을 복원합니다.
-
-필수 환경변수는 `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `SUPABASE_JWT_ISSUER`입니다. 비대칭 Supabase signing key를 사용할 때는 JWKS를 사용하므로 `SUPABASE_JWT_SECRET`은 비워 둡니다. 기존 HS256 프로젝트에서만 JWT secret을 별도로 설정합니다.
-
-FestaMate 팀 개발용 FastAPI 백엔드입니다. React 프론트엔드(`aio-03-p2-2team-Frontend`)와 별도 레포로 관리하며, 프론트의 `DemoProvider → demoModel → localStorage` 목업 흐름을 향후 REST/WebSocket API로 교체할 수 있도록 API 계약을 구현합니다.
-
-## 아키텍처 검토
-
-현재 구조는 프론트와 백엔드를 기능별로 나눈 방향이 적절합니다.
-
-```text
-Frontend                                  Backend
-React Router / DemoProvider               FastAPI /api/v1
-  ├─ features/*                             ├─ features/auth
-  ├─ shared/components                       ├─ features/festivals
-  ├─ shared/data                             ├─ features/matching
-  └─ shared/lib/demoModel                    ├─ features/groups
-       ↕ localStorage                        ├─ features/chat
-                                             ├─ features/schedules
-                                             └─ features/alerts
-```
-
-향후 연결 구조는 다음 순서로 확장합니다.
-
-```text
-React
-  ├─ Supabase Auth
-  └─ FastAPI
-       ├─ Supabase PostgreSQL / RLS
-       ├─ 공식 축제·날씨 외부 API
-       ├─ LangGraph + OpenAI
-       └─ WebSocket 채팅
-```
-
-기능 API는 `get_repository()`를 통해 도메인별 Repository를 사용하며, `DATABASE_URL`이 설정되면 Supabase PostgreSQL의 실제 CRUD 쿼리를 실행합니다. `app/core/store.py`의 인메모리 데이터는 이전 데모 구현을 위한 레거시 샘플이며 현재 라우터에서는 호출하지 않습니다. 보호 API는 Supabase Auth JWT와 RLS를 사용합니다.
+React 프론트와 별도 레포로 관리하는 FastAPI 백엔드입니다. 기능별 API와 LangGraph 에이전트를 함께 제공합니다.
 
 ## 기술 스택
 
-- Python 3.12+
-- FastAPI, Uvicorn, WebSockets
-- pydantic-settings
-- uv (`pyproject.toml`, `uv.lock`)
-- asyncpg (Supabase PostgreSQL 연결)
+Python 3.12+, FastAPI, uv, Supabase PostgreSQL/Auth, LangGraph를 사용합니다. OpenAI·Open-Meteo·TourAPI는 설정에 따라 사용합니다.
 
 ## 실행
 
+기존 `.env`가 없을 때만 `.env.example`을 복사하고 설정을 입력합니다.
+
 ```powershell
 uv sync
-uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uv run python -m app --reload --host 127.0.0.1 --port 8000
 ```
 
-기본 설정에서는 `.env`가 없어도 실행됩니다. 설정을 바꿀 때만, 기존 `.env`를 덮어쓰지 않도록 파일이 없는 경우에 복사합니다.
+- 상태: http://127.0.0.1:8000/health
+- DB 상태: http://127.0.0.1:8000/health/db
+- Swagger: http://127.0.0.1:8000/docs
+- OpenAPI: http://127.0.0.1:8000/openapi.json
 
-```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-```
+Windows에서는 위 실행 명령으로 psycopg에 필요한 Selector 이벤트 루프를 사용합니다.
 
-macOS/Linux:
+## DB·인증 설정
 
-```bash
-test -f .env || cp .env.example .env
-```
+DB 담당자가 기존 스키마를 준비한 뒤 `db/supabase_auth_rls.sql`과 `docs/sql/001_agent_postgres.sql`을 검토·적용해야 합니다. SQL 파일 수정만으로 원격 Supabase가 변경되지는 않습니다. 기존 테이블 생성 SQL 전체를 다시 실행하지 않습니다.
 
-실제 `.env`, `.venv/`, `__pycache__/`는 Git에 포함하지 않습니다.
+- `DATABASE_URL`: Supabase PostgreSQL Direct 또는 Session pooler 연결 문자열. Transaction pooler(6543)는 지원하지 않습니다.
+- `SUPABASE_URL`: 해당 프로젝트의 Project URL. DB 연결 문자열과 다릅니다.
+- `SUPABASE_JWT_ISSUER`: 미설정 시 Project URL에서 계산합니다.
+- `SUPABASE_JWT_SECRET`: HS256 레거시 프로젝트만 설정합니다. JWKS signing key 프로젝트는 비워 둡니다. DB 비밀번호·API key와 다른 값입니다.
 
-## PostgreSQL 연결
+보호된 API는 `Authorization: Bearer <access-token>`을 사용합니다. Swagger의 **Authorize**에 로그인 access token을 입력합니다. JWT의 `sub`를 `public.users.auth_user_id`에 연결하며 `X-Demo-User-Id`는 지원하지 않습니다.
 
-`.env`에 Supabase PostgreSQL 연결 문자열을 설정하면 FastAPI startup 때 asyncpg pool을 엽니다.
+일반 repository는 요청 claims와 `anon`/`authenticated` 역할을 사용합니다. 에이전트 체크포인트·기억은 서버 전용 `agent_storage`에 저장합니다. 서버는 테이블을 자동 생성하지 않으며 SQLite·인메모리로 자동 전환하지 않습니다.
 
-```dotenv
-# Local persistent FastAPI backend: use Direct or Session pooler (port 5432).
-DATABASE_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres
-DATABASE_REQUIRED=true
-DATABASE_POOL_MIN_SIZE=1
-DATABASE_POOL_MAX_SIZE=5
-```
+자세한 안내: [인증 전환](docs/auth-migration.md), [에이전트 DB 설정](docs/agent-postgres.md).
 
-연결 확인은 `GET /health/db`에서 합니다. `connected`이면 연결과 필수 테이블 확인까지 통과한 상태이며, `schema_missing`이면 연결은 됐지만 DB 설계서의 필수 테이블이 아직 생성되지 않은 상태입니다. `DATABASE_URL`이 없으면 기능 API는 자동으로 인메모리로 전환되지 않고 `503 DATABASE_UNAVAILABLE`을 반환합니다. 로컬에서도 실제 CRUD를 검증하려면 Supabase/PostgreSQL 연결을 설정해야 합니다.
-
-Supabase SQL Editor에는 제공된 `festamate_schema_v4.3.txt`를 먼저 실행해야 합니다. 이 SQL은 `auth.users`, RLS, 승인 트랜잭션 함수를 포함하므로 운영 환경에서는 service-role 키와 RLS 정책을 함께 관리해야 합니다. API·DB 상세 불일치 검토는 [`docs/api-db-review.md`](docs/api-db-review.md)에 기록했습니다.
-
-## 기본 엔드포인트
-
-| 경로 | 설명 |
-| --- | --- |
-| `GET /health` | `{"status":"ok"}` |
-| `/docs` | Swagger UI |
-| `/openapi.json` | OpenAPI 3.1 명세 |
-
-API 기능 경로의 기본 접두어는 `/api/v1`입니다. 성공 응답은 `{ "data": ..., "meta": { "requestId": ... } }` 형식이며, 목록은 `items`, `page`, `pageSize`, `total`을 사용합니다. 오류는 `{ "error": { "code", "message", "details", "requestId" } }` 형식입니다.
-
-## 구현된 MVP API
-
-- 사용자: `/users/{userId}`, 프로필·알림 동의 PATCH
-- 축제: 목록/검색, 캘린더, 상세, 대체 축제, 개발용 sync/import
-- 매칭: 자연어 슬롯 추출, 후보 점수, 매칭 실행 조회, 필요 시 모임 생성
-- 모임: 생성·조회·수정, 공개 댓글, 참여 신청/즉시 참여, 승인·거절, 탈퇴
-- 채팅: 참여자 전용 메시지 조회·등록, 이벤트 폴백, WebSocket
-- 일정: 참여 가능 시간 검증, 일정 제안 생성·승인·거절
-- 알림: 목록, 읽음, 의사 응답, 대체 축제, 개발용 날씨/공지 sync
-
-### 개발용 사용자 식별
-
-보호 API는 Supabase Auth access token이 필요합니다. REST 요청은 다음 헤더를 사용합니다.
-
-```http
-Authorization: Bearer <supabase-access-token>
-```
-
-WebSocket은 `Authorization` 헤더를 우선 사용하고, 브라우저 native WebSocket에서 헤더를 설정할 수 없는 경우에만 `access_token` 쿼리를 사용합니다.
+## 에이전트 흐름
 
 ```text
-/api/v1/ws/groups/{groupId}/chat?access_token=<supabase-access-token>
+요청 → 기억·조건 확인 → 도구 조회 → 후보 생성 → 독립 검증
+                             ↑                ↓ 오류
+                             └─ 재조회·수정 ──┘
+정상 일정 → 초안 → 모임장 승인 대기 → 최신 조건 재검증 → 트랜잭션 반영
 ```
 
-JWT 서명과 RLS가 신원 및 데이터 접근 범위를 검증합니다. `X-Demo-User-Id`와 `demoUserId`는 지원하지 않습니다.
+입력·승인 대기는 LangGraph interrupt/resume과 PostgreSQL 체크포인트를 사용합니다. 승인 전 확정 일정은 유지하고, 조건이 달라지면 새 초안으로 다시 승인받습니다. 기존 일정 API도 같은 그래프를 호출하며 생성·승인 응답은 실행 객체입니다.
 
-### 상태 전이와 권한
+## 실제 연동과 시뮬레이션
 
-- 공개 축제·모임·댓글 조회는 사용자 ID 없이 가능합니다.
-- 프로필 변경, 참여 신청, 알림은 JWT로 확인된 현재 사용자만 수행할 수 있습니다.
-- 채팅·일정 조회는 모임 멤버만 가능합니다.
-- 참여 신청 승인·거절과 일정 제안·확정은 모임장만 가능합니다.
-- 정원이 차면 모임 상태가 `full`이 되며, 멤버 추가는 원자적 저장소 구역에서 정원을 다시 확인합니다.
-- 모임·일정 변경은 `version` 또는 `If-Match`를 검사하여 `409 RESOURCE_VERSION_CONFLICT`를 반환합니다.
-- `/admin/*`는 `development`, `local`, `test` 환경에서만 활성화됩니다.
+| 설정 | 동작 |
+| --- | --- |
+| `AGENT_MODEL_PROVIDER=rules` | LLM 호출 없는 규칙 기반 생성 |
+| `AGENT_MODEL_PROVIDER=openai` | OpenAI로 조건 해석·일정 생성·수정 전략 생성 |
+| `AGENT_WEATHER_PROVIDER=demo` | 고정 시험 날씨 |
+| `AGENT_WEATHER_PROVIDER=openmeteo` | 실제 예보 조회 |
+| `TOUR_API_SERVICE_KEY` 설정 | TourAPI 대체 축제 검색 |
+
+OpenAI 모드에는 `OPENAI_API_KEY`, `OPENAI_MODEL`이 필요합니다. 매칭 점수·대체 후보 정렬은 규칙 기반입니다. `DemoRepository`와 인메모리 체크포인터는 테스트에서만 명시적으로 주입합니다. 프론트의 DemoProvider/localStorage는 별도 실제 API 연동이 필요합니다.
 
 ## 폴더 구조
 
 ```text
 app/
-├── main.py                         # 앱, CORS, 오류 형식, 라우터 등록
-├── core/
-│   ├── api.py                       # 표준 응답·오류
-│   ├── config.py                    # 환경 설정
-│   ├── schemas.py                   # 공통 요청 모델
-│   ├── database.py                   # Supabase PostgreSQL pool 및 스키마 health check
-│   ├── repository.py                 # 공통 DB 오류·타입 변환
-│   ├── repositories.py               # 도메인 Repository facade
-│   └── store.py                      # 레거시 데모 샘플(기능 API에서 미사용)
+├── main.py                    # 앱 팩토리·시작·종료
+├── __main__.py                # Windows 호환 실행
+├── core/                      # 설정·JWT 인증·응답·DB·repository 구성
 └── features/
-    ├── auth/                        # 현재 /users 계약, 인증은 별도 과제
+    ├── agents/                # graph·state·policy·providers·tools·memory·service
+    ├── auth/
     ├── festivals/
     ├── matching/
     ├── groups/
     ├── chat/
-    ├── schedules/
+    ├── schedules/             # 그래프 연결 API·일정 저장
     └── alerts/
+db/supabase_auth_rls.sql        # 인증 정책·회원가입 트리거
+docs/sql/001_agent_postgres.sql # 체크포인트·기억 저장소
+scripts/                       # HTTP 시연·격리 평가
+tests/                         # 그래프·인증·저장소 테스트
 ```
 
-## 다음 작업
+## 테스트·시연
 
-1. 프론트 API client에 Supabase Auth access token 연결
-2. Supabase PostgreSQL 스키마와 RLS 도입
-3. 외부 축제·날씨 수집 worker 및 job 상태 조회 API 추가
-4. OpenAI/LangGraph 기반 매칭·일정 제안으로 교체
-5. WebSocket 브로커/Redis와 rate limit, 감사 로그, 콘텐츠 sanitizing 보강
-6. Supabase Auth/RLS 운영 키와 정책 검증, 사용자 매핑 데이터 backfill
+```powershell
+uv run python -m pytest tests -q
+uv run python -m scripts.agent_demo --group-id YOUR_GROUP_ID
+uv run python -m scripts.evaluate_agent --output data/agent-evaluation.json
+```
+
+시연 스크립트는 `SUPABASE_ACCESS_TOKEN` 환경변수로 로그인 토큰을 받습니다. `--approve` 옵션은 실제 일정을 변경합니다. 토큰을 Git이나 문서에 저장하지 않습니다.
+
+DB 통합 테스트는 별도로 준비한 시험 DB의 `TEST_AGENT_DATABASE_URL`이 필요합니다. 공유 서비스 DB를 시험 DB로 지정하지 않습니다. HTTP RLS 시험에는 테스트 사용자의 Auth 연결도 필요합니다.
+
+현재 병합 검증 범위와 미확인 항목은 [PR 통합 검증](docs/pr2-integration.md)에 정리했습니다. 과거 시험 결과는 각 시험 보고서에 기록되어 있습니다.
+
+## 팀에서 이어갈 작업
+
+- 프론트: Supabase 로그인, JWT API 요청, 추가 질문·승인·실패 화면 연결.
+- 백엔드: 실제 로그인 통합 검증, 참여·위험 이벤트의 실행 연결, API 계약 조율.
+- DB: 인증·에이전트 SQL 검토 및 적용, 역할 권한·RLS 검증, 기억 보존 정책.
+- 에이전트: 실제 모델·축제 데이터 시험, 이동시간·비용 검증 확장.
+
+상세 노드·API 계약: [에이전트 워크플로우](docs/agent-workflow.md).

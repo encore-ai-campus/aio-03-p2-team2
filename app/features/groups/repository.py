@@ -36,11 +36,13 @@ class GroupRepositoryMixin(RepositoryBase):
     @staticmethod
     def _schedule_view(row: asyncpg.Record | None, proposals: Iterable[asyncpg.Record]) -> dict:
         items = (row["items"] if row else []) or []
+        items = json.loads(items) if isinstance(items,str) else items
         return {
             "version": row["version"] if row else 1,
             "current": items[0] if items else None,
+            "items": items,
             "validation": {"status": row["validation_status"], "conflict": row["conflict"]} if row and row["validation_status"] else None,
-            "proposals": [{"id": p["id"], "groupId": p["group_id"], "status": p["status"], "strategy": p["strategy"], "schedule": (p["items"] or [None])[0], "createdAt": _iso(p["created_at"]), "version": p["base_version"], "reason": p["reason"]} for p in proposals],
+            "proposals": [{"id": p["id"], "groupId": p["group_id"], "status": p["status"], "strategy": p["strategy"], "schedule": ((json.loads(p["items"]) if isinstance(p["items"],str) else p["items"]) or [None])[0], "items": (json.loads(p["items"]) if isinstance(p["items"],str) else p["items"]) or [], "createdAt": _iso(p["created_at"]), "version": p["base_version"], "reason": p["reason"]} for p in proposals],
         }
 
     async def list_groups(self, *, festival_id: str | None, status: str | None, keyword: str | None) -> list[dict]:

@@ -5,12 +5,24 @@ description = "FestaMate FastAPI application scaffold"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<1",
-    "asyncpg>=0.30,<1",
-    "PyJWT[crypto]>=2.0,<3",
+    "PyJWT[crypto]>=2.10,<3",
+    "asyncpg>=0.30,<0.32",
     "pydantic-settings>=2.6,<3",
-    "uvicorn>=0.32,<1",
+    "uvicorn>=0.36,<1",
     "websockets>=13,<16",
+    "langgraph>=1,<2",
+    "openai>=2,<3",
+    "httpx>=0.28,<1",
+    "xxhash>=3.5,<4",
+    "langgraph-checkpoint-postgres>=3,<4",
+    "psycopg[binary,pool]>=3.2,<3.3",
 ]
-
 [tool.uv]
 package = false
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "pytest-asyncio>=1.5,<2",
+]
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
