@@ -140,7 +140,10 @@ async def authenticate_websocket(websocket: WebSocket) -> tuple[CurrentUser, Any
 
     authorization = websocket.headers.get("authorization")
     token = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else None
-    token = token or websocket.query_params.get("access_token")
+    # Keep both spellings while browser clients migrate to the API contract.
+    # `accessToken` is the documented frontend spelling; `access_token` remains
+    # supported for existing clients and direct API usage.
+    token = token or websocket.query_params.get("accessToken") or websocket.query_params.get("access_token")
     if not token:
         raise APIError(401, "AUTH_REQUIRED", "WebSocket 인증 토큰이 필요합니다.")
     auth = await get_jwt_verifier().verify(token)

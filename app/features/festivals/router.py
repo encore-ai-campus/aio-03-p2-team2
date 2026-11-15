@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.api import APIError, success
