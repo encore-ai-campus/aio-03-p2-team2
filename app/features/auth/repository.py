@@ -8,6 +8,22 @@ from app.core.repository import RepositoryBase, _hhmm, _time
 
 
 class AuthRepositoryMixin(RepositoryBase):
+    async def user_by_auth_id(self, auth_user_id: str) -> dict | None:
+        row = await self._pool().fetchrow(
+            """
+            select u.id, u.display_name, u.avatar_url,
+                   p.interests, p.budget_manwon, p.travel_style, p.mbti,
+                   p.preferred_party_size, p.available_from, p.default_join_mode,
+                   n.push, n.email, n.risk_alert
+            from users u
+            left join user_profiles p on p.user_id = u.id
+            left join notification_consents n on n.user_id = u.id
+            where u.auth_user_id = $1 and u.status = 'active'
+            """,
+            auth_user_id,
+        )
+        return self._user_view(row) if row else None
+
     async def user(self, user_id: str) -> dict | None:
         row = await self._pool().fetchrow(
             """

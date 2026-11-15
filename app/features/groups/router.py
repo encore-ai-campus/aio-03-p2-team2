@@ -2,19 +2,14 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Header, Query, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 
 from app.core.api import APIError, success
-from app.core.repositories import RepositoryError, SupabaseRepository, get_repository
+from app.core.auth import current_user_id, require_current_user
+from app.core.repositories import RepositoryError, get_repository
 from .schemas import CommentCreate, GroupCreate, GroupUpdate, JoinRequestCreate, RejectRequest, VersionRequest
 
 router = APIRouter(prefix="/groups", tags=["groups"])
-
-
-async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
 
 
 async def get_group(group_id: str, repository: SupabaseRepository) -> dict:
@@ -53,10 +48,10 @@ async def list_groups(request: Request, festival_id: str | None = Query(default=
     return success({"items": items[start : start + page_size], "page": page, "pageSize": page_size, "total": len(items)}, request)
 
 
-@router.post("", operation_id="createGroup", status_code=201)
-async def create_group(payload: GroupCreate, request: Request, x_demo_user_id: str | None = Header(default=None)):
+@router.post("", operation_id="createGroup", status_code=201, dependencies=[Depends(require_current_user)])
+async def create_group(payload: GroupCreate, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     festival = await repository.festival(payload.festival_id)
     if not festival or festival["riskStatus"] == "cancelled" or festival["endDate"] < date.today().isoformat():
         raise APIError(422, "FESTIVAL_NOT_AVAILABLE", "종료되었거나 이용할 수 없는 축제입니다.")
@@ -72,10 +67,10 @@ async def get_group_detail(group_id: str, request: Request):
     return success(await get_group(group_id, get_repository(request)), request)
 
 
-@router.patch("/{group_id}", operation_id="updateGroup")
-async def update_group(group_id: str, payload: GroupUpdate, request: Request, x_demo_user_id: str | None = Header(default=None), if_match: str | None = Header(default=None)):
+@router.patch("/{group_id}", operation_id="updateGroup", dependencies=[Depends(require_current_user)])
+async def update_group(group_id: str, payload: GroupUpdate, request: Request, if_match: str | None = Header(default=None)):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     group = await get_group(group_id, repository)
     require_leader(group, user_id)
     version = int(if_match.strip('"')) if if_match and if_match.strip('"').isdigit() else payload.version
@@ -99,10 +94,10 @@ async def list_comments(group_id: str, request: Request, cursor: str | None = No
     return success({"items": items, "nextCursor": next_cursor}, request)
 
 
-@router.post("/{group_id}/comments", operation_id="createComment", status_code=201)
-async def create_comment(group_id: str, payload: CommentCreate, request: Request, x_demo_user_id: str | None = Header(default=None)):
+@router.post("/{group_id}/comments", operation_id="createComment", status_code=201, dependencies=[Depends(require_current_user)])
+async def create_comment(group_id: str, payload: CommentCreate, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     await get_group(group_id, repository)
     try:
         comment = await repository.add_comment(group_id, user_id, payload.text)
@@ -111,19 +106,19 @@ async def create_comment(group_id: str, payload: CommentCreate, request: Request
     return success(comment, request, status_code=201)
 
 
-@router.delete("/{group_id}/comments/{comment_id}", operation_id="deleteComment", status_code=204)
-async def delete_comment(group_id: str, comment_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+@router.delete("/{group_id}/comments/{comment_id}", operation_id="deleteComment", status_code=204, dependencies=[Depends(require_current_user)])
+async def delete_comment(group_id: str, comment_id: str, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     if not await repository.delete_comment(group_id, comment_id, user_id):
         raise APIError(404, "COMMENT_NOT_FOUND", "댓글을 찾을 수 없습니다.")
     return Response(status_code=204)
 
 
-@router.get("/{group_id}/join-requests", operation_id="listJoinRequests")
-async def list_join_requests(group_id: str, request: Request, status: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize"), x_demo_user_id: str | None = Header(default=None)):
+@router.get("/{group_id}/join-requests", operation_id="listJoinRequests", dependencies=[Depends(require_current_user)])
+async def list_join_requests(group_id: str, request: Request, status: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize")):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     group = await get_group(group_id, repository)
     require_leader(group, user_id)
     start = (page - 1) * page_size
@@ -131,10 +126,10 @@ async def list_join_requests(group_id: str, request: Request, status: str | None
     return success({"items": items, "page": page, "pageSize": page_size, "total": total}, request)
 
 
-@router.post("/{group_id}/join-requests", operation_id="createJoinRequest", status_code=201)
-async def create_join_request(group_id: str, payload: JoinRequestCreate, request: Request, x_demo_user_id: str | None = Header(default=None)):
+@router.post("/{group_id}/join-requests", operation_id="createJoinRequest", status_code=201, dependencies=[Depends(require_current_user)])
+async def create_join_request(group_id: str, payload: JoinRequestCreate, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         result = await repository.create_join_request(group_id, user_id, payload.message)
     except RepositoryError as error:
@@ -144,10 +139,10 @@ async def create_join_request(group_id: str, payload: JoinRequestCreate, request
     return success({"membership": result["membership"], "group": result["group"]}, request, status_code=201)
 
 
-@router.post("/{group_id}/join-requests/{request_id}/approve", operation_id="approveJoinRequest")
-async def approve_join_request(group_id: str, request_id: str, payload: VersionRequest, request: Request, x_demo_user_id: str | None = Header(default=None), if_match: str | None = Header(default=None)):
+@router.post("/{group_id}/join-requests/{request_id}/approve", operation_id="approveJoinRequest", dependencies=[Depends(require_current_user)])
+async def approve_join_request(group_id: str, request_id: str, payload: VersionRequest, request: Request, if_match: str | None = Header(default=None)):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     version = int(if_match.strip('"')) if if_match and if_match.strip('"').isdigit() else payload.version
     try:
         result = await repository.approve_join_request(group_id, request_id, user_id, version)
@@ -156,10 +151,10 @@ async def approve_join_request(group_id: str, request_id: str, payload: VersionR
     return success(result, request)
 
 
-@router.post("/{group_id}/join-requests/{request_id}/reject", operation_id="rejectJoinRequest")
-async def reject_join_request(group_id: str, request_id: str, payload: RejectRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
+@router.post("/{group_id}/join-requests/{request_id}/reject", operation_id="rejectJoinRequest", dependencies=[Depends(require_current_user)])
+async def reject_join_request(group_id: str, request_id: str, payload: RejectRequest, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         result = await repository.reject_join_request(group_id, request_id, user_id, payload.version, payload.reason)
     except RepositoryError as error:
@@ -169,10 +164,10 @@ async def reject_join_request(group_id: str, request_id: str, payload: RejectReq
     return success(result, request)
 
 
-@router.delete("/{group_id}/membership", operation_id="leaveGroup", status_code=204)
-async def leave_group(group_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+@router.delete("/{group_id}/membership", operation_id="leaveGroup", status_code=204, dependencies=[Depends(require_current_user)])
+async def leave_group(group_id: str, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         await repository.leave_group(group_id, user_id)
     except RepositoryError as error:

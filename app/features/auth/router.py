@@ -1,31 +1,26 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.core.api import APIError, success
-from app.core.repositories import SupabaseRepository, get_repository
+from app.core.auth import current_user_id, require_current_user
+from app.core.repositories import get_repository
 from .schemas import NotificationConsentPatch, ProfilePatch
 
-router = APIRouter(tags=["users"])
+router = APIRouter(tags=["users"], dependencies=[Depends(require_current_user)])
 
 
-async def demo_user(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
-
-
-async def self_user(user_id: str, value: str | None, repository: SupabaseRepository) -> str:
-    current = await demo_user(value, repository)
+def authenticated_self_user(user_id: str, request: Request) -> str:
+    current = current_user_id(request)
     if current != user_id:
-        raise APIError(403, "DEMO_USER_FORBIDDEN", "본인 사용자만 변경할 수 있습니다.")
+        raise APIError(403, "USER_FORBIDDEN", "본인 사용자 정보만 변경할 수 있습니다.")
     return current
 
 
 @router.get("/users/{user_id}", operation_id="getUser")
-async def get_user(user_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def get_user(user_id: str, request: Request):
     repository = get_repository(request)
-    await self_user(user_id, x_demo_user_id, repository)
+    authenticated_self_user(user_id, request)
     user = await repository.user(user_id)
     if not user:
         raise APIError(404, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.")
@@ -33,9 +28,9 @@ async def get_user(user_id: str, request: Request, x_demo_user_id: str | None = 
 
 
 @router.patch("/users/{user_id}/profile", operation_id="updateUserProfile")
-async def update_profile(user_id: str, payload: ProfilePatch, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def update_profile(user_id: str, payload: ProfilePatch, request: Request):
     repository = get_repository(request)
-    await self_user(user_id, x_demo_user_id, repository)
+    authenticated_self_user(user_id, request)
     user = await repository.update_profile(user_id, payload.model_dump(by_alias=True, exclude_none=True))
     if not user:
         raise APIError(404, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.")
@@ -43,9 +38,9 @@ async def update_profile(user_id: str, payload: ProfilePatch, request: Request, 
 
 
 @router.patch("/users/{user_id}/notification-consents", operation_id="updateNotificationConsents")
-async def update_consents(user_id: str, payload: NotificationConsentPatch, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def update_consents(user_id: str, payload: NotificationConsentPatch, request: Request):
     repository = get_repository(request)
-    await self_user(user_id, x_demo_user_id, repository)
+    authenticated_self_user(user_id, request)
     consents = await repository.update_consents(user_id, payload.model_dump(by_alias=True, exclude_none=True))
     if consents is None:
         raise APIError(404, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.")

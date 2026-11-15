@@ -18,7 +18,7 @@ API 설계서와 DB 설계서는 큰 도메인 범위와 핵심 상태 전이가
 | --- | --- | --- | --- |
 | 축제 `status` | `past/live/upcoming` 응답 | 저장하지 않고 오늘 날짜로 계산하는 뷰 | 응답 시 계산하도록 구현. KST 기준 계산은 PostgreSQL의 `kst_today()`를 사용 |
 | 축제 장소·운영시간 | `venue`, `operatingHours` 중첩 JSON | `venue_*` 컬럼과 `festival_operating_hours` 행 | Repository에서 조립해야 함 |
-| 사용자 인증 | MVP에서는 `X-Demo-User-Id` | `users.auth_user_id` + Supabase Auth/RLS | 개발용 헤더는 임시 어댑터. 운영에서는 JWT의 `auth.uid()`로 교체 |
+| 사용자 인증 | Supabase Auth Bearer JWT | `users.auth_user_id` + Supabase Auth/RLS | JWT `sub`를 앱 사용자로 매핑하고 DB 세션의 `auth.uid()`로 RLS 적용 |
 | 프로필 값 | camelCase JSON | snake_case, `travel_style`/MBTI CHECK | 요청 스키마에 DB 허용값과 길이 제약 반영 |
 | 모임 정원 | `capacity`, `memberCount`, `full` | `member_count` 조건부 증가 + 행 잠금/버전 | Repository 트랜잭션에서 행 잠금·정원 확인·버전 증가를 함께 수행 |
 | 멤버 탈퇴 | `DELETE /membership` | `left_at` 소프트 탈퇴 | DB Repository는 삭제 대신 `left_at` 갱신해야 함 |
@@ -50,8 +50,8 @@ API 설계서와 DB 설계서는 큰 도메인 범위와 핵심 상태 전이가
 4. 일정 제안 승인도 `group_schedules.version`과 모임 `version`을 검사해 충돌을 차단합니다.
 5. 채팅은 현재 스키마에 맞춰 `clientMessageId`별 PostgreSQL advisory transaction lock과 재조회를 사용해 재시도 멱등성을 보장합니다.
 6. 외부 수집 작업은 `external_sync_runs`에 저장하고 `/jobs/{jobId}`가 DB 상태를 반환합니다. 실제 worker와 운영 재시도 정책은 별도 작업입니다.
-7. 운영 배포 전 `X-Demo-User-Id` 경로를 제거하고 Supabase Auth JWT와 RLS만 사용합니다.
+7. 운영 배포 경로는 Supabase Auth JWT와 RLS를 사용하며, 세부 SQL은 `db/supabase_auth_rls.sql`에 있습니다.
 
 ## HTML 목업의 취급
 
-HTML의 데모 사용자 전환, 강수·취소 즉시 주입, JSON 업로드, localStorage 초기화·복원, 화면용 샘플 데이터는 발표용 목업 기능입니다. API·DB 영속성 요구사항으로 그대로 옮기지 않고, 개발 환경용 admin sync/import와 데모 헤더로만 제한합니다.
+HTML의 데모 사용자 전환, 강수·취소 즉시 주입, JSON 업로드, localStorage 초기화·복원, 화면용 샘플 데이터는 발표용 목업 기능입니다. API·DB 영속성 요구사항으로 그대로 옮기지 않고, 개발 환경용 admin sync/import로만 제한합니다.

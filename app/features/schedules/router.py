@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Depends, Request
 
 from app.core.api import APIError, success
+from app.core.auth import current_user_id, require_current_user
 from app.core.repositories import RepositoryError, SupabaseRepository, get_repository
 from .schemas import ProposalAction, ProposalCreate, ScheduleValidateRequest
 
-router = APIRouter(tags=["schedules"])
-
-
-async def require_demo(value: str | None, repository: SupabaseRepository) -> str:
-    if not value or not await repository.user(value):
-        raise APIError(400, "DEMO_USER_INVALID", "유효한 X-Demo-User-Id가 필요합니다.")
-    return value
+router = APIRouter(tags=["schedules"], dependencies=[Depends(require_current_user)])
 
 
 async def get_group(group_id: str, repository: SupabaseRepository) -> dict:
@@ -37,18 +32,18 @@ def repository_error(error: RepositoryError) -> APIError:
 
 
 @router.get("/groups/{group_id}/schedule", operation_id="getGroupSchedule")
-async def get_schedule(group_id: str, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def get_schedule(group_id: str, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     group = await get_group(group_id, repository)
     require_member(group, user_id)
     return success(group["schedule"], request)
 
 
 @router.post("/groups/{group_id}/schedule/validate", operation_id="validateGroupSchedule")
-async def validate_schedule(group_id: str, payload: ScheduleValidateRequest, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def validate_schedule(group_id: str, payload: ScheduleValidateRequest, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         result = await repository.validate_schedule(group_id, user_id, payload.trigger, payload.version)
     except RepositoryError as error:
@@ -57,9 +52,9 @@ async def validate_schedule(group_id: str, payload: ScheduleValidateRequest, req
 
 
 @router.post("/groups/{group_id}/schedule/proposals", operation_id="createScheduleProposal", status_code=201)
-async def create_proposal(group_id: str, payload: ProposalCreate, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def create_proposal(group_id: str, payload: ProposalCreate, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         proposal = await repository.create_proposal(group_id, user_id, payload.strategy, payload.version)
     except RepositoryError as error:
@@ -73,9 +68,9 @@ async def create_proposal(group_id: str, payload: ProposalCreate, request: Reque
 
 
 @router.post("/groups/{group_id}/schedule/proposals/{proposal_id}/approve", operation_id="approveScheduleProposal")
-async def approve_proposal(group_id: str, proposal_id: str, payload: ProposalAction, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def approve_proposal(group_id: str, proposal_id: str, payload: ProposalAction, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         result = await repository.decide_proposal(group_id, proposal_id, user_id, payload.version, True, payload.reason)
     except RepositoryError as error:
@@ -84,9 +79,9 @@ async def approve_proposal(group_id: str, proposal_id: str, payload: ProposalAct
 
 
 @router.post("/groups/{group_id}/schedule/proposals/{proposal_id}/reject", operation_id="rejectScheduleProposal")
-async def reject_proposal(group_id: str, proposal_id: str, payload: ProposalAction, request: Request, x_demo_user_id: str | None = Header(default=None)):
+async def reject_proposal(group_id: str, proposal_id: str, payload: ProposalAction, request: Request):
     repository = get_repository(request)
-    user_id = await require_demo(x_demo_user_id, repository)
+    user_id = current_user_id(request)
     try:
         result = await repository.decide_proposal(group_id, proposal_id, user_id, payload.version, False, payload.reason)
     except RepositoryError as error:

@@ -25,7 +25,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 - Python 3.12+, FastAPI, Uvicorn
 - 요청·응답 모델: Pydantic 기반 camelCase JSON 계약
 - 영속 저장소: PostgreSQL/Supabase용 `asyncpg` Repository
-- 인증 어댑터: 개발용 `X-Demo-User-Id` 헤더 및 WebSocket `demoUserId` 쿼리
+- 인증 어댑터: Supabase Auth JWT 및 WebSocket access token
 - 실시간 통신: 그룹 채팅 WebSocket
 - 관리성 작업: 개발 환경에서만 축제·날씨·공지 동기화 작업 생성
 
@@ -34,7 +34,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 | 사용자 유형 | 설명 | 주요 권한 |
 |---|---|---|
 | 비인증/공개 사용자 | 축제 및 공개 모임 탐색 사용자 | 축제 목록·상세·캘린더, 공개 모임 목록·상세 조회 |
-| 데모 사용자 | `X-Demo-User-Id`로 식별되는 개발용 사용자 | 본인 프로필·동의 수정, 매칭, 모임 생성·신청, 댓글·채팅, 일정·알림 이용 |
+| 인증 사용자 | Supabase Auth JWT의 `sub`와 `users.auth_user_id`로 연결되는 사용자 | 본인 프로필·동의 수정, 매칭, 모임 생성·신청, 댓글·채팅, 일정·알림 이용 |
 | 모임장 | 모임을 생성한 사용자 | 모임 수정, 참여 신청 조회·승인·거절, 일정 검증·제안·승인·거절 |
 | 모임 멤버 | 모임에 승인되었거나 즉시 참여한 사용자 | 모임 채팅, 일정 조회, 모임 탈퇴 |
 | 개발 관리자 | `development`, `local`, `test` 환경에서 관리 API를 호출하는 주체 | 축제·날씨·공지 동기화 작업 생성 |
@@ -42,13 +42,13 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 
 ### 2.1 인증·인가 요구사항
 
-- REQ-AUTH-001 **[구현됨]** 인증이 필요한 REST 요청은 유효한 `X-Demo-User-Id`를 받아야 한다.
-- REQ-AUTH-002 **[구현됨]** 헤더 값은 `users`에서 활성 사용자로 조회되어야 하며, 유효하지 않으면 `400 DEMO_USER_INVALID`를 반환한다.
-- REQ-AUTH-003 **[구현됨]** 사용자 프로필·알림 동의 수정은 대상 사용자 ID와 현재 데모 사용자 ID가 동일해야 한다. 불일치 시 `403 DEMO_USER_FORBIDDEN`을 반환한다.
+- REQ-AUTH-001 **[구현됨]** 인증이 필요한 REST 요청은 유효한 Supabase Auth Bearer JWT를 받아야 한다.
+- REQ-AUTH-002 **[구현됨]** JWT subject는 `users.auth_user_id`의 활성 사용자로 조회되어야 하며, 토큰이 없거나 유효하지 않으면 `401`, 매핑되지 않으면 `403`을 반환한다.
+- REQ-AUTH-003 **[구현됨]** 사용자 프로필·알림 동의 수정은 대상 사용자 ID와 JWT로 확인한 현재 사용자 ID가 동일해야 한다. 불일치 시 `403 USER_FORBIDDEN`을 반환한다.
 - REQ-AUTH-004 **[구현됨]** 모임장 전용 작업은 그룹의 `leaderId`와 요청 사용자가 일치해야 한다.
 - REQ-AUTH-005 **[구현됨]** 멤버 전용 작업은 현재 멤버 목록에 요청 사용자가 포함되어야 한다.
-- REQ-AUTH-006 **[구현됨]** 운영 환경에서는 데모 헤더를 Supabase Auth JWT 및 RLS 기반 인증으로 교체해야 한다. 현재 구현은 개발용 어댑터다.
-- REQ-AUTH-007 **[보완 필요]** 관리 API는 현재 환경명만 검사하므로, 운영 전에는 관리자 역할·토큰 검증을 추가해야 한다.
+- REQ-AUTH-006 **[구현됨]** 보호 API는 Supabase Auth JWT 및 RLS 기반 인증을 사용한다.
+- REQ-AUTH-007 **[구현됨]** 관리 API는 JWT의 `app_metadata.role`이 `admin` 또는 `service_role`인 경우에만 접근할 수 있다.
 
 ## 3. 공통 API 요구사항
 
@@ -246,7 +246,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 | REQ-CHAT-001 | GET | `/groups/{groupId}/messages` | 멤버 | `before`, `after`, `limit` 기반으로 메시지를 조회한다. |
 | REQ-CHAT-002 | POST | `/groups/{groupId}/messages` | 멤버 | 메시지를 저장하고 생성 이벤트를 방송한다. |
 | REQ-CHAT-003 | GET | `/groups/{groupId}/events` | 멤버 | 최근 메시지를 이벤트 형태로 조회한다. |
-| REQ-CHAT-004 | WebSocket | `/ws/groups/{groupId}/chat?demoUserId=...` | 멤버 | 연결·송수신·해제를 처리한다. |
+| REQ-CHAT-004 | WebSocket | `/ws/groups/{groupId}/chat` + JWT | 멤버 | JWT로 인증된 멤버의 연결·송수신·해제를 처리한다. |
 
 현재 WebSocket 연결 목록은 프로세스 메모리에만 보관되므로 다중 인스턴스 운영 시 Redis 등의 브로커가 필요하다.
 
@@ -350,7 +350,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 ### 6.3 보안
 
 - REQ-NFR-010 **[구현됨]** CORS 허용 origin은 설정으로 관리한다.
-- REQ-NFR-011 **[보완 필요]** 운영에서는 데모 사용자 ID 헤더를 제거하고 Supabase Auth JWT·RLS를 적용해야 한다.
+- REQ-NFR-011 **[구현됨]** 데모 사용자 ID 헤더를 제거하고 Supabase Auth JWT·RLS를 적용한다.
 - REQ-NFR-012 **[보완 필요]** 관리자 API에 역할 기반 접근 제어, rate limit, 감사 로그를 추가해야 한다.
 - REQ-NFR-013 **[보완 필요]** 채팅 메시지에 대한 콘텐츠 정제, 욕설·개인정보·악성 링크 정책을 추가해야 한다.
 - REQ-NFR-014 **[보완 필요]** 요청 크기 제한, WebSocket 연결 수 제한, 사용자별 메시지 rate limit을 적용해야 한다.
@@ -389,7 +389,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 
 1. `app/core/store.py`에는 데모 인메모리 데이터와 저장소가 있으나, 현재 라우터는 `get_repository()`를 통해 `SupabaseRepository`만 사용한다. 따라서 `DATABASE_URL`이 없을 때 기능 API가 자동으로 인메모리 모드로 전환된다고 보기 어렵다. README 및 `docs/api-db-review.md`의 인메모리 fallback 설명과 현재 코드의 동작을 일치시켜야 한다.
 2. `DATABASE_URL`이 설정되지 않았거나 필수 테이블이 없으면 Repository 호출 시 기능 API가 런타임 오류를 낼 수 있다. 애플리케이션 시작 시 명확한 degraded mode를 선택하거나 DB를 필수화해야 한다.
-3. 관리자 API는 개발 환경 여부만 검사하며 관리자 인증은 없다.
+3. 관리자 API의 JWT 역할 클레임과 `is_admin()` RLS 정책은 Supabase Auth app metadata 설정과 함께 운영해야 한다.
 4. 동기화 API는 작업을 생성하지만 외부 수집·worker·비동기 상태 갱신은 구현 범위 밖이다.
 5. 매칭은 규칙 기반 점수 계산이며, README에 언급된 OpenAI/LangGraph 연동은 현재 코드에 없다.
 6. WebSocket 연결 상태가 프로세스 로컬이며, 서버 수평 확장 시 메시지 방송이 분리될 수 있다.

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import contextvars
+import json
 import logging
+import re
 from typing import Any
 
 import asyncpg
@@ -28,6 +31,30 @@ REQUIRED_TABLES = (
     "external_sync_runs",
 )
 
+_auth_claims: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "request_auth_claims", default=None
+)
+
+
+class _ScopedAcquire:
+    def __init__(self, database: "Database") -> None:
+        self.database = database
+        self.connection: asyncpg.Connection | None = None
+
+    async def __aenter__(self) -> asyncpg.Connection:
+        if self.database.pool is None:
+            raise RuntimeError("DATABASE_URL is not configured or the database is unavailable")
+        self.connection = await self.database.pool.acquire()
+        await self.database._set_connection_claims(self.connection)
+        return self.connection
+
+    async def __aexit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
+        if self.connection is not None and self.database.pool is not None:
+            try:
+                await self.database._clear_connection_claims(self.connection)
+            finally:
+                await self.database.pool.release(self.connection)
+
 
 class Database:
     """Supabase PostgreSQL connection pool used by the API process.
@@ -46,6 +73,33 @@ class Database:
     @property
     def enabled(self) -> bool:
         return bool(self.settings.database_url)
+
+    def bind_auth_claims(self, claims: dict[str, Any]) -> contextvars.Token:
+        """Bind JWT claims to this request so PostgreSQL auth.uid() can see them."""
+
+        return _auth_claims.set(claims)
+
+    @staticmethod
+    def reset_auth_claims(token: contextvars.Token) -> None:
+        _auth_claims.reset(token)
+
+    async def _set_connection_claims(self, connection: asyncpg.Connection) -> None:
+        claims = _auth_claims.get()
+        role = self.settings.database_authenticated_role if claims else self.settings.database_anon_role
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", role):
+            raise RuntimeError("Invalid PostgreSQL RLS role configuration")
+        await connection.execute(f"set role {role}")
+        await connection.execute(
+            "select set_config('request.jwt.claims', $1, false)",
+            json.dumps(claims or {}, separators=(",", ":")),
+        )
+
+    async def _clear_connection_claims(self, connection: asyncpg.Connection) -> None:
+        await connection.execute("select set_config('request.jwt.claims', '{}', false)")
+        await connection.execute("reset role")
+
+    def acquire(self) -> _ScopedAcquire:
+        return _ScopedAcquire(self)
 
     async def connect(self) -> None:
         if not self.enabled:
@@ -96,12 +150,26 @@ class Database:
     async def fetch(self, query: str, *args: Any) -> list[asyncpg.Record]:
         if self.pool is None:
             raise RuntimeError("DATABASE_URL is not configured or the database is unavailable")
-        return await self.pool.fetch(query, *args)
+        async with self.acquire() as connection:
+            return await connection.fetch(query, *args)
+
+    async def fetchrow(self, query: str, *args: Any) -> asyncpg.Record | None:
+        if self.pool is None:
+            raise RuntimeError("DATABASE_URL is not configured or the database is unavailable")
+        async with self.acquire() as connection:
+            return await connection.fetchrow(query, *args)
+
+    async def fetchval(self, query: str, *args: Any) -> Any:
+        if self.pool is None:
+            raise RuntimeError("DATABASE_URL is not configured or the database is unavailable")
+        async with self.acquire() as connection:
+            return await connection.fetchval(query, *args)
 
     async def execute(self, query: str, *args: Any) -> str:
         if self.pool is None:
             raise RuntimeError("DATABASE_URL is not configured or the database is unavailable")
-        return await self.pool.execute(query, *args)
+        async with self.acquire() as connection:
+            return await connection.execute(query, *args)
 
 
 def database_status(database: Database) -> dict[str, Any]:

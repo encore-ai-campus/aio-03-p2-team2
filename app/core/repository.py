@@ -45,7 +45,7 @@ class RepositoryBase:
     def __init__(self, database: Database) -> None:
         self.database = database
 
-    def _pool(self) -> asyncpg.Pool:
+    def _pool(self) -> Database:
         if self.database.pool is None:
             raise RepositoryError("DATABASE_UNAVAILABLE", "데이터베이스에 연결할 수 없습니다.", 503)
-        return self.database.pool
+        return self.database
