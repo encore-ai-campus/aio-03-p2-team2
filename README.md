@@ -113,6 +113,13 @@ uv run python -m scripts.agent_demo --group-id YOUR_GROUP_ID
 uv run python -m scripts.evaluate_agent --output data/agent-evaluation.json
 ```
 
+외부 축제·날씨 동기화 Worker는 API 서버와 별도 프로세스로 실행합니다. `DATABASE_URL`과
+`TOUR_API_SERVICE_KEY`를 설정하고 `db/external_sync_worker.sql`을 적용한 뒤 다음 명령을 실행합니다.
+
+```powershell
+uv run python -m app.sync_worker
+```
+
 시연 스크립트는 `SUPABASE_ACCESS_TOKEN` 환경변수로 로그인 토큰을 받습니다. `--approve` 옵션은 실제 일정을 변경합니다. 토큰을 Git이나 문서에 저장하지 않습니다.
 
 DB 통합 테스트는 별도로 준비한 시험 DB의 `TEST_AGENT_DATABASE_URL`이 필요합니다. 공유 서비스 DB를 시험 DB로 지정하지 않습니다. HTTP RLS 시험에는 테스트 사용자의 Auth 연결도 필요합니다.

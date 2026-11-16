@@ -29,6 +29,7 @@ REQUIRED_TABLES = (
     "alerts",
     "alert_answers",
     "external_sync_runs",
+    "festival_weather_forecasts",
 )
 
 _auth_claims: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(

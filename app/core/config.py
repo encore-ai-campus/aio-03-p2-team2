@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     openai_model: str = ""
     agent_weather_provider: Literal["demo", "openmeteo"] = "demo"
     tour_api_service_key: SecretStr | None = None
+    external_sync_poll_interval: float = Field(default=5, ge=0.1, le=300)
+    external_sync_http_timeout: float = Field(default=15, ge=1, le=120)
+    external_sync_lease_seconds: int = Field(default=300, ge=30, le=3600)
+    external_sync_max_attempts: int = Field(default=3, ge=1, le=10)
+    external_sync_retry_base_seconds: float = Field(default=5, ge=0.1, le=3600)
     agent_max_iterations: int = Field(default=3,ge=1,le=8)
     agent_tool_retries: int = Field(default=2,ge=0,le=4)
     agent_max_tool_rounds: int = Field(default=8,ge=2,le=16)
