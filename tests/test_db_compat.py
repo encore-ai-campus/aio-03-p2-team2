@@ -48,3 +48,16 @@ def test_party_size_and_group_text_follow_db_limits():
 )
 def test_postgres_errors_map_to_api_status(error, status, code):
     assert _postgres_error(error)[:2] == (status, code)
+
+
+def test_rpc_result_accepts_jsonb_text_from_asyncpg():
+    from app.core.repository import RepositoryError, assert_rpc_success
+
+    assert assert_rpc_success('{"ok": true, "version": 2}') == {"ok": True, "version": 2}
+    assert assert_rpc_success({"ok": True}) == {"ok": True}
+    with pytest.raises(RepositoryError) as failed:
+        assert_rpc_success('{"ok": false, "code": "GROUP_CAPACITY_EXCEEDED", "status": 409, "message": "정원"}')
+    assert failed.value.code == "GROUP_CAPACITY_EXCEEDED" and failed.value.status_code == 409
+    with pytest.raises(RepositoryError) as invalid:
+        assert_rpc_success("not json")
+    assert invalid.value.code == "DATABASE_RPC_INVALID"

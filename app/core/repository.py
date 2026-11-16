@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, time, timezone
 from typing import Any
 
@@ -19,6 +20,12 @@ class RepositoryError(Exception):
 
 def assert_rpc_success(result: Any) -> dict[str, Any]:
     """Convert a concurrency RPC result into the repository error contract."""
+    # asyncpg 는 jsonb 코덱을 따로 등록하지 않으면 jsonb 를 문자열로 돌려준다 → dict 로 변환
+    if isinstance(result, (str, bytes)):
+        try:
+            result = json.loads(result)
+        except ValueError:
+            result = None
     if not isinstance(result, dict):
         raise RepositoryError("DATABASE_RPC_INVALID", "DB 동시성 처리 결과가 올바르지 않습니다.", 503)
     if not result.get("ok"):
