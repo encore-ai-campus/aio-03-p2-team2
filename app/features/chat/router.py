@@ -10,7 +10,7 @@ from app.core.auth import authenticate_websocket, current_user_id, require_curre
 from app.core.repositories import SupabaseRepository, get_repository
 from .schemas import MessageCreate
 
-router = APIRouter(tags=["chat"], dependencies=[Depends(require_current_user)])
+router = APIRouter(tags=["chat"])
 connections: dict[str, set[WebSocket]] = defaultdict(set)
 
 
@@ -34,7 +34,7 @@ async def broadcast(group_id: str, message: dict) -> None:
         connections[group_id].discard(socket)
 
 
-@router.get("/groups/{group_id}/messages", operation_id="listMessages")
+@router.get("/groups/{group_id}/messages", operation_id="listMessages", dependencies=[Depends(require_current_user)])
 async def list_messages(group_id: str, request: Request, before: str | None = None, after: str | None = None, limit: int = Query(default=50, ge=1, le=100)):
     repository = get_repository(request)
     user_id = current_user_id(request)
@@ -43,7 +43,7 @@ async def list_messages(group_id: str, request: Request, before: str | None = No
     return success({"items": items, "nextCursor": items[0]["id"] if items else None}, request)
 
 
-@router.post("/groups/{group_id}/messages", operation_id="createMessage", status_code=201)
+@router.post("/groups/{group_id}/messages", operation_id="createMessage", status_code=201, dependencies=[Depends(require_current_user)])
 async def create_message(group_id: str, payload: MessageCreate, request: Request):
     repository = get_repository(request)
     user_id = current_user_id(request)
@@ -53,7 +53,7 @@ async def create_message(group_id: str, payload: MessageCreate, request: Request
     return success(message, request, status_code=201)
 
 
-@router.get("/groups/{group_id}/events", operation_id="listGroupEvents")
+@router.get("/groups/{group_id}/events", operation_id="listGroupEvents", dependencies=[Depends(require_current_user)])
 async def list_events(group_id: str, request: Request):
     repository = get_repository(request)
     user_id = current_user_id(request)
@@ -73,16 +73,16 @@ async def chat_socket(websocket: WebSocket, group_id: str):
         await websocket.close(code=1008, reason=error.code)
         return
     user_id = current_user.id
-    group = await repository.group(group_id, include_comments=False)
-    if not group:
-        await websocket.close(code=1008, reason="GROUP_NOT_FOUND")
-        return
-    if not any(item["userId"] == user_id for item in group["members"]):
-        await websocket.close(code=1008, reason="CHAT_MEMBER_ONLY")
-        return
-    await websocket.accept()
-    connections[group_id].add(websocket)
     try:
+        group = await repository.group(group_id, include_comments=False)
+        if not group:
+            await websocket.close(code=1008, reason="GROUP_NOT_FOUND")
+            return
+        if not any(item["userId"] == user_id for item in group["members"]):
+            await websocket.close(code=1008, reason="CHAT_MEMBER_ONLY")
+            return
+        await websocket.accept()
+        connections[group_id].add(websocket)
         await websocket.send_json({"event": "chat.connected", "data": {"groupId": group_id, "userId": user_id}})
         while True:
             payload = await websocket.receive_json()

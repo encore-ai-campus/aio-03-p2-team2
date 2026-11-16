@@ -33,7 +33,7 @@ class SupabaseRepository(
 
 
 def get_repository(request: Any) -> SupabaseRepository:
-    return SupabaseRepository(request.app.state.database)
+    return request.app.state.repository
 
 
 __all__ = ["RepositoryBase", "RepositoryError", "SupabaseRepository", "get_repository"]

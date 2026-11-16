@@ -60,15 +60,23 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+    app_user_id text;
+    display_name_value text;
 begin
+    display_name_value := left(coalesce(
+        nullif(btrim(new.raw_user_meta_data ->> 'display_name'), ''),
+        nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+        '새 사용자'
+    ), 20);
     insert into public.users (id, auth_user_id, display_name, status)
-    values (
-        'usr_' || left(replace(new.id::text, '-', ''), 24),
-        new.id,
-        coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1), 'FestaMate user'),
-        'active'
-    )
+    values ('usr_' || replace(new.id::text, '-', ''), new.id, display_name_value, 'active')
     on conflict (auth_user_id) do nothing;
+    select id into app_user_id from public.users where auth_user_id = new.id;
+    insert into public.user_profiles (user_id) values (app_user_id)
+        on conflict (user_id) do nothing;
+    insert into public.notification_consents (user_id) values (app_user_id)
+        on conflict (user_id) do nothing;
     return new;
 end
 $$;
@@ -77,6 +85,13 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
     after insert on auth.users
     for each row execute procedure public.handle_new_auth_user();
+
+insert into public.user_profiles (user_id)
+    select id from public.users where auth_user_id is not null
+    on conflict (user_id) do nothing;
+insert into public.notification_consents (user_id)
+    select id from public.users where auth_user_id is not null
+    on conflict (user_id) do nothing;
 
 -- RLS is enabled for every table reachable from the API. The FastAPI
 -- connection sets request.jwt.claims and switches to anon/authenticated for
@@ -185,7 +200,7 @@ drop policy if exists messages_member_read on public.group_messages;
 create policy messages_member_read on public.group_messages for select
     using (exists (
         select 1 from public.group_members gm
-        where gm.group_id = group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null
+        where gm.group_id = group_messages.group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null
     ));
 drop policy if exists messages_member_create on public.group_messages;
 create policy messages_member_create on public.group_messages for insert
@@ -195,13 +210,13 @@ create policy messages_member_create on public.group_messages for insert
         ))
         and exists (
             select 1 from public.group_members gm
-            where gm.group_id = group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null
+            where gm.group_id = group_messages.group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null
         )
     );
 
 drop policy if exists schedules_member_read on public.group_schedules;
 create policy schedules_member_read on public.group_schedules for select
-    using (exists (select 1 from public.group_members gm where gm.group_id = group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null));
+    using (exists (select 1 from public.group_members gm where gm.group_id = group_schedules.group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null));
 drop policy if exists schedules_leader_write on public.group_schedules;
 create policy schedules_leader_write on public.group_schedules for all
     using (exists (select 1 from public.groups g where g.id = group_id and g.leader_id = public.current_app_user_id()))
@@ -209,7 +224,7 @@ create policy schedules_leader_write on public.group_schedules for all
 
 drop policy if exists proposals_member_read on public.schedule_proposals;
 create policy proposals_member_read on public.schedule_proposals for select
-    using (exists (select 1 from public.group_members gm where gm.group_id = group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null));
+    using (exists (select 1 from public.group_members gm where gm.group_id = schedule_proposals.group_id and gm.user_id = public.current_app_user_id() and gm.left_at is null));
 drop policy if exists proposals_member_create on public.schedule_proposals;
 create policy proposals_member_create on public.schedule_proposals for insert
     with check (created_by = public.current_app_user_id());

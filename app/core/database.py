@@ -45,7 +45,12 @@ class _ScopedAcquire:
         if self.database.pool is None:
             raise RuntimeError("DATABASE_URL is not configured or the database is unavailable")
         self.connection = await self.database.pool.acquire()
-        await self.database._set_connection_claims(self.connection)
+        try:
+            await self.database._set_connection_claims(self.connection)
+        except BaseException:
+            await self.database.pool.release(self.connection)
+            self.connection = None
+            raise
         return self.connection
 
     async def __aexit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
@@ -120,9 +125,11 @@ class Database:
                 raise RuntimeError(self.error)
         except Exception as exc:
             self.status = "error"
-            self.error = str(exc)
+            self.error = "Database connection failed; check server configuration"
+            if self.pool is not None:
+                await self.pool.close()
             self.pool = None
-            logger.exception("PostgreSQL connection failed")
+            logger.error("PostgreSQL connection failed (%s)",type(exc).__name__)
             if self.settings.database_required:
                 raise
 

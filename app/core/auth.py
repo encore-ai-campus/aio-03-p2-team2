@@ -94,10 +94,10 @@ def get_jwt_verifier() -> JWTVerifier:
     return JWTVerifier(get_settings())
 
 
-async def _claims_from_credentials(credentials: HTTPAuthorizationCredentials | None) -> AuthClaims:
+async def _claims_from_credentials(credentials: HTTPAuthorizationCredentials | None, verifier: JWTVerifier) -> AuthClaims:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise APIError(401, "AUTH_REQUIRED", "Authorization Bearer 토큰이 필요합니다.")
-    return await get_jwt_verifier().verify(credentials.credentials)
+    return await verifier.verify(credentials.credentials)
 
 
 async def require_current_user(
@@ -106,7 +106,7 @@ async def require_current_user(
 ) -> AsyncIterator[CurrentUser]:
     """Validate JWT, bind its claims to the DB session, and resolve app user."""
 
-    auth = await _claims_from_credentials(credentials)
+    auth = await _claims_from_credentials(credentials, request.app.state.jwt_verifier)
     database = request.app.state.database
     context_token = database.bind_auth_claims(auth.claims)
     try:
@@ -146,7 +146,7 @@ async def authenticate_websocket(websocket: WebSocket) -> tuple[CurrentUser, Any
     token = token or websocket.query_params.get("accessToken") or websocket.query_params.get("access_token")
     if not token:
         raise APIError(401, "AUTH_REQUIRED", "WebSocket 인증 토큰이 필요합니다.")
-    auth = await get_jwt_verifier().verify(token)
+    auth = await websocket.app.state.jwt_verifier.verify(token)
     database = websocket.app.state.database
     context_token = database.bind_auth_claims(auth.claims)
     try:

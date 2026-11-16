@@ -4,3 +4,7 @@ __pycache__/
 .env
 !.env.example
 
+
+# Local agent memory, checkpoints and demo fixtures
+data/
+.pytest_cache/

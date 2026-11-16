@@ -1,3 +1,5 @@
+> 이 문서는 기존 API/DB 설계 검토 기록입니다. 아래 인메모리 전환·일정 RPC 관련 계획은 현재 구현과 다를 수 있습니다. 최신 에이전트·일정 계약과 검증 범위는 [agent-workflow.md](agent-workflow.md), [시험 보고서](agent-test-report.md)를 확인하세요.
+
 # API · DB 설계 일치 검토
 
 검토 대상은 다음 문서입니다.

@@ -47,6 +47,7 @@ async def list_groups(request: Request, festival_id: str | None = Query(default=
         item.pop("joinRequests", None)
         item.pop("comments", None)
         item.pop("schedule", None)
+        item.pop("messages", None)
         items.append(item)
     start = (page - 1) * page_size
     return success({"items": items[start : start + page_size], "page": page, "pageSize": page_size, "total": len(items)}, request)
@@ -67,7 +68,10 @@ async def create_group(payload: GroupCreate, request: Request):
 
 @router.get("/{group_id}", operation_id="getGroup")
 async def get_group_detail(group_id: str, request: Request):
-    return success(await get_group(group_id, get_repository(request)), request)
+    group = dict(await get_group(group_id, get_repository(request)))
+    for key in ("joinRequests","schedule","messages"):
+        group.pop(key,None)
+    return success(group, request)
 
 
 @router.patch("/{group_id}", operation_id="updateGroup", dependencies=[Depends(require_current_user)])
