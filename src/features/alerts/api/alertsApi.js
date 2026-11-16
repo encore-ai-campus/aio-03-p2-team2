@@ -1,0 +1,31 @@
+// 악천후 알림·대체 축제 API — 백엔드 기준: app/features/alerts/router.py, app/features/agents/workflow.py
+import { apiFetch } from "../../../shared/lib/apiClient.js";
+
+const enc = encodeURIComponent;
+
+// GET /alerts — 내 알림 (최신순) { id, type, festivalId, groupId, title, message, status, choice, isTest, createdAt }
+export const listAlerts = () => apiFetch("/alerts?pageSize=50").then((d) => d.items);
+
+// POST /alerts/{id}/answer — 참여 의사: continue(그대로 참여) | find_alternative(대체 축제) | dismiss
+export const answerAlert = (alertId, answer) => apiFetch(`/alerts/${enc(alertId)}/answer`, { method: "POST", body: { answer } });
+
+// PATCH /me/notification-consents — 악천후 알림 수신 동의 (꺼져 있으면 알림이 생성되지 않음)
+export const enableRiskAlert = () => apiFetch("/me/notification-consents", { method: "PATCH", body: { riskAlert: true } });
+
+// POST /workflow/groups/{id}/weather-check — 모임 일정 날짜의 날씨 확인 (모임장만)
+// simulateRisk: true 면 개발 환경에서 시험용 악천후 알림 생성 (제목 [테스트], isTest=true)
+// 응답 { groupId, date, risk, createdAlertCount, isTest, nextAction }
+export const weatherCheck = (groupId, simulateRisk = false) =>
+  apiFetch(`/workflow/groups/${enc(groupId)}/weather-check`, { method: "POST", body: { simulateRisk } });
+
+// 대체 축제 추천 (모임장만) — 알림에서 시작하거나, 알림 없이 모임에서 바로 시작
+// 응답 = 에이전트 실행: status completed → candidate.items(대체 축제 목록)
+export const riskResponseFromAlert = (alertId) => apiFetch(`/alerts/${enc(alertId)}/risk-response`, { method: "POST" });
+export const riskResponseForGroup = (groupId) => apiFetch(`/workflow/groups/${enc(groupId)}/risk-response`, { method: "POST" });
+
+// POST /workflow/risk-runs/{runId}/select — 추천받은 대체 축제 선택 → 그 축제 기준 일정 재생성 실행
+// 응답 = 에이전트 실행: waiting_approval → comparison.before(기존)·after(새 일정) → 모임장 확정(resume decision)
+// ⚠️ 날짜는 자동으로 바뀌지 않음 — 대체 축제 기간 안의 날짜를 conditions.date로 꼭 보내야 함
+//    (안 보내면 기존 일정 날짜로 검증해서 FESTIVAL_UNAVAILABLE "축제 기간 또는 취소 상태를 확인해야 합니다")
+export const selectAlternative = (runId, festivalId, date) =>
+  apiFetch(`/workflow/risk-runs/${enc(runId)}/select`, { method: "POST", body: { festivalId, conditions: date ? { date } : {} } });

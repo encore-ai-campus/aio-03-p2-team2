@@ -1,6 +1,8 @@
-import { Fragment } from "react";
+import { Fragment, useCallback, useState } from "react";
 import { Button } from "../../../shared/components/Primitives.jsx";
 import { useDemo } from "../../../app/DemoProvider.jsx";
+import { useFestivals } from "../../festivals/hooks/useFestivals.js";
+import LiveAlerts from "../components/LiveAlerts.jsx";
 export default function AlertsPage() {
   const demo = useDemo();
   const {
@@ -16,6 +18,10 @@ export default function AlertsPage() {
     alternativeFestivals,
     pageHead,
   } = demo;
+  // 실제 API 우선 (실패 시 아래 기존 데모 화면)
+  const { festivals } = useFestivals(state.festivals);
+  const [apiFailed, setApiFailed] = useState(false);
+  const onFail = useCallback(() => setApiFailed(true), []);
   let w = state.weather,
     ref = festival(w.festivalId) || festival("f22"),
     options = alternativeFestivals(ref);
@@ -27,6 +33,10 @@ export default function AlertsPage() {
         "악천후·취소·외부 변경 상황에서 사용자 의사를 먼저 확인하고 대안을 안내해요.",
       )}
 
+      {!apiFailed ? (
+        <LiveAlerts festivals={festivals} pill={pill} onFail={onFail} />
+      ) : (
+      <>
       <div
         className="two"
         style={{
@@ -223,6 +233,8 @@ export default function AlertsPage() {
         </>
       ) : (
         ""
+      )}
+      </>
       )}
     </>
   );
