@@ -1,11 +1,15 @@
 import { Fragment } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import CalendarView, { ViewToggle } from "../components/CalendarView.jsx";
+import { SOURCE_LABEL, useFestivals } from "../hooks/useFestivals.js";
 export default function FestivalExplorePage() {
   const demo = useDemo();
   const { state, btn, fieldProps, today, active, groupClosed, fCard, calMonth } = demo;
   const calendar = state.discoverView === "calendar";
-  const all = state.festivals.filter(
+  // 실제 API 축제 목록 (실패하면 데모 데이터 그대로)
+  const { festivals, source } = useFestivals(state.festivals);
+  const [sourceText, sourceClass] = SOURCE_LABEL[source];
+  const all = festivals.filter(
     (f) => f.start <= "2026-12-31" && f.end >= "2026-01-01",
   );
   const available = all.filter(active).length,
@@ -112,6 +116,7 @@ export default function FestivalExplorePage() {
           </p>
         </div>
         <div className="section-actions">
+          <span className={sourceClass} title="축제 데이터 출처">{sourceText}</span>
           {!calendar && (
             <span className="pill blue">
               {"검색 결과 "}
