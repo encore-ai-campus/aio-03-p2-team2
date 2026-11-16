@@ -65,8 +65,19 @@ class DemoRepository:
         return [deepcopy(g) for g in self.store.groups.values() if (not filters.get("festival_id") or g["festivalId"] == filters["festival_id"]) and (not filters.get("status") or g["status"] == filters["status"]) and (not filters.get("keyword") or filters["keyword"] in g["title"])]
     async def create_group(self,user_id,payload):
         if not await self.festival(payload["festivalId"]): raise RepositoryError("FESTIVAL_NOT_FOUND","축제를 찾을 수 없습니다.",404)
+        if payload.get("workflowGroupId") and payload["workflowGroupId"] in self.store.groups:
+            return deepcopy(self.owned(payload["workflowGroupId"], user_id))
         self.store.create_group(user_id,payload)
         group = list(self.store.groups.values())[-1]
+        if payload.get("workflowGroupId"):
+            del self.store.groups[group["id"]]
+            group["id"] = payload["workflowGroupId"]
+            self.store.groups[group["id"]] = group
+        conditions = payload.get("conditions", {})
+        if conditions.get("date"):
+            group["schedule"]["current"]["date"] = conditions["date"]
+        if conditions.get("start_time"):
+            group["schedule"]["current"]["time"] = conditions["start_time"]
         group["schedule"]["current"]["endTime"] = "14:00"
         group["schedule"]["items"] = [deepcopy(group["schedule"]["current"])]
         self.persist(); return deepcopy(group)
@@ -104,6 +115,8 @@ class DemoRepository:
             existing = next((p for p in schedule["proposals"] if p["id"] == proposal_id),None)
             if existing: return deepcopy(existing)
             proposal = {"id":proposal_id,"groupId":group_id,"items":deepcopy(plan["items"]),"summary":plan["summary"],"schedule":deepcopy(plan["items"][0]),"status":"draft","version":schedule_version,"createdAt":now_iso()}
+            if plan.get("targetFestivalId"):
+                proposal["targetFestivalId"] = plan["targetFestivalId"]
             schedule["proposals"].append(proposal); self.persist(); return deepcopy(proposal)
     async def reject_agent_proposal(self,group_id,proposal_id,user_id):
         with self.store.lock:
@@ -122,6 +135,8 @@ class DemoRepository:
             if schedule["version"] != schedule_version or current != availability or proposal["status"] != "draft" or proposal["version"] != schedule_version:
                 raise RepositoryError("RESOURCE_VERSION_CONFLICT","참여 조건 또는 일정이 변경되었습니다.",409)
             proposal["status"] = "approved"
+            if proposal.get("targetFestivalId"):
+                group["festivalId"] = proposal["targetFestivalId"]
             schedule.update(items=deepcopy(proposal["items"]),current=deepcopy(proposal["items"][0]),version=schedule_version+1,validation={"status":"valid","conflict":None})
             group["version"] += 1
             self.store.add_message(group,None,"모임장이 검증된 새 일정을 승인했습니다.","system")

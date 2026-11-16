@@ -30,7 +30,7 @@ class ScheduleRepositoryMixin(RepositoryBase):
                 pending = await connection.fetchrow("select id from schedule_proposals where group_id=$1 and status='draft'",group_id)
                 if pending and pending["id"] != proposal_id:
                     raise RepositoryError("PROPOSAL_ALREADY_PENDING","기존 일정 제안을 승인 또는 거절한 뒤 새 실행을 시작해 주세요.",409)
-                await connection.execute("insert into schedule_proposals (id,group_id,base_version,items,strategy,status,created_by) values ($1,$2,$3,$4::jsonb,'agent_validated','draft',$5) on conflict (id) do nothing",proposal_id,group_id,schedule_version,json.dumps(plan["items"],ensure_ascii=False),user_id)
+                await connection.execute("insert into schedule_proposals (id,group_id,base_version,items,strategy,status,created_by,validation) values ($1,$2,$3,$4::jsonb,'agent_validated','draft',$5,$6::jsonb) on conflict (id) do nothing",proposal_id,group_id,schedule_version,json.dumps(plan["items"],ensure_ascii=False),user_id,json.dumps({"targetFestivalId":plan["targetFestivalId"]}) if plan.get("targetFestivalId") else None)
         return {"id":proposal_id,"groupId":group_id,"status":"draft","items":plan["items"],"version":schedule_version}
 
     async def reject_agent_proposal(self,group_id,proposal_id,user_id):
@@ -56,6 +56,18 @@ class ScheduleRepositoryMixin(RepositoryBase):
                 if current != sorted(availability,key=lambda r:r["userId"]):
                     raise RepositoryError("RESOURCE_VERSION_CONFLICT","참여자 가능 시간이 변경되었습니다.",409)
                 items = json.loads(proposal["items"]) if isinstance(proposal["items"],str) else proposal["items"]
+                target = None
+                if proposal["validation"]:
+                    try:
+                        metadata = json.loads(proposal["validation"]) if isinstance(proposal["validation"], str) else proposal["validation"]
+                        target = metadata.get("targetFestivalId") if isinstance(metadata, dict) else None
+                    except (ValueError, TypeError):
+                        pass
+                if target:
+                    festival = await connection.fetchrow("select id, risk_status, start_date, end_date from festivals where id=$1 for share", target)
+                    if not festival or festival["risk_status"] == "cancelled" or any(not str(festival["start_date"]) <= item["date"] <= str(festival["end_date"]) for item in items):
+                        raise RepositoryError("FESTIVAL_UNAVAILABLE", "대체 축제 상태가 변경되었습니다.", 422)
+                    await connection.execute("update groups set festival_id=$1 where id=$2", target, group_id)
                 await connection.execute("update schedule_proposals set status='approved',decided_by=$1,decided_at=now() where id=$2",user_id,proposal_id)
                 await connection.execute("update group_schedules set items=$1::jsonb,version=version+1,validation_status='valid',conflict=null,updated_by=$2,updated_at=now() where group_id=$3",json.dumps(items,ensure_ascii=False),user_id,group_id)
                 await connection.execute("update groups set version=version+1,updated_at=now() where id=$1",group_id)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+import json
 
 import asyncpg
 
@@ -24,7 +25,7 @@ class AlertRepositoryMixin(RepositoryBase):
 
     @staticmethod
     def _alert_view(row: asyncpg.Record) -> dict:
-        return {"id": row["id"], "type": row["type"], "festivalId": row["festival_id"], "groupId": row["group_id"], "severity": row["severity"], "title": row["title"], "message": row["message"], "status": row["status"], "choice": row["choice"], "createdAt": _iso(row["created_at"]), "answeredAt": _iso(row["answered_at"])}
+        return {"isTest": row.get("is_test", False), "evidence": json.loads(row["evidence"]) if isinstance(row.get("evidence"),str) else row.get("evidence"), "id": row["id"], "type": row["type"], "festivalId": row["festival_id"], "groupId": row["group_id"], "severity": row["severity"], "title": row["title"], "message": row["message"], "status": row["status"], "choice": row["choice"], "createdAt": _iso(row["created_at"]), "answeredAt": _iso(row["answered_at"])}
 
     async def update_alert(self, alert_id: str, user_id: str, *, status: str | None = None, choice: str | None = None) -> dict | None:
         alert = await self.alert(alert_id, user_id)

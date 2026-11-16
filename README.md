@@ -104,6 +104,24 @@ uv run python -m scripts.agent_console --provider rules
 
 대화형 입력 시험: 규칙 모드에서 추가 질문 후 승인, 거절, 취소, 잘못된 시간 수정, 입력 종료(EOF) 처리 5개 시나리오를 확인했습니다.
 
+## 전체 워크플로우 터미널 대화 테스트
+
+```powershell
+uv run python -m scripts.workflow_console
+```
+
+기본값은 공유 DB와 별도 서버가 필요 없는 격리 데모입니다. 단계마다 입력 형식과 예시를 보여주며 축제 선택 → 시간 되묻기 → 매칭 후보 → 모집글 → B 계정 참여 신청 → A 계정 승인 → 공동 일정 → 악천후 알림 → 대체 축제·수정 전후 비교까지 진행합니다. Enter는 표시된 기본값, `/exit` 또는 Ctrl+C는 종료입니다.
+
+데모의 두 계정·JWT·날씨·저장소는 시험용이지만 실제 FastAPI 경로와 에이전트 그래프를 실행합니다. 자가 수정 재현 질문에 `y`를 입력하면 첫 초안에만 시험용 시간 오류를 주입하고 실제 검증·성찰 루프가 수정합니다. 기본 `rules`는 OpenAI 호출이 없으며, `--provider openai`를 추가하면 `.env` 모델로 실제 OpenAI를 호출합니다.
+
+실행 중인 백엔드에 두 실제 계정으로 접속하려면:
+
+```powershell
+uv run python -m scripts.workflow_console --mode live --base-url http://127.0.0.1:8000
+```
+
+`login`·`signup`·`token` 중 인증 방법을 선택합니다. 비밀번호와 토큰은 숨겨 입력하며 파일에 저장하지 않습니다. A와 B는 서로 다른 계정이어야 합니다. 실제 모드는 프로필·모집글·참여·일정 변경을 서버 DB에 반영하고 서버의 모델·날씨 설정을 사용합니다. 이메일 인증이 켜져 있으면 인증 후 로그인합니다. 개발 서버에서는 `simulate`로 악천후를 재현하고, 운영 서버에서는 `actual`을 선택합니다.
+
 ## 테스트·시연
 
 ```powershell

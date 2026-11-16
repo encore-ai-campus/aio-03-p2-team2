@@ -74,6 +74,20 @@ async def alert_alternatives(alert_id: str, request: Request, limit: int = Query
     return success({"items": items[:limit]}, request)
 
 
+@router.post("/{alert_id}/risk-response", status_code=201)
+async def alert_risk_response(alert_id: str, request: Request):
+    from app.features.agents.workflow import WorkflowService
+    user_id = current_user_id(request)
+    alert = await own_alert(alert_id, user_id, get_repository(request))
+    if not alert.get("groupId"):
+        raise APIError(422, "ALERT_GROUP_REQUIRED", "모임에 연결된 알림이 필요합니다.")
+    group = await WorkflowService(request.app.state.agents).leader_group(user_id, alert["groupId"])
+    if group["festivalId"] != alert["festivalId"]:
+        raise APIError(409, "ALERT_STALE", "모임 축제가 변경되었습니다. 최신 알림을 확인해 주세요.")
+    result = await WorkflowService(request.app.state.agents).risk(user_id, group["id"])
+    return success(result, request, status_code=201)
+
+
 @admin_router.post("/weather/sync", operation_id="syncWeatherAlerts")
 async def sync_weather(payload: dict, request: Request):
     require_development()

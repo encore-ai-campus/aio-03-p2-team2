@@ -23,6 +23,8 @@ from app.core.repositories import SupabaseRepository, RepositoryError
 from app.core.auth import JWTVerifier
 from app.features.agents.service import AgentService
 from app.features.agents.router import router as agents_router
+from app.features.agents.workflow import router as workflow_router
+from app.features.alerts.monitor import WeatherMonitor
 from app.features.agents.tools import ToolFailure
 
 
@@ -38,12 +40,18 @@ def create_app(settings: Settings | None = None, *, repository=None, model=None,
         app.state.database = database
         app.state.repository = repository if repository is not None else SupabaseRepository(database)
         agents = None
+        monitor = None
         try:
             agents = AgentService(app.state.repository,settings,model=model,tools=tools,storage=agent_storage)
             await agents.open()
             app.state.agents = agents
+            monitor = WeatherMonitor(database, agents, settings)
+            app.state.weather_monitor = monitor
+            monitor.start()
             yield
         finally:
+            if monitor is not None:
+                await monitor.close()
             if agents is not None:
                 await agents.close()
             await database.close()
@@ -101,7 +109,7 @@ def create_app(settings: Settings | None = None, *, repository=None, model=None,
         )
 
 
-    for feature in (agents_router, auth_router, users_router, festivals_router, matching_router, groups_router, chat_router, schedules_router, alerts_router):
+    for feature in (workflow_router, agents_router, auth_router, users_router, festivals_router, matching_router, groups_router, chat_router, schedules_router, alerts_router):
         app.include_router(feature, prefix=settings.api_prefix)
 
     app.include_router(festivals_admin_router, prefix=settings.api_prefix)

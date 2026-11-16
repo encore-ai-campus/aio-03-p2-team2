@@ -202,7 +202,7 @@ async def test_matching_can_choose_optional_weather_after_candidate_result(tmp_p
     model=ScriptedOpenAI(replies)
     service=await make_service(repo,settings(tmp_path),model=model).open()
     try:
-        run=await service.start(USER,RunStart(message='동행 추천',intent='matching',festival_id=g['festivalId'],conditions=Conditions(date=day)))
+        run=await service.start(USER,RunStart(message='동행 추천',intent='matching',festival_id=g['festivalId'],conditions=Conditions(date=day,start_time='15:00')))
         assert run['status']=='completed'
         assert [c['tool'] for c in run['toolCalls']]==['get_festival','get_candidates','get_weather']
         assert not (await repo.group(g['id']))['schedule']['proposals']

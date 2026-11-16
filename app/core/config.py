@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     openai_model: str = ""
     agent_weather_provider: Literal["demo", "openmeteo"] = "demo"
+    weather_monitor_interval_seconds: int = Field(default=300, ge=0, le=86400)
     tour_api_service_key: SecretStr | None = None
     agent_max_iterations: int = Field(default=3,ge=1,le=8)
     agent_tool_retries: int = Field(default=2,ge=0,le=4)

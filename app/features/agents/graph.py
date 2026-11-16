@@ -55,9 +55,9 @@ class AgentNodes:
                 return self.update(state,"parse_request",status="failed",errors=[error("GROUP_NOT_FOUND","모임을 찾을 수 없습니다.")])
             if group["leaderId"] != state["user_id"]:
                 raise RepositoryError("LEADER_ONLY","모임장만 일정 에이전트를 실행할 수 있습니다.",403)
-            if festival_id and festival_id != group["festivalId"]:
+            if festival_id and festival_id != group["festivalId"] and festival_id != state.get("target_festival_id"):
                 raise RepositoryError("FESTIVAL_GROUP_MISMATCH","모임에 연결된 축제로 요청해야 합니다.",400)
-            festival_id = group["festivalId"]
+            festival_id = state.get("target_festival_id") or group["festivalId"]
             current = group["schedule"].get("current")
             if current and not conditions.get("date"):
                 conditions["date"] = current["date"]
@@ -68,10 +68,13 @@ class AgentNodes:
             missing.append("festivalId")
         if not conditions.get("date"):
             missing.append("date")
+        if intent == "matching" and not conditions.get("start_time"):
+            missing.append("startTime")
         return self.update(state,"parse_request",intent=intent,conditions=conditions,group=group,festival_id=festival_id,missing=missing,status="running")
 
     async def ask_user(self, state):
-        payload = {"type":"input_required","missing":state.get("missing",[]),"errors":state.get("errors",[]),"message":"누락 조건 또는 검증 오류를 확인하고 answers, groupId, festivalId로 응답해 주세요."}
+        questions = {"startTime": "몇 시에 참여하실 건가요?", "date": "어느 날짜에 참여하실 건가요?", "festivalId": "어떤 축제에 참여하실 건가요?", "groupId": "어느 모임의 일정을 만들까요?"}
+        payload = {"type":"input_required","missing":state.get("missing",[]),"errors":state.get("errors",[]),"questions":[{"field": key, "message": questions[key]} for key in state.get("missing",[])],"message":" ".join(questions[key] for key in state.get("missing",[])) or "검증 오류를 확인하고 추가 조건을 알려 주세요."}
         answer = interrupt(payload)
         if answer.get("decision") == "cancel":
             return self.update(state,"ask_user",status="cancelled")
@@ -173,7 +176,8 @@ class AgentNodes:
 
     async def validate_candidate(self, state):
         errors = validate_plan(state.get("candidate"),state["conditions"],state["tool_results"],state["intent"])
-        return self.update(state,"validate_candidate",errors=errors)
+        history = state.get("candidate_history", []) + [{"iteration": state["iteration"], "candidate": deepcopy(state.get("candidate")), "errors": deepcopy(errors), "repair": deepcopy(state.get("repair", {}))}]
+        return self.update(state,"validate_candidate",errors=errors,candidate_history=history)
 
     async def reflect_and_repair(self, state):
         if state["iteration"] >= self.settings.agent_max_iterations:
@@ -191,7 +195,10 @@ class AgentNodes:
         group = state["group"]
         proposal_id = f"prp_{state['run_id'].replace('run_','')[:20]}_{state['iteration']}"
         try:
-            proposal = await self.repository.save_agent_proposal(state["group_id"],state["user_id"],proposal_id,state["candidate"],group["version"],group["schedule"]["version"])
+            plan = {**state["candidate"]}
+            if state.get("target_festival_id"):
+                plan["targetFestivalId"] = state["target_festival_id"]
+            proposal = await self.repository.save_agent_proposal(state["group_id"],state["user_id"],proposal_id,plan,group["version"],group["schedule"]["version"])
         except RepositoryError as exc:
             if exc.code == "RESOURCE_VERSION_CONFLICT":
                 return self.update(state,"save_proposal",errors=[error(exc.code,exc.message)])

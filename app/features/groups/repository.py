@@ -105,7 +105,7 @@ class GroupRepositoryMixin(RepositoryBase):
         return [self._join_request_view(row) for row in rows], int(total or 0)
 
     async def create_group(self, user_id: str, payload: dict) -> dict:
-        group_id = f"grp_{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S%f')}"
+        group_id = payload.get("workflowGroupId") or f"grp_{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S%f')}"
         async with self._pool().acquire() as connection:
             async with connection.transaction():
                 festival = await connection.fetchrow("select id, name, start_date from festivals where id = $1", payload["festivalId"])
@@ -113,7 +113,7 @@ class GroupRepositoryMixin(RepositoryBase):
                     raise RepositoryError("FESTIVAL_NOT_FOUND", "축제를 찾을 수 없습니다.", 404)
                 await connection.execute("insert into groups (id, festival_id, leader_id, title, post_body, join_mode, capacity, member_count, status, version) values ($1,$2,$3,$4,$5,$6,$7,1,'open',1)", group_id, payload["festivalId"], user_id, payload["title"], payload["postBody"], payload["joinMode"], payload["capacity"])
                 await connection.execute("insert into group_members (group_id, user_id, role) values ($1,$2,'leader')", group_id, user_id)
-                await connection.execute("insert into group_schedules (group_id, items, version, validation_status, updated_by) values ($1,$2::jsonb,1,'valid',$3)", group_id, json.dumps([{"date": _iso(festival["start_date"]), "time": "13:00", "label": festival["name"], "description": "모임 기본 일정"}]), user_id)
+                await connection.execute("insert into group_schedules (group_id, items, version, validation_status, updated_by) values ($1,$2::jsonb,1,'valid',$3)", group_id, json.dumps([{"date": payload.get("conditions", {}).get("date") or _iso(festival["start_date"]), "time": payload.get("conditions", {}).get("start_time") or "13:00", "label": festival["name"], "description": "모임 기본 일정"}]), user_id)
         return await self.group(group_id)  # type: ignore[return-value]
 
     async def update_group(self, group_id: str, values: dict, version: int) -> dict | None:

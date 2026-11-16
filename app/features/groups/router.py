@@ -152,7 +152,7 @@ async def approve_join_request(group_id: str, request_id: str, payload: VersionR
         result = await GroupService(repository).approve_join_request(group_id, request_id, user_id, version)
     except RepositoryError as error:
         raise repository_error(error) from error
-    return success(result, request)
+    return success({**result, "nextActions": [{"method": "POST", "path": f"{request.app.state.settings.api_prefix}/workflow/groups/{group_id}/schedule", "label": "참여자 조건으로 일정 생성"}]}, request)
 
 
 @router.post("/{group_id}/join-requests/{request_id}/reject", operation_id="rejectJoinRequest", dependencies=[Depends(require_current_user)])

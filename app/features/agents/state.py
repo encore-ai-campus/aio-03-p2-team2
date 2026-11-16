@@ -35,3 +35,6 @@ class AgentState(TypedDict, total=False):
     status: str
     result: dict | None
     trace: list[dict]
+    candidate_history: list[dict]
+    target_festival_id: str | None
+    original_schedule: dict | None
