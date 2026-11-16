@@ -11,7 +11,7 @@ from app.core.api import APIError, error_response
 from app.core.config import get_settings
 from app.core.database import Database, database_status
 from app.features.alerts.router import admin_router as alerts_admin_router, router as alerts_router
-from app.features.auth.router import router as auth_router
+from app.features.auth.router import auth_router, users_router
 from app.features.chat.router import router as chat_router
 from app.features.festivals.router import admin_router as festivals_admin_router, router as festivals_router
 from app.features.groups.router import router as groups_router
@@ -101,7 +101,7 @@ def create_app(settings: Settings | None = None, *, repository=None, model=None,
         )
 
 
-    for feature in (agents_router, auth_router, festivals_router, matching_router, groups_router, chat_router, schedules_router, alerts_router):
+    for feature in (agents_router, auth_router, users_router, festivals_router, matching_router, groups_router, chat_router, schedules_router, alerts_router):
         app.include_router(feature, prefix=settings.api_prefix)
 
     app.include_router(festivals_admin_router, prefix=settings.api_prefix)
