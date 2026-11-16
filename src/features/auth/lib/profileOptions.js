@@ -16,6 +16,13 @@ export const STYLES = [
   { value: "계획적으로", emoji: "📋", desc: "동선과 시간을 미리 짜서" },
 ];
 
+// 성별·연령대 — DB user_profiles CHECK와 같은 한글 값 (백엔드 ProfilePatch gender / ageBand)
+export const GENDERS = [
+  { value: "여성", emoji: "👩" },
+  { value: "남성", emoji: "👨" },
+];
+export const AGE_BANDS = ["10대", "20대", "30대", "40대", "50대"];
+
 export const BUDGETS = [3, 5, 7, 10, 15]; // 만원
 export const PARTY_SIZES = [2, 3, 4, 5, 6, 7, 8]; // 모임 정원 상한 8
 
@@ -38,6 +45,8 @@ export const MBTIS = [
 
 // 화면 입력값의 시작 상태 (전부 비어 있음 = 선택 안 함)
 export const EMPTY_FORM = {
+  gender: "",
+  ageBand: "",
   interests: [],
   budgetManwon: "",
   travelStyle: "",
@@ -50,6 +59,8 @@ export const EMPTY_FORM = {
 // 화면 입력값 → PATCH /me/profile 요청 본문 (비운 항목은 보내지 않음)
 export function toProfileBody(form) {
   const body = { defaultJoinMode: form.defaultJoinMode };
+  if (form.gender) body.gender = form.gender;
+  if (form.ageBand) body.ageBand = form.ageBand;
   if (form.interests.length) body.interests = form.interests;
   if (form.budgetManwon) body.budgetManwon = Number(form.budgetManwon);
   if (form.travelStyle) body.travelStyle = form.travelStyle;
@@ -62,6 +73,8 @@ export function toProfileBody(form) {
 // GET /me 응답의 profile → 화면 입력값 (마이페이지에서 기존 값 채우기)
 export function fromProfile(profile = {}) {
   return {
+    gender: profile.gender ?? "",
+    ageBand: profile.ageBand ?? "",
     interests: profile.interests ?? [],
     budgetManwon: profile.budgetManwon ?? "",
     travelStyle: profile.travelStyle ?? "",
