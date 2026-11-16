@@ -1,5 +1,6 @@
 """Compare the actual HTTP entry points with the same identity and candidate pool."""
 from copy import deepcopy
+import json
 from types import SimpleNamespace
 
 import httpx
@@ -9,6 +10,7 @@ from pydantic import ValidationError
 from app.features.agents.policy import parse_text
 from app.features.agents.providers import OpenAIModel
 from app.features.agents.schemas import Conditions, ParsedRequest
+from app.features.matching.repository import MatchingRepositoryMixin
 from app.main import create_app
 from tests.auth_helpers import install_test_identity, token_headers
 from tests.ephemeral_storage import EphemeralAgentStorage
@@ -37,7 +39,12 @@ def repository():
 
     async def save(user_id, festival_id, conditions, candidates, top_k, create_group, group_id):
         # Storage is a fixture; routers, input validation and both business paths are real.
-        return {"runId":"matching_test", "candidates":deepcopy(candidates), "group":None}
+        persisted = [MatchingRepositoryMixin._matching_candidate_view({
+            "candidate_user_id": item["user"]["id"], "display_name": item["user"]["displayName"],
+            "avatar_url": item["user"]["avatarUrl"], "score": item["score"],
+            "parts": json.dumps(item["parts"]), "reasons": item["reasons"],
+        }) for item in candidates]
+        return {"runId":"matching_test", "candidates":persisted, "group":None}
 
     repo.create_matching_run = save
     return repo, day
@@ -81,7 +88,7 @@ async def test_http_matching_api_and_agent_return_identical_candidates(tmp_path,
             assert run["status"] == "completed"
             assert run["candidate"]["items"] == direct.json()["data"]["candidates"]
             ids = {item["user"]["id"] for item in run["candidate"]["items"]}
-            assert not ids & {USER,"late","no-time"}
+            assert not ids & {USER,"late"}
             if shared.get("genderPreference") == "only_same":
                 assert not ids & {"male","unknown"}
             if not conditions:

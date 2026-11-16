@@ -111,7 +111,7 @@ def _validate_plan(candidate: dict | None, conditions: dict, results: dict, inte
                 user = known.get(item.get("user",{}).get("id"))
                 if not user:
                     errors.append(error("UNGROUNDED_CANDIDATE","도구 결과에 없는 사용자입니다."))
-                elif conditions.get("start_time") and (not user.get("profile",{}).get("availableFrom") or user["profile"]["availableFrom"] > conditions["start_time"]):
+                elif conditions.get("start_time") and user.get("profile",{}).get("availableFrom") and user["profile"]["availableFrom"] > conditions["start_time"]:
                     errors.append(error("TIME_CONFLICT","후보자의 시작 가능 시간이 맞지 않습니다."))
         else:
             known = {row["id"] for row in results.get("search_festivals",{}).get("data",[])}
