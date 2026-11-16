@@ -5,9 +5,30 @@ from fastapi import APIRouter, Depends, Request
 from app.core.api import APIError, success
 from app.core.auth import current_user_id, require_current_user
 from app.core.repositories import get_repository
-from .schemas import NotificationConsentPatch, ProfilePatch
+from .schemas import LoginRequest, NotificationConsentPatch, ProfilePatch, SignupRequest
+from .service import SupabaseAuthClient
 
-router = APIRouter(tags=["users"], dependencies=[Depends(require_current_user)])
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
+users_router = APIRouter(tags=["users"], dependencies=[Depends(require_current_user)])
+# Keep the old module-level name available for callers that imported it before
+# the public auth router was introduced.
+router = users_router
+
+
+@auth_router.post("/signup", operation_id="signUp")
+async def signup(payload: SignupRequest, request: Request):
+    """Create a Supabase Auth account and return its session when available."""
+
+    result = await SupabaseAuthClient(request.app.state.settings).signup(payload)
+    return success(result, request, status_code=201)
+
+
+@auth_router.post("/login", operation_id="login")
+async def login(payload: LoginRequest, request: Request):
+    """Sign in with email/password and return Supabase access and refresh tokens."""
+
+    result = await SupabaseAuthClient(request.app.state.settings).login(payload)
+    return success(result, request)
 
 
 def authenticated_self_user(user_id: str, request: Request) -> str:
@@ -26,14 +47,14 @@ async def current_user(request: Request) -> dict:
     return user
 
 
-@router.get("/me", operation_id="getCurrentUser")
+@users_router.get("/me", operation_id="getCurrentUser")
 async def get_current_user(request: Request):
     """Frontend-friendly alias that does not require the user id in the URL."""
 
     return success(await current_user(request), request)
 
 
-@router.patch("/me/profile", operation_id="updateCurrentUserProfile")
+@users_router.patch("/me/profile", operation_id="updateCurrentUserProfile")
 async def update_current_user_profile(payload: ProfilePatch, request: Request):
     user_id = current_user_id(request)
     user = await get_repository(request).update_profile(
@@ -45,7 +66,7 @@ async def update_current_user_profile(payload: ProfilePatch, request: Request):
     return success(user, request)
 
 
-@router.patch("/me/notification-consents", operation_id="updateCurrentUserNotificationConsents")
+@users_router.patch("/me/notification-consents", operation_id="updateCurrentUserNotificationConsents")
 async def update_current_user_consents(payload: NotificationConsentPatch, request: Request):
     user_id = current_user_id(request)
     consents = await get_repository(request).update_consents(
@@ -57,7 +78,7 @@ async def update_current_user_consents(payload: NotificationConsentPatch, reques
     return success(consents, request)
 
 
-@router.get("/users/{user_id}", operation_id="getUser")
+@users_router.get("/users/{user_id}", operation_id="getUser")
 async def get_user(user_id: str, request: Request):
     repository = get_repository(request)
     authenticated_self_user(user_id, request)
@@ -67,7 +88,7 @@ async def get_user(user_id: str, request: Request):
     return success(user, request)
 
 
-@router.patch("/users/{user_id}/profile", operation_id="updateUserProfile")
+@users_router.patch("/users/{user_id}/profile", operation_id="updateUserProfile")
 async def update_profile(user_id: str, payload: ProfilePatch, request: Request):
     repository = get_repository(request)
     authenticated_self_user(user_id, request)
@@ -77,7 +98,7 @@ async def update_profile(user_id: str, payload: ProfilePatch, request: Request):
     return success(user, request)
 
 
-@router.patch("/users/{user_id}/notification-consents", operation_id="updateNotificationConsents")
+@users_router.patch("/users/{user_id}/notification-consents", operation_id="updateNotificationConsents")
 async def update_consents(user_id: str, payload: NotificationConsentPatch, request: Request):
     repository = get_repository(request)
     authenticated_self_user(user_id, request)

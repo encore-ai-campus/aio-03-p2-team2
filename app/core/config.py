@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     database_authenticated_role: str = "authenticated"
     database_anon_role: str = "anon"
     supabase_url: str | None = None
+    # Public Supabase client key used for Auth sign-up/sign-in requests.
+    # This is not used to verify JWTs; keep SUPABASE_JWT_SECRET separate.
+    supabase_key: SecretStr | None = None
     supabase_jwt_secret: str | None = None
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_issuer: str | None = None
