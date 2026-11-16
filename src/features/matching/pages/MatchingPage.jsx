@@ -1,9 +1,11 @@
 import { Fragment, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import AiChatPanel from "../components/AiChatPanel.jsx";
+import AgentChatPanel from "../components/AgentChatPanel.jsx";
 import { AI_JOIN } from "../lib/aiParse.js";
 import { SOURCE_LABEL, useFestivals } from "../../festivals/hooks/useFestivals.js";
 import { conditionKey, useMatchingRun } from "../hooks/useMatchingRun.js";
+import CreatePostBox from "../../groups/components/CreatePostBox.jsx";
 
 const INTERESTS = ["미식", "사진", "산책", "음악", "문화", "전통", "자연", "카페", "액티비티"];
 const MBTIS = [
@@ -26,7 +28,10 @@ export default function MatchingPage() {
   // 직접 조건 매칭(실제 API) — 조건이 바뀌면 이전 결과는 숨긴다
   const { run, execute } = useMatchingRun();
   const [formMsg, setFormMsg] = useState("");
-  const apiResult = useApi && run.key === conditionKey(state.festivalId, pr) ? run : null;
+  // 오른쪽 패널 결과: 챗봇(에이전트) 결과가 있으면 우선, 없으면 직접 조건 매칭 결과
+  const [agentRun, setAgentRun] = useState(null);
+  const directResult = useApi && run.key === conditionKey(state.festivalId, pr) ? run : null;
+  const apiResult = useApi ? agentRun || directResult : null;
   const showDemoResult = !useApi && state.matchingDone;
   const runApiMatch = () => {
     const missing = [
@@ -36,6 +41,7 @@ export default function MatchingPage() {
     ].filter(Boolean);
     if (missing.length) return setFormMsg(`필수 조건을 입력해 주세요: ${missing.join(", ")}`);
     setFormMsg("");
+    setAgentRun(null);
     execute(state.festivalId, pr);
   };
   const [sourceText, sourceClass] = SOURCE_LABEL[source];
@@ -72,18 +78,48 @@ export default function MatchingPage() {
         "가고 싶은 축제와 원하는 동행을 말로 적으면 AI가 조건을 정리해 추천하고, 공개 모집글과 모임방을 만들어요.",
       )}
 
-      <ol className={`workflow ${showDemoResult || apiResult?.status === "done" ? "done" : ""}`} aria-label="매칭 진행 단계">
+      {/* 실서버 모드: 실제 진행한 단계까지만 ✓ (후보 추천까지 = 2단계, 모집글·신청은 다음 화면) */}
+      {useApi ? (
+        <ol className="workflow" aria-label="매칭 진행 단계">
+          {["조건 말하기", "AI 후보 추천", "모집글 만들기", "참여 신청·승인"].map((x, i) => {
+            const done = apiResult?.status === "done" && i < 2;
+            return (
+              <li className="step" key={x}>
+                <b style={done ? { background: "var(--coral)", color: "#fff" } : undefined}>{done ? "✓" : i + 1}</b>
+                {x}
+              </li>
+            );
+          })}
+        </ol>
+      ) : (
+      <ol className={`workflow ${showDemoResult ? "done" : ""}`} aria-label="매칭 진행 단계">
         {["조건 말하기", "AI 점수 계산", "모임방 생성", "모집글 등록"].map((x, i) => (
           <li className="step" key={x}>
-            <b>{showDemoResult || apiResult?.status === "done" ? "✓" : i + 1}</b>
+            <b>{showDemoResult ? "✓" : i + 1}</b>
             {x}
           </li>
         ))}
       </ol>
+      )}
 
       <div className="match-layout">
       <div className="match-main">
-      <AiChatPanel />
+      {useApi ? (
+        <AgentChatPanel
+          festivals={all}
+          festivalId={state.festivalId}
+          pill={pill}
+          onResult={setAgentRun}
+          onPickFestival={(id) =>
+            mutate((s) => {
+              s.festivalId = id;
+              s.matchingDone = false;
+            })
+          }
+        />
+      ) : (
+        <AiChatPanel />
+      )}
 
       <details
         className="box match-form form-fold"
@@ -219,7 +255,7 @@ export default function MatchingPage() {
 
       <section className="box pad match-results">
         {apiResult ? (
-          <ApiResults run={apiResult} festivalName={findFestival(state.festivalId)?.name} pill={pill} />
+          <ApiResults run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={summary} pill={pill} />
         ) : showDemoResult ? (
           <>
           {matchingGroup && (
@@ -321,7 +357,8 @@ function ScoreWhy({ parts }) {
 }
 
 // 실제 API 매칭 결과 (POST /matching/runs) — 데모 결과와 같은 카드 모양
-function ApiResults({ run, festivalName, pill }) {
+function ApiResults({ run, festival, profile, summary, pill }) {
+  const festivalName = festival?.name;
   const head = (label, tone) => (
     <div className="section-head" style={{ marginTop: 0 }}>
       <h2>추천 동행 후보</h2>
@@ -391,6 +428,9 @@ function ApiResults({ run, festivalName, pill }) {
       ) : (
         <div className="empty">조건에 맞는 추천 후보가 아직 없어요.</div>
       )}
+      <div style={{ marginTop: "12px" }}>
+        <CreatePostBox festival={festival} partySize={profile.party} joinMode={profile.joinMode || "approval"} summary={summary} />
+      </div>
       <div className="note" style={{ marginTop: "15px" }}>
         추천 점수는 입력한 조건이 얼마나 겹치는지를 나타내요. 실제 만족도를 보장하지는 않아요.
       </div>

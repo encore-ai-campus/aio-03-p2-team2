@@ -1,9 +1,15 @@
-import { Fragment } from "react";
+import { Fragment, useCallback, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
+import { useFestivals } from "../../festivals/hooks/useFestivals.js";
+import LiveCommunity from "../components/LiveCommunity.jsx";
 export default function CommunityPage() {
   const demo = useDemo();
-  const { state, btn, group, groupClosed, pageHead, roomCard, roomDetail } =
+  const { state, btn, pill, group, groupClosed, pageHead, roomCard, roomDetail } =
     demo;
+  // 실제 모임 API 우선, 실패하면 기존 데모 화면
+  const { festivals } = useFestivals(state.festivals);
+  const [apiFailed, setApiFailed] = useState(false);
+  const onFail = useCallback(() => setApiFailed(true), []);
   const groups = [...state.groups]
     .filter(
       (g) =>
@@ -28,6 +34,10 @@ export default function CommunityPage() {
           " · 최초 게시글 작성자가 모임장이 돼요. 공개 댓글은 누구나, 채팅은 승인된 참여자만 이용해요. 정원 초과 시 자동 마감되지만 게시글은 삭제되지 않아요."
         }
       </div>
+      {!apiFailed ? (
+        <LiveCommunity festivals={festivals} pill={pill} onFail={onFail} />
+      ) : (
+      <>
       <div className="section-head">
         <div>
           <h2>
@@ -66,6 +76,8 @@ export default function CommunityPage() {
         </div>
         {roomDetail(g)}
       </div>
+      </>
+      )}
     </>
   );
 }
