@@ -63,44 +63,153 @@ def parse_slots(text: str, festivals: list[dict]) -> dict:
     }
 
 
-def score_candidate(conditions: dict, user: dict) -> dict:
-    """Score one active user using the product's matching weights."""
-    profile = user["profile"]
-    weights = {"schedule": 25, "interests": 20, "budget": 20, "style": 15, "mbti": 10, "partySize": 10}
+# 매칭 가중치 (합계 100).
+# - 요청자가 고르지 않은 조건은 점수에서 제외(분모에서 빠짐)
+# - 후보의 정보가 비어 있는 항목도 제외(missing)하되, 요청한 조건 가중치의 절반 이상에
+#   후보 정보가 있어야 추천 대상이 된다 (정보가 거의 없는 후보가 100%가 되는 것 방지)
+MATCH_WEIGHTS = {
+    "schedule": 20, "interests": 20, "budget": 15, "style": 15,
+    "ageBand": 10, "partySize": 10, "gender": 5, "mbti": 5,
+}
+# 이 점수(%) 이상인 후보만 추천한다.
+MATCH_THRESHOLD = 80
+# 요청한 조건 가중치 중 후보 정보가 있는 비율의 최소값
+MIN_PROFILE_COVERAGE = 0.5
+AGE_BANDS = ("10대", "20대", "30대", "40대", "50대")
+GENDER_PREFERENCES = ("any", "same", "only_same")
+
+
+def _excluded() -> dict[str, Any]:
+    return {"score": 0, "max": 0, "excluded": True}
+
+
+def _missing(weight: int) -> dict[str, Any]:
+    """요청한 조건이지만 후보 정보가 없는 항목: 점수에서는 제외하고 정보 부족으로 표시."""
+    return {"score": 0, "max": 0, "excluded": True, "missing": True, "requested": weight}
+
+
+def _part(score: float, maximum: int) -> dict[str, Any]:
+    return {"score": max(0, min(maximum, round(score))), "max": maximum}
+
+
+def score_candidate(conditions: dict, user: dict, requester: dict | None = None) -> dict:
+    """Score one active user. `requester` is the user asking for matches (for age band / gender)."""
+    profile = user.get("profile") or {}
+    mine = (requester or {}).get("profile") or {}
+    w = MATCH_WEIGHTS
     parts: dict[str, dict[str, Any]] = {}
+    reasons: list[str] = []
 
-    available = profile.get("availableFrom") or "23:59"
-    desired = conditions.get("startTime") or "00:00"
-    parts["schedule"] = {"score": weights["schedule"] if available <= desired else round(weights["schedule"] * 0.4), "max": weights["schedule"]}
+    # 일정: 후보가 요청 시각까지 합류 가능하면 만점, 늦으면 40%
+    desired, available = conditions.get("startTime"), profile.get("availableFrom")
+    if not desired:
+        parts["schedule"] = _excluded()
+    elif not available:
+        parts["schedule"] = _missing(w["schedule"])
+    elif available <= desired:
+        parts["schedule"] = _part(w["schedule"], w["schedule"])
+        reasons.append(f"{available}부터 합류 가능")
+    else:
+        parts["schedule"] = _part(w["schedule"] * 0.4, w["schedule"])
 
-    matches = set(conditions.get("interests") or []) & set(profile.get("interests") or [])
-    parts["interests"] = {"score": round(weights["interests"] * len(matches) / max(1, len(conditions.get("interests") or []))), "max": weights["interests"]}
+    # 관심사: 요청한 관심사 중 겹치는 비율
+    wanted = list(dict.fromkeys(conditions.get("interests") or []))
+    matches = [item for item in wanted if item in set(profile.get("interests") or [])]
+    if not wanted:
+        parts["interests"] = _excluded()
+    elif not profile.get("interests"):
+        parts["interests"] = _missing(w["interests"])
+    else:
+        parts["interests"] = _part(w["interests"] * len(matches) / len(wanted), w["interests"])
+        if matches:
+            reasons.append(f"관심사 {len(matches)}개 일치({', '.join(matches)})")
 
-    budget = conditions.get("budgetManwon")
-    budget_score = weights["budget"] if budget is None or profile.get("budgetManwon") is None else max(0, weights["budget"] - abs(budget - profile["budgetManwon"]) * 2)
-    parts["budget"] = {"score": budget_score, "max": weights["budget"]}
-    parts["style"] = {"score": weights["style"] if not conditions.get("travelStyle") or conditions["travelStyle"] == profile.get("travelStyle") else 0, "max": weights["style"]}
+    # 예산: 1만원 차이마다 2점 감점
+    budget, their_budget = conditions.get("budgetManwon"), profile.get("budgetManwon")
+    if budget is None:
+        parts["budget"] = _excluded()
+    elif their_budget is None:
+        parts["budget"] = _missing(w["budget"])
+    else:
+        gap = abs(budget - their_budget)
+        parts["budget"] = _part(w["budget"] - gap * 2, w["budget"])
+        reasons.append(f"예산 차이 {gap}만원")
 
-    preferred = set(conditions.get("preferredMbti") or [])
-    parts["mbti"] = {"score": weights["mbti"] if preferred and preferred & set(profile.get("mbti") or []) else 0, "max": weights["mbti"] if preferred and profile.get("mbti") else 0}
-    if parts["mbti"]["max"] == 0:
-        parts["mbti"]["excluded"] = True
+    # 여행 스타일: 같으면 만점
+    style = conditions.get("travelStyle")
+    if not style:
+        parts["style"] = _excluded()
+    elif not profile.get("travelStyle"):
+        parts["style"] = _missing(w["style"])
+    else:
+        same_style = style == profile.get("travelStyle")
+        parts["style"] = _part(w["style"] if same_style else 0, w["style"])
+        if same_style:
+            reasons.append(f"여행 스타일 같음({style})")
 
-    party = conditions.get("partySize")
-    parts["partySize"] = {"score": weights["partySize"] if not party or party == profile.get("preferredPartySize") else max(0, weights["partySize"] - 4), "max": weights["partySize"]}
-    score = round(sum(part["score"] for part in parts.values()) / max(1, sum(part["max"] for part in parts.values())) * 100)
+    # 나이대: 같은 나이대 만점, 바로 옆 나이대 절반 (조건이 없으면 요청자 본인 나이대 기준)
+    target, theirs = conditions.get("ageBand") or mine.get("ageBand"), profile.get("ageBand")
+    if target not in AGE_BANDS:
+        parts["ageBand"] = _excluded()
+    elif theirs not in AGE_BANDS:
+        parts["ageBand"] = _missing(w["ageBand"])
+    else:
+        distance = abs(AGE_BANDS.index(target) - AGE_BANDS.index(theirs))
+        parts["ageBand"] = _part(w["ageBand"] if distance == 0 else w["ageBand"] / 2 if distance == 1 else 0, w["ageBand"])
+        if distance == 0:
+            reasons.append(f"같은 나이대({theirs})")
 
-    reasons = []
-    if matches:
-        reasons.append(f"관심사가 {len(matches)}개 일치")
-    if budget is not None and profile.get("budgetManwon") is not None:
-        reasons.append(f"예산 차이 {abs(budget - profile['budgetManwon'])}만원")
+    # 희망 인원: 1명 차이마다 3점 감점
+    party, their_party = conditions.get("partySize"), profile.get("preferredPartySize")
+    if not party:
+        parts["partySize"] = _excluded()
+    elif their_party is None:
+        parts["partySize"] = _missing(w["partySize"])
+    else:
+        parts["partySize"] = _part(w["partySize"] - abs(party - their_party) * 3, w["partySize"])
+
+    # 성별: '상관없음'이면 제외, '동성 선호'면 같은 성별에 점수 ('동성만'은 rank_candidates 에서 먼저 거름)
+    preference, my_gender = conditions.get("genderPreference") or "any", mine.get("gender")
+    if preference == "any" or not my_gender:
+        parts["gender"] = _excluded()
+    elif not profile.get("gender"):
+        parts["gender"] = _missing(w["gender"])
+    else:
+        parts["gender"] = _part(w["gender"] if profile.get("gender") == my_gender else 0, w["gender"])
+
+    # MBTI: 선호 MBTI 를 골랐고 후보가 MBTI 를 공개한 경우에만 계산 (비공개는 감점하지 않음)
+    preferred, their_mbti = set(conditions.get("preferredMbti") or []), set(profile.get("mbti") or [])
+    if not preferred or not their_mbti:
+        parts["mbti"] = _excluded()
+    else:
+        parts["mbti"] = _part(w["mbti"] if preferred & their_mbti else 0, w["mbti"])
+
+    total_max = sum(part["max"] for part in parts.values())
+    score = round(sum(part["score"] for part in parts.values()) / total_max * 100) if total_max else 0
+    # 요청한 조건 가중치 중 후보 정보가 있는 비율 (MBTI 비공개는 감점·부족으로 보지 않음)
+    requested = total_max + sum(part.get("requested", 0) for part in parts.values())
+    coverage = round(total_max / requested, 2) if requested else 0.0
     return {
         "user": {"id": user["id"], "displayName": user["displayName"], "avatarUrl": user.get("avatarUrl")},
         "score": score,
         "parts": parts,
         "reasons": reasons,
+        "coverage": coverage,
     }
+
+
+def rank_candidates(conditions: dict, users: list[dict], requester: dict | None = None, *,
+                    top_k: int = 5, threshold: int = MATCH_THRESHOLD) -> list[dict]:
+    """필수 조건(동성만)으로 거른 뒤 점수를 매기고, 기준점 이상만 높은 순으로 돌려준다."""
+    if (conditions.get("genderPreference") or "any") == "only_same":
+        my_gender = ((requester or {}).get("profile") or {}).get("gender")
+        if not my_gender:
+            raise ServiceError(400, "MATCHING_GENDER_REQUIRED", "'동성만' 조건을 쓰려면 내 프로필에 성별을 입력해 주세요.")
+        users = [user for user in users if (user.get("profile") or {}).get("gender") == my_gender]
+    scored = [score_candidate(conditions, user, requester) for user in users]
+    passed = [item for item in scored
+              if item["coverage"] >= MIN_PROFILE_COVERAGE and item["score"] >= threshold]
+    return sorted(passed, key=lambda item: item["score"], reverse=True)[:top_k]
 
 
 # Backward-compatible name for callers that used the old router helper.
@@ -120,12 +229,9 @@ class MatchingService:
             raise ServiceError(422, "FESTIVAL_NOT_AVAILABLE", "매칭할 수 없는 축제입니다.")
 
         conditions = payload.conditions.model_dump(by_alias=True)
+        requester = await self.repository.user(user_id)
         users = await self.repository.users(exclude_id=user_id)
-        candidates = sorted(
-            [score_candidate(conditions, user) for user in users],
-            key=lambda item: item["score"],
-            reverse=True,
-        )[: payload.top_k]
+        candidates = rank_candidates(conditions, users, requester, top_k=payload.top_k)
 
         group_id = None
         if payload.create_group:

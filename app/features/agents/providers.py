@@ -36,12 +36,12 @@ class RuleBasedModel:
         if state["intent"] == "scheduling":
             return rules_plan(state["conditions"], state["tool_results"])
         if state["intent"] == "matching":
-            from app.features.matching.router import candidate
+            from app.features.matching.service import rank_candidates
             conditions = state["conditions"]
             mapped = {"startTime": conditions.get("start_time"), "budgetManwon": conditions.get("budget_manwon"), "interests": conditions.get("interests", []), "travelStyle": conditions.get("travel_style"), "partySize": conditions.get("party_size")}
             users = state["tool_results"]["get_candidates"]["data"]
             users = [user for user in users if not conditions.get("start_time") or (user.get("profile",{}).get("availableFrom") and user["profile"]["availableFrom"] <= conditions["start_time"])]
-            return {"kind": "matching", "items": sorted([candidate(mapped, user) for user in users], key=lambda row: row["score"], reverse=True)[:5]}
+            return {"kind": "matching", "items": rank_candidates(mapped, users, top_k=5)}
         source = state["festival_id"]
         candidates = state["tool_results"]["search_festivals"]["data"]
         current = state["tool_results"]["get_festival"]["data"]
