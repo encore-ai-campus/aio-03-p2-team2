@@ -1,5 +1,8 @@
+import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
+
+import asyncpg
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +27,25 @@ from app.core.auth import JWTVerifier
 from app.features.agents.service import AgentService
 from app.features.agents.router import router as agents_router
 from app.features.agents.tools import ToolFailure
+
+logger = logging.getLogger(__name__)
+
+_POSTGRES_ERRORS: tuple[tuple[type[Exception], int, str, str], ...] = (
+    (asyncpg.InsufficientPrivilegeError, 403, "DB_PERMISSION_DENIED", "이 작업을 수행할 권한이 없습니다."),
+    (asyncpg.UniqueViolationError, 409, "DB_DUPLICATE", "이미 존재하는 데이터입니다."),
+    (asyncpg.ForeignKeyViolationError, 409, "DB_REFERENCE_INVALID", "연결된 데이터가 없거나 사용 중입니다."),
+    (asyncpg.CheckViolationError, 400, "DB_INVALID_VALUE", "허용되지 않는 값입니다."),
+    (asyncpg.NotNullViolationError, 400, "DB_INVALID_VALUE", "필수 값이 비어 있습니다."),
+    (asyncpg.StringDataRightTruncationError, 400, "DB_INVALID_VALUE", "값이 너무 깁니다."),
+    (asyncpg.InvalidTextRepresentationError, 400, "DB_INVALID_VALUE", "값의 형식이 올바르지 않습니다."),
+)
+
+
+def _postgres_error(exc: Exception) -> tuple[int, str, str]:
+    for error_type, status_code, code, message in _POSTGRES_ERRORS:
+        if isinstance(exc, error_type):
+            return status_code, code, message
+    return 500, "DB_ERROR", "데이터베이스 처리 중 오류가 발생했습니다."
 
 
 def create_app(settings: Settings | None = None, *, repository=None, model=None, tools=None, agent_storage=None):
@@ -60,6 +82,15 @@ def create_app(settings: Settings | None = None, *, repository=None, model=None,
     @app.exception_handler(ToolFailure)
     async def tool_error_handler(request,exc):
         return error_response(APIError(503 if exc.retryable else 422,exc.code,exc.message),request)
+
+    @app.exception_handler(asyncpg.PostgresError)
+    async def postgres_error_handler(request: Request, exc: asyncpg.PostgresError):
+        # DB 제약·RLS 위반을 500 대신 의미 있는 상태 코드로 돌려준다 (SQL 원문·값은 노출하지 않음).
+        status_code, code, message = _postgres_error(exc)
+        details = {"constraint": exc.constraint_name} if getattr(exc, "constraint_name", None) else None
+        if status_code >= 500:
+            logger.error("Unhandled PostgreSQL error %s (%s)", type(exc).__name__, getattr(exc, "sqlstate", None))
+        return error_response(APIError(status_code, code, message, details), request)
 
     @app.get("/health", tags=["health"])
     def health() -> dict[str, str]:

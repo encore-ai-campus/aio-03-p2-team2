@@ -30,14 +30,33 @@ class LoginRequest(AuthCredentials):
     pass
 
 
+MBTI_TYPES = frozenset(
+    a + b + c + d for a in "EI" for b in "NS" for c in "TF" for d in "JP"
+)
+
+
 class ProfilePatch(APIModel):
     interests: list[str] | None = None
     budget_manwon: int | None = Field(default=None, ge=1, le=1000)
     travel_style: Literal["여유롭게", "활동적으로", "계획적으로"] | None = None
     mbti: list[str] | None = None
-    preferred_party_size: int | None = Field(default=None, ge=2, le=100)
+    preferred_party_size: int | None = Field(default=None, ge=2, le=8)
     available_from: str | None = None
     default_join_mode: Literal["approval", "instant"] | None = None
+    # DB user_profiles CHECK 와 같은 한글 값
+    gender: Literal["남성", "여성"] | None = None
+    age_band: Literal["10대", "20대", "30대", "40대", "50대"] | None = None
+
+    @field_validator("mbti")
+    @classmethod
+    def valid_mbti(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return value
+        normalized = [item.strip().upper() for item in value]
+        invalid = [item for item in normalized if item not in MBTI_TYPES]
+        if invalid:
+            raise ValueError(f"mbti must be one of the 16 MBTI types: {invalid}")
+        return list(dict.fromkeys(normalized))
 
     @field_validator("available_from")
     @classmethod

@@ -14,6 +14,7 @@ class AuthRepositoryMixin(RepositoryBase):
             select u.id, u.display_name, u.avatar_url,
                    p.interests, p.budget_manwon, p.travel_style, p.mbti,
                    p.preferred_party_size, p.available_from, p.default_join_mode,
+                   p.gender, p.age_band,
                    n.push, n.email, n.risk_alert
             from users u
             left join user_profiles p on p.user_id = u.id
@@ -30,6 +31,7 @@ class AuthRepositoryMixin(RepositoryBase):
             select u.id, u.display_name, u.avatar_url,
                    p.interests, p.budget_manwon, p.travel_style, p.mbti,
                    p.preferred_party_size, p.available_from, p.default_join_mode,
+                   p.gender, p.age_band,
                    n.push, n.email, n.risk_alert
             from users u
             left join user_profiles p on p.user_id = u.id
@@ -69,6 +71,8 @@ class AuthRepositoryMixin(RepositoryBase):
                 "preferredPartySize": row["preferred_party_size"],
                 "availableFrom": _hhmm(row["available_from"]),
                 "defaultJoinMode": row["default_join_mode"] or "approval",
+                "gender": row["gender"],
+                "ageBand": row["age_band"],
             },
             "notificationConsent": {
                 "push": bool(row["push"]) if row["push"] is not None else False,
@@ -90,6 +94,8 @@ class AuthRepositoryMixin(RepositoryBase):
             "preferredPartySize": "preferred_party_size",
             "availableFrom": "available_from",
             "defaultJoinMode": "default_join_mode",
+            "gender": "gender",
+            "ageBand": "age_band",
         }
         fields = [(mapping[key], value) for key, value in values.items() if key in mapping]
         if not fields:
