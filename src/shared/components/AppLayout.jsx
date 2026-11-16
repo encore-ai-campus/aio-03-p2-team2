@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useDemo, paths } from "../../app/DemoProvider.jsx";
+import { useAuth } from "../../features/auth/AuthProvider.jsx";
 import DemoActorSelect from "../../features/auth/components/DemoActorSelect.jsx";
 import { Button } from "./Primitives.jsx";
 
@@ -22,6 +23,7 @@ const ACTOR_LABELS = {
 
 export default function AppLayout() {
   const { state, NAV, countPending, actorProps, dispatch } = useDemo();
+  const { user, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const bell = countPending() + (state.weather?.type && !state.weather?.choice ? 1 : 0);
@@ -87,6 +89,12 @@ export default function AppLayout() {
             <b>{NAV.find((row) => row[0] === state.page)?.[2] || "축제 탐색"}</b>
           </div>
           <div className="top-right">
+            <span className="auth-user" title={user?.email}>
+              {user?.user_metadata?.display_name || user?.email}
+            </span>
+            <Button className="btn small" onClick={signOut}>
+              로그아웃
+            </Button>
             <Button
               className="toplink bell"
               title="AI 알림"
