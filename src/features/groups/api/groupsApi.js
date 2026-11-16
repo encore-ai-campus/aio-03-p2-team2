@@ -18,6 +18,11 @@ export const createGroup = ({ festivalId, title, postBody, capacity, joinMode })
 export const listJoinRequests = (id, status = "pending") =>
   apiFetch(`/groups/${enc(id)}/join-requests?status=${status}&pageSize=100`).then((d) => d.items);
 
+// POST /workflow/matching/{runId}/group — 에이전트 매칭 결과로 모집글 생성 (축제·날짜·시간·선호 조건을 이어받음, 승인제)
+// 같은 매칭 실행으로 다시 요청하면 같은 모임을 돌려준다
+export const createGroupFromRun = (runId, { title, postBody, capacity }) =>
+  apiFetch(`/workflow/matching/${enc(runId)}/group`, { method: "POST", body: { title, postBody, capacity } }).then((d) => d.group);
+
 // POST /groups/{id}/join-requests — 승인제면 신청 생성, 즉시 참여제면 바로 멤버
 export const requestJoin = (id, message) =>
   apiFetch(`/groups/${enc(id)}/join-requests`, { method: "POST", body: { message: message || null } });

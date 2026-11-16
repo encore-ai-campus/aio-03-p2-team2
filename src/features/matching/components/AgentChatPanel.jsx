@@ -9,10 +9,12 @@ import { Button } from "../../../shared/components/Primitives.jsx";
 import { resumeAgentRun, startAgentRun } from "../api/agentsApi.js";
 import { toCandidateModel } from "../api/matchingApi.js";
 
-const EXAMPLES = [
-  "오후 3시부터 2명이서 여유롭게 둘러볼 동행 찾아줘",
+// 시간을 일부러 빼 둔 예시 → 에이전트가 "몇 시에 참여하실 건가요?"를 되묻는 장면을 보여줄 수 있다
+// 첫 예시는 선택한 축제 이름을 넣는다 (선택 전이면 축제를 되묻는다)
+const examplesFor = (f) => [
+  f ? `${f.name} 같이 갈 동행 찾아줘` : "축제 같이 갈 동행 찾아줘",
+  "2명이서 여유롭게 둘러볼 동행 찾아줘",
   "예산 5만원, 사진·미식 좋아하는 사람이랑 가고 싶어",
-  "내일 저녁에 활동적으로 같이 놀 사람 4명 구해줘",
 ];
 
 const pad = (n) => String(n).padStart(2, "0");
@@ -34,6 +36,19 @@ function festivalDates(f) {
   }
   return out;
 }
+
+// 자유 입력에서 시각 찾기: 15:00 · 오후 3시 · 3시 반 · 저녁 6시
+function parseTime(text) {
+  const m1 = text.match(/(\d{1,2}):(\d{2})/);
+  if (m1) return `${pad(m1[1])}:${m1[2]}`;
+  const m2 = text.match(/(오전|오후|저녁|밤|낮)?\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?/);
+  if (!m2) return null;
+  let h = Number(m2[2]);
+  if (["오후", "저녁", "밤"].includes(m2[1]) && h < 12) h += 12;
+  const min = m2[3] === "반" ? 30 : Number(m2[4] || 0);
+  return h > 23 ? null : `${pad(h)}:${pad(min)}`;
+}
+const TIME_CHIPS = [["오전 11시", "11:00"], ["오후 1시", "13:00"], ["오후 3시", "15:00"], ["저녁 6시", "18:00"]];
 
 // 자유 입력에서 날짜 찾기: 2026-11-17 · 11월 17일 · 17일 · 오늘 · 내일 · 모레
 function parseDate(text) {
@@ -88,12 +103,19 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
   function handle(res) {
     setRun(res);
     if (res.status === "waiting_input") {
-      push({ role: "bot", type: "ask", missing: res.interrupt?.missing || [], errors: res.interrupt?.errors || [], run: res });
+      push({
+        role: "bot",
+        type: "ask",
+        missing: res.interrupt?.missing || [],
+        question: res.interrupt?.message, // 백엔드가 만든 질문 (예: "몇 시에 참여하실 건가요?")
+        errors: res.interrupt?.errors || [],
+        run: res,
+      });
     } else if (res.status === "completed") {
-      const items = (res.result?.items || []).map(toCandidateModel);
+      const items = (res.candidate?.items || res.result?.items || []).map(toCandidateModel);
       push({ role: "bot", type: "result", items, run: res });
       // 오른쪽 「추천 동행 후보」 패널에도 같은 결과 표시
-      onResult?.({ status: "done", key: "agent", result: { candidates: items }, error: null });
+      onResult?.({ status: "done", key: "agent", runId: res.runId, partySize: res.conditions?.party_size, result: { candidates: items }, error: null });
     } else if (res.status === "failed" || res.status === "cancelled") {
       const reason = res.errors?.[0]?.message || res.result?.summary || "요청을 완료하지 못했어요.";
       push({ role: "bot", type: "text", text: `😥 ${reason}\n조건을 바꿔서 다시 말해 주세요.`, run: res });
@@ -126,12 +148,14 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
     setText("");
     if (waiting) {
       const date = parseDate(value);
+      const startTime = parseTime(value);
+      const answers = { ...(date && { date }), ...(startTime && { startTime }) };
       return call(
         () =>
           resumeAgentRun(run.runId, {
             checkpointId: run.checkpointId,
             message: value,
-            answers: date ? { date } : undefined,
+            answers: Object.keys(answers).length ? answers : undefined,
           }),
         value,
       );
@@ -144,6 +168,9 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
 
   const answerDate = (date) =>
     call(() => resumeAgentRun(run.runId, { checkpointId: run.checkpointId, answers: { date } }), dayLabel(date));
+
+  const answerTime = ([label, startTime]) =>
+    call(() => resumeAgentRun(run.runId, { checkpointId: run.checkpointId, answers: { startTime } }), label + "부터 가능해요");
 
   const answerFestival = (id) => {
     onPickFestival?.(id);
@@ -192,11 +219,14 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
       return botRow(
         <>
           <div className="ai-bubble">
-            {m.missing.includes("festivalId")
-              ? "어떤 축제에 함께 갈 동행을 찾으세요?"
-              : m.missing.includes("date")
-                ? `${f ? `‘${f.name}’ ` : ""}언제 가실 건가요? 날짜를 골라 주세요.`
-                : "조건을 조금 더 알려주세요."}
+            {m.question ||
+              (m.missing.includes("festivalId")
+                ? "어떤 축제에 참여하실 건가요?"
+                : m.missing.includes("date")
+                  ? "어느 날짜에 참여하실 건가요?"
+                  : m.missing.includes("startTime")
+                    ? "몇 시에 참여하실 건가요?"
+                    : "조건을 조금 더 알려주세요.")}
             {m.errors.length > 0 && `\n(${m.errors.map((e) => e.message).join(" · ")})`}
           </div>
           {active && m.missing.includes("festivalId") && (
@@ -225,6 +255,15 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
               ) : (
                 <span className="ai-quick-label">‘11월 20일’처럼 날짜를 적어 주세요</span>
               )}
+            </div>
+          )}
+          {active && !m.missing.includes("festivalId") && !m.missing.includes("date") && m.missing.includes("startTime") && (
+            <div className="ai-quick">
+              {TIME_CHIPS.map((t) => (
+                <Button key={t[1]} className="ai-chip" onClick={() => answerTime(t)}>
+                  {t[0]}
+                </Button>
+              ))}
             </div>
           )}
           {traceBox(m.run)}
@@ -301,7 +340,7 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
               <span className="ai-quick-label">
                 💡 {festival(festivalId) ? `‘${festival(festivalId).name}’ 기준으로 찾아요 · ` : ""}예시를 누르면 바로 보내져요
               </span>
-              {EXAMPLES.map((x) => (
+              {examplesFor(festival(festivalId)).map((x) => (
                 <Button key={x} className="ai-chip" onClick={() => send(x)}>
                   {x}
                 </Button>
@@ -334,7 +373,7 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
             ref={inputRef}
             rows="1"
             maxLength="300"
-            placeholder={waiting ? "질문에 답하거나 날짜를 적어 주세요 (예: 11월 20일)" : "예) 오후 3시부터 2명이서 여유롭게 둘러볼 동행"}
+            placeholder={waiting ? "질문에 답해 주세요 (예: 11월 20일 · 오후 3시부터)" : "예) 2명이서 여유롭게 둘러볼 동행 찾아줘"}
             aria-label="동행 조건 입력"
             value={text}
             onChange={(e) => setText(e.target.value)}

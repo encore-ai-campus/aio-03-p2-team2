@@ -429,7 +429,13 @@ function ApiResults({ run, festival, profile, summary, pill }) {
         <div className="empty">조건에 맞는 추천 후보가 아직 없어요.</div>
       )}
       <div style={{ marginTop: "12px" }}>
-        <CreatePostBox festival={festival} partySize={profile.party} joinMode={profile.joinMode || "approval"} summary={summary} />
+        <CreatePostBox
+          festival={festival}
+          runId={run.runId}
+          partySize={run.partySize || profile.party}
+          joinMode={profile.joinMode || "approval"}
+          summary={summary}
+        />
       </div>
       <div className="note" style={{ marginTop: "15px" }}>
         추천 점수는 입력한 조건이 얼마나 겹치는지를 나타내요. 실제 만족도를 보장하지는 않아요.

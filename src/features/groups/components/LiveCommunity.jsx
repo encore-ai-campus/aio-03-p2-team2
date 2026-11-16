@@ -3,7 +3,7 @@
 // 모임장 판단은 GET /me 의 users.id 와 group.leaderId 비교 (JWT sub와 다름)
 // 목록 API가 실패하면 onFail()로 CommunityPage가 기존 데모 화면을 보여준다.
 import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { addComment, approveJoin, getGroup, listGroups, listJoinRequests, rejectJoin, requestJoin } from "../api/groupsApi.js";
 
@@ -22,6 +22,7 @@ const shortId = (id) => (id ? id.replace(/^usr_/, "").slice(0, 6) : "?");
 
 export default function LiveCommunity({ festivals, pill, onFail }) {
   const me = useMe();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("groupId");
   const [groups, setGroups] = useState(null);
@@ -96,15 +97,19 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
   const myPending = g && requested.has(g.id);
   const pending = isLeader ? requests : [];
 
+  const fmt = (iso) => (iso ? new Date(iso).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+  const period = (f) => (f ? `${f.start} ~ ${f.end}` : "-");
+
+  // 화면 구조·클래스는 기존 데모 커뮤니티(GroupCard·GroupDetail)와 동일하게 맞춘다
   return (
     <>
       <div className="section-head">
         <div>
           <h2>
             {"모임 목록 "}
-            <span className="muted sm">{shown.length}개</span> {pill("🟢 실제 모임 데이터", "green")}
+            <span className="muted sm">{shown.length}개</span>
           </h2>
-          <p>생성일 최신순 · 정원·참여 방식 확인</p>
+          <p>생성일 최신순 · 신청 대기자·유형·정원 확인</p>
         </div>
         <div className="chips">
           {[
@@ -128,19 +133,31 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
                 <button
                   key={item.id}
                   type="button"
-                  className={`box pad room-card ${item.id === currentId ? "active" : ""}`}
-                  style={{ textAlign: "left", width: "100%" }}
+                  className={`room-summary ${item.id === currentId ? "active" : ""}`}
                   onClick={() => setParams({ groupId: item.id })}
                 >
                   <div className="btnrow">
                     {pill(label, tone)}
-                    {pill(item.joinMode === "approval" ? "승인제" : "즉시 참여", item.joinMode === "approval" ? "purple" : "blue")}
+                    {pill(item.joinMode === "approval" ? "모임장 승인" : "즉시 참여", item.joinMode === "approval" ? "purple" : "blue")}
                     {me && item.leaderId === me.id ? pill("👑 내가 모임장", "red") : null}
                   </div>
-                  <strong>{item.title}</strong>
-                  <div className="tiny muted">
-                    {f ? `${f.emoji} ${f.name}` : item.festivalId} · 👥 {item.memberCount}/{item.capacity}명
-                    {item.pendingRequestCount ? ` · 신청 대기 ${item.pendingRequestCount}` : ""}
+                  <h3>{item.title}</h3>
+                  <div className="metadata">
+                    {"🎪 "}
+                    {f?.name || "축제"}
+                    {"   📍 "}
+                    {f?.region || "미정"}
+                    {"   📅 "}
+                    {period(f)}
+                  </div>
+                  <div className="meter">
+                    <div style={{ width: Math.min(100, (item.memberCount / item.capacity) * 100) + "%" }} />
+                  </div>
+                  <div className="lower">
+                    <span className="tiny muted">
+                      👤 {item.memberCount}/{item.capacity}명 · 신청 대기 {item.pendingRequestCount || 0}명
+                    </span>
+                    <span className="tiny muted">{fmt(item.createdAt)}</span>
                   </div>
                 </button>
               );
@@ -158,119 +175,142 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
               <div className="btnrow">
                 {pill(...(STATUS[g.status] || [g.status, "dark"]))}
                 {pill(g.joinMode === "approval" ? "모임장 승인제" : "즉시 참여제", g.joinMode === "approval" ? "purple" : "blue")}
-                {isLeader ? pill("👑 내가 모임장", "red") : isMember ? pill("✅ 참여 중", "green") : null}
+                {isLeader ? pill("👑 내가 모임장", "red") : null}
               </div>
               <h2>{g.title}</h2>
-              <p className="sm muted">
-                {festival(g.festivalId) ? `${festival(g.festivalId).emoji} ${festival(g.festivalId).name}` : g.festivalId}
-              </p>
-              <p style={{ whiteSpace: "pre-line" }}>{g.postBody}</p>
+              <div className="metadata">
+                {"🎪 "}
+                {festival(g.festivalId)?.name || g.festivalId}
+                {"   📍 "}
+                {festival(g.festivalId)?.region || "미정"}
+                {"   📅 "}
+                {period(festival(g.festivalId))}
+              </div>
+              <div className="member-chips">
+                {g.members.map((m) => (
+                  <span key={m.userId}>
+                    {m.role === "leader" ? "👑" : "👤"} {m.user.displayName}
+                  </span>
+                ))}
+                <span>
+                  정원 {g.memberCount} / {g.capacity}명
+                </span>
+              </div>
+              <div className="post">{g.postBody}</div>
 
               <div className="note">
-                <strong>
-                  👥 정원 {g.memberCount}/{g.capacity}명
-                </strong>
-                <div className="score-bar" style={{ marginTop: "6px" }}>
-                  <div style={{ width: Math.min(100, (g.memberCount / g.capacity) * 100) + "%" }} />
-                </div>
-                <div className="tiny muted" style={{ marginTop: "6px" }}>
-                  {g.members.map((m) => `${m.role === "leader" ? "👑 " : ""}${m.user.displayName}`).join(" · ")}
-                </div>
+                <strong>모집 현황</strong> · 정원 {g.capacity}명 · 현재 {g.memberCount}명
+                {isLeader ? ` · 승인 대기 ${pending.length}명` : ""} · {g.status === "open" ? "참여 신청 가능" : "모집 종료 (게시글 유지)"}
               </div>
-
               {notice && (
-                <div className="note coral" role="status">
+                <div className="note coral" role="status" style={{ marginTop: "10px" }}>
                   {notice}
                 </div>
               )}
+              <div style={{ height: "12px" }} />
 
-              {/* 참여 신청 (모임장·멤버가 아닐 때) */}
-              {me && !isLeader && !isMember && (
-                <div className="note">
-                  {myPending ? (
-                    <strong>⏳ 참여 신청 완료 · 모임장 승인을 기다리는 중이에요</strong>
-                  ) : g.status !== "open" ? (
-                    <strong>모집이 마감된 모임이에요</strong>
-                  ) : (
-                    <>
-                      <input
-                        className="input"
-                        maxLength={300}
-                        placeholder="모임장에게 한마디 (선택) — 예) 사진 찍는 거 좋아해요!"
-                        value={joinMsg}
-                        onChange={(e) => setJoinMsg(e.target.value)}
-                      />
-                      <button
-                        type="button"
-                        className="btn primary"
-                        style={{ marginTop: "8px" }}
-                        disabled={busy}
-                        onClick={() =>
-                          act(
-                            () =>
-                              requestJoin(g.id, joinMsg)
-                                .then(() => setRequested((s) => new Set(s).add(g.id)))
-                                .catch((e) => {
-                                  if (e.code === "JOIN_REQUEST_ALREADY_EXISTS") setRequested((s) => new Set(s).add(g.id));
-                                  throw e;
-                                }),
-                            g.joinMode === "approval" ? "참여 신청을 보냈어요. 모임장 승인을 기다려 주세요." : "모임에 참여했어요!",
-                          ).then(() => setJoinMsg(""))
-                        }
-                      >
-                        {g.joinMode === "approval" ? "참여 신청하기" : "바로 참여하기"}
-                      </button>
-                    </>
-                  )}
+              {/* 내 상태에 따라 버튼 하나만 */}
+              <div className="btnrow">
+                {isLeader || isMember ? (
+                  <>
+                    {isLeader ? pill("모임장 · 직접 참여 승인", "red") : pill("✅ 참여 확정", "green")}
+                    {/* 플로우 다음 단계: 참여 확정 → 공동 일정 */}
+                    <button type="button" className="btn" onClick={() => navigate(`/schedules?groupId=${encodeURIComponent(g.id)}`)}>
+                      🗓️ 공동 일정 {isLeader ? "만들기" : "보기"} →
+                    </button>
+                  </>
+                ) : myPending ? (
+                  pill("⏳ 승인 대기 중", "purple")
+                ) : g.status !== "open" ? (
+                  pill("모집이 마감됐어요", "dark")
+                ) : (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={busy || !me}
+                    onClick={() =>
+                      act(
+                        () =>
+                          requestJoin(g.id, joinMsg)
+                            .then(() => setRequested((s) => new Set(s).add(g.id)))
+                            .catch((e) => {
+                              if (e.code === "JOIN_REQUEST_ALREADY_EXISTS") setRequested((s) => new Set(s).add(g.id));
+                              throw e;
+                            }),
+                        g.joinMode === "approval" ? "참여 신청을 보냈어요. 모임장 승인을 기다려 주세요." : "모임에 참여했어요!",
+                      ).then(() => setJoinMsg(""))
+                    }
+                  >
+                    {g.joinMode === "approval" ? "참여 신청하기" : "바로 참여하기"}
+                  </button>
+                )}
+              </div>
+              {me && !isLeader && !isMember && !myPending && g.status === "open" && g.joinMode === "approval" && (
+                <div className="comment-form" style={{ marginTop: "8px" }}>
+                  <input maxLength={300} placeholder="모임장에게 한마디 (선택) · 예) 오후 3시부터 참여 가능해요" aria-label="신청 메시지" value={joinMsg} onChange={(e) => setJoinMsg(e.target.value)} />
                 </div>
               )}
 
-              {/* 모임장: 신청 승인/거절 */}
-              {isLeader && (
-                <div className="note">
-                  <strong>📮 참여 신청 {pending.length}건</strong>
-                  {pending.length === 0 && <div className="tiny muted">대기 중인 신청이 없어요.</div>}
+              {isLeader && pending.length > 0 && (
+                <>
+                  <div className="divider" />
+                  <h3 style={{ fontSize: "14px" }}>모임장 승인 대기 {pending.length}명</h3>
                   {pending.map((r) => (
-                    <div key={r.id} style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "8px", flexWrap: "wrap" }}>
-                      <span className="sm">
-                        신청자 #{shortId(r.userId)}
-                        {r.message ? ` · “${r.message}”` : ""}
-                      </span>
-                      <button type="button" className="btn small primary" disabled={busy} onClick={() => act(() => approveJoin(g.id, r.id, g.version), "승인했어요. 참여가 확정됐어요!")}>
-                        승인
-                      </button>
-                      <button type="button" className="btn small" disabled={busy} onClick={() => act(() => rejectJoin(g.id, r.id, g.version), "거절했어요. 신청자에게 안내돼요.")}>
-                        거절
-                      </button>
+                    <div className="request" key={r.id}>
+                      <div>
+                        <strong>👤 신청자 #{shortId(r.userId)}</strong>
+                        <br />
+                        <small>
+                          {r.message ? `“${r.message}” · ` : ""}
+                          {fmt(r.createdAt)}
+                        </small>
+                      </div>
+                      <div className="btnrow">
+                        <button type="button" className="btn small green" disabled={busy} onClick={() => act(() => approveJoin(g.id, r.id, g.version), "승인했어요. 참여가 확정됐어요! 이제 ‘공동 일정 만들기’로 참여자 조건에 맞는 일정을 만들 수 있어요.")}>
+                          승인
+                        </button>
+                        <button type="button" className="btn small" disabled={busy} onClick={() => act(() => rejectJoin(g.id, r.id, g.version), "거절했어요. 신청자에게 안내돼요.")}>
+                          거절
+                        </button>
+                      </div>
                     </div>
                   ))}
-                </div>
+                </>
               )}
 
-              {/* 공개 댓글 */}
-              <div className="section-head" style={{ marginTop: "12px" }}>
-                <h3>💬 공개 댓글 {g.comments.length}</h3>
+              <div className="divider" />
+              <div className="section-head" style={{ margin: "0 0 9px" }}>
+                <h2>
+                  {"공개 댓글 "}
+                  <span className="muted">({g.comments.length})</span>
+                </h2>
+                {pill("참여 전에도 공개", "blue")}
               </div>
-              {g.comments.map((c) => (
-                <div className="comment" key={c.id}>
-                  <div className="content">
-                    <strong>{c.author.displayName}</strong>
-                    <span className="tiny muted"> · {new Date(c.createdAt).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                    <p>{c.text}</p>
+              {g.comments.length ? (
+                g.comments.map((c) => (
+                  <div className="comment" key={c.id}>
+                    <span className="miniava">{(c.author.displayName || "?").slice(0, 1)}</span>
+                    <div className="content">
+                      <strong>{c.author.displayName}</strong>
+                      <span className="tiny muted"> · {fmt(c.createdAt)}</span>
+                      <p>{c.text}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <div className="note">첫 공개 댓글을 남겨 보세요.</div>
+              )}
               {me && (
                 <form
-                  style={{ display: "flex", gap: "8px", marginTop: "8px" }}
+                  className="comment-form"
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (comment.trim()) act(() => addComment(g.id, comment.trim())).then(() => setComment(""));
                   }}
                 >
-                  <input className="input" style={{ flex: 1 }} maxLength={500} placeholder="공개 댓글로 인사해 보세요" value={comment} onChange={(e) => setComment(e.target.value)} />
+                  <input maxLength={500} placeholder="공개 댓글로 인사하거나 참여 의사를 밝혀보세요" aria-label="공개 댓글" value={comment} onChange={(e) => setComment(e.target.value)} />
                   <button type="submit" className="btn small" disabled={busy || !comment.trim()}>
-                    등록
+                    댓글 등록
                   </button>
                 </form>
               )}

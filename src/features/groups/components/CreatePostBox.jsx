@@ -3,13 +3,15 @@
 // 만든 사람이 모임장이 되고, 생성 후 동행 커뮤니티에서 해당 모집글을 연다.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createGroup } from "../api/groupsApi.js";
+import { createGroup, createGroupFromRun } from "../api/groupsApi.js";
 
 const ERROR_TEXT = {
   FESTIVAL_NOT_AVAILABLE: "종료되었거나 이용할 수 없는 축제예요.",
+  MATCHING_REQUIRED: "완료된 매칭 결과가 필요해요. 다시 매칭해 주세요.",
+  MATCHING_EMPTY: "추천 후보가 없어서 모집글을 만들 수 없어요. 조건을 바꿔 주세요.",
 };
 
-export default function CreatePostBox({ festival, partySize, joinMode = "approval", summary }) {
+export default function CreatePostBox({ festival, partySize, joinMode = "approval", summary, runId }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -43,7 +45,11 @@ export default function CreatePostBox({ festival, partySize, joinMode = "approva
     setBusy(true);
     setError("");
     try {
-      const group = await createGroup({ festivalId: festival.id, ...form, title: form.title.trim(), postBody: form.postBody.trim() });
+      const body = { ...form, title: form.title.trim(), postBody: form.postBody.trim() };
+      // 에이전트 매칭이면 매칭 조건을 이어받는 workflow API, 직접 매칭이면 일반 모임 생성
+      const group = runId
+        ? await createGroupFromRun(runId, body)
+        : await createGroup({ festivalId: festival.id, ...body });
       navigate(`/groups?groupId=${encodeURIComponent(group.id)}`);
     } catch (err) {
       console.warn("[groups] 생성 실패", err);
@@ -66,7 +72,7 @@ export default function CreatePostBox({ festival, partySize, joinMode = "approva
             </option>
           ))}
         </select>
-        <select className="input" value={form.joinMode} onChange={set("joinMode")} aria-label="참여 방식">
+        <select className="input" value={runId ? "approval" : form.joinMode} disabled={!!runId} onChange={set("joinMode")} aria-label="참여 방식">
           <option value="approval">모임장 승인제</option>
           <option value="instant">즉시 참여제</option>
         </select>
