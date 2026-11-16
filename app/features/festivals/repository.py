@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import asyncpg
@@ -109,15 +109,88 @@ class FestivalRepositoryMixin(RepositoryBase):
                     )
         return await self.festival(festival_id)  # type: ignore[return-value]
 
+    async def upsert_weather_forecast(self, festival_id: str, forecast: dict[str, Any]) -> None:
+        """Persist the latest daily forecast used by weather synchronization."""
+        await self._pool().execute(
+            """
+            insert into festival_weather_forecasts
+                (festival_id, forecast_date, precipitation_probability, weather_code, source, fetched_at)
+            values ($1, $2, $3, $4, $5, now())
+            on conflict (festival_id, forecast_date) do update set
+                precipitation_probability = excluded.precipitation_probability,
+                weather_code = excluded.weather_code,
+                source = excluded.source,
+                fetched_at = now()
+            """,
+            festival_id,
+            date.fromisoformat(forecast["date"]),
+            forecast["precipitationProbability"],
+            forecast.get("weatherCode"),
+            forecast.get("source", "open-meteo"),
+        )
+
     async def create_sync_job(self, kind: str, params: dict, requested_by: str | None = None) -> dict:
         row = await self._pool().fetchrow(
-            "insert into external_sync_runs (kind, params, requested_by) values ($1,$2::jsonb,$3) returning *",
+            "insert into external_sync_runs (kind, params, requested_by, status) values ($1,$2::jsonb,$3,'queued') returning *",
             kind, json.dumps(params), requested_by,
         )
         return self._job_view(row)
 
+    async def claim_next_sync_job(self, worker_id: str, *, lease_seconds: int, max_attempts: int) -> dict | None:
+        row = await self._pool().fetchrow(
+            """
+            with candidate as (
+                select id
+                from external_sync_runs
+                where status = 'queued'
+                  and (next_attempt_at is null or next_attempt_at <= now())
+                  and attempts < least(max_attempts, $2)
+                order by created_at asc, id asc
+                for update skip locked
+                limit 1
+            )
+            update external_sync_runs as run
+               set status = 'running',
+                   attempts = run.attempts + 1,
+                   max_attempts = least(run.max_attempts, $2),
+                   started_at = coalesce(run.started_at, now()),
+                   locked_at = now(),
+                   worker_id = $1,
+                   next_attempt_at = null,
+                   error = null
+              from candidate
+             where run.id = candidate.id
+         returning run.*
+            """,
+            worker_id,
+            max_attempts,
+        )
+        return self._job_view(row) if row else None
+
+    async def requeue_stale_sync_jobs(self, lease_seconds: int) -> int:
+        result = await self._pool().execute(
+            """
+            update external_sync_runs
+               set status = case when attempts >= max_attempts then 'failed' else 'queued' end,
+                   locked_at = null, worker_id = null, next_attempt_at = null,
+                   finished_at = case when attempts >= max_attempts then now() else finished_at end,
+                   error = coalesce(error, 'SYNC_LEASE_EXPIRED: Worker lease expired')
+             where status = 'running'
+               and locked_at is not null
+               and locked_at < now() - ($1 * interval '1 second')
+            """,
+            lease_seconds,
+        )
+        try:
+            return int(result.rsplit(" ", 1)[-1])
+        except (TypeError, ValueError):
+            return 0
+
     async def update_sync_job(self, job_id: str, **values: Any) -> dict | None:
-        allowed = {"status", "accepted", "rejected", "rejections", "error", "started_at", "finished_at"}
+        allowed = {
+            "status", "accepted", "rejected", "rejections", "error", "started_at", "finished_at",
+            "attempts", "max_attempts", "next_attempt_at", "locked_at", "worker_id",
+        }
         fields = [(key, value) for key, value in values.items() if key in allowed]
         if fields:
             assignments = []
@@ -126,7 +199,9 @@ class FestivalRepositoryMixin(RepositoryBase):
                 assignments.append(f"{key} = ${index}" + ("::jsonb" if key == "rejections" else ""))
                 if key in {"started_at", "finished_at"} and value == "now()":
                     value = datetime.now(timezone.utc)
-                args.append(json.dumps(value) if key == "rejections" else value)
+                if key == "next_attempt_at" and isinstance(value, str) and value.startswith("delay:"):
+                    value = datetime.now(timezone.utc) + timedelta(seconds=float(value.split(":", 1)[1]))
+                args.append(json.dumps(value) if key == "rejections" or (key == "error" and isinstance(value, (dict, list))) else value)
             await self._pool().execute(f"update external_sync_runs set {', '.join(assignments)} where id = $1", *args)
         return await self.sync_job(job_id)
 
@@ -138,7 +213,11 @@ class FestivalRepositoryMixin(RepositoryBase):
     def _job_view(row: asyncpg.Record) -> dict:
         return {
             "jobId": row["id"], "status": row["status"], "kind": row["kind"],
+            "params": row["params"],
             "accepted": row["accepted"], "rejected": row["rejected"], "rejections": row["rejections"],
             "error": row["error"], "createdAt": _iso(row["created_at"]),
             "startedAt": _iso(row["started_at"]), "finishedAt": _iso(row["finished_at"]),
+            "attempts": row["attempts"], "maxAttempts": row["max_attempts"],
+            "nextAttemptAt": _iso(row["next_attempt_at"]), "lockedAt": _iso(row["locked_at"]),
+            "workerId": row["worker_id"],
         }

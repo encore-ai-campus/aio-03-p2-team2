@@ -44,14 +44,14 @@ class GroupService:
         group = await self.get(group_id)
         self.require_leader(group, user_id)
         self.validate_capacity(group, values)
-        updated = await self.repository.update_group(group_id, values, version)
+        updated = await self.repository.update_group(group_id, values, version, user_id)
         if not updated:
             raise ServiceError(409, "RESOURCE_VERSION_CONFLICT", "리소스 버전이 변경되었습니다.", {"latest": await self.repository.group(group_id)})
         return updated
 
-    async def create_join_request(self, group_id: str, user_id: str, message: str | None) -> dict:
+    async def create_join_request(self, group_id: str, user_id: str, message: str | None, version: int | None = None) -> dict:
         """Application boundary for the join policy and its atomic repository action."""
-        return await self.repository.create_join_request(group_id, user_id, message)
+        return await self.repository.create_join_request(group_id, user_id, message, version)
 
     async def approve_join_request(self, group_id: str, request_id: str, leader_id: str, version: int) -> dict:
         return await self.repository.approve_join_request(group_id, request_id, leader_id, version)

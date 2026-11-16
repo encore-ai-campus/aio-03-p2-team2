@@ -51,7 +51,7 @@ API 설계서와 DB 설계서는 큰 도메인 범위와 핵심 상태 전이가
 3. 모임 생성·신청·승인·거절·탈퇴는 PostgreSQL 트랜잭션과 행 잠금으로 원자 처리합니다.
 4. 일정 제안 승인도 `group_schedules.version`과 모임 `version`을 검사해 충돌을 차단합니다.
 5. 채팅은 현재 스키마에 맞춰 `clientMessageId`별 PostgreSQL advisory transaction lock과 재조회를 사용해 재시도 멱등성을 보장합니다.
-6. 외부 수집 작업은 `external_sync_runs`에 저장하고 `/jobs/{jobId}`가 DB 상태를 반환합니다. 실제 worker와 운영 재시도 정책은 별도 작업입니다.
+6. 외부 수집 작업은 `external_sync_runs`에 저장하고 Worker가 TourAPI/Open-Meteo를 호출합니다. `/alerts/jobs/{jobId}`는 DB 상태·시도 횟수·실패 원인을 반환하며, 큐 선점·lease 복구·지수 백오프 재시도를 적용합니다. `db/external_sync_worker.sql`을 먼저 적용해야 합니다.
 7. 운영 배포 경로는 Supabase Auth JWT와 RLS를 사용하며, 세부 SQL은 `db/supabase_auth_rls.sql`에 있습니다.
 
 ## HTML 목업의 취급

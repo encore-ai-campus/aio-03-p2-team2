@@ -17,6 +17,20 @@ class RepositoryError(Exception):
         super().__init__(message)
 
 
+def assert_rpc_success(result: Any) -> dict[str, Any]:
+    """Convert a concurrency RPC result into the repository error contract."""
+    if not isinstance(result, dict):
+        raise RepositoryError("DATABASE_RPC_INVALID", "DB 동시성 처리 결과가 올바르지 않습니다.", 503)
+    if not result.get("ok"):
+        raise RepositoryError(
+            str(result.get("code") or "DATABASE_RPC_FAILED"),
+            str(result.get("message") or "DB 동시성 처리가 실패했습니다."),
+            int(result.get("status") or 409),
+            result.get("details"),
+        )
+    return result
+
+
 def _time(value: str | time | None) -> time | None:
     if value is None or isinstance(value, time):
         return value

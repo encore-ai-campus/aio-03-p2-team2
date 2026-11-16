@@ -27,6 +27,7 @@ Windows에서는 위 실행 명령으로 psycopg에 필요한 Selector 이벤트
 DB 담당자가 기존 스키마를 준비한 뒤 `db/supabase_auth_rls.sql`과 `docs/sql/001_agent_postgres.sql`을 검토·적용해야 합니다. SQL 파일 수정만으로 원격 Supabase가 변경되지는 않습니다. 기존 테이블 생성 SQL 전체를 다시 실행하지 않습니다.
 
 - `DATABASE_URL`: Supabase PostgreSQL Direct 또는 Session pooler 연결 문자열. Transaction pooler(6543)는 지원하지 않습니다.
+- 동시성 RPC: 기본 스키마와 `db/supabase_auth_rls.sql` 적용 후 `db/concurrency_rpc.sql`도 적용해야 합니다. 정원 변경·참여 승인·일정 승인은 이 migration의 PostgreSQL RPC에서 행 잠금, 트랜잭션, 낙관적 버전 검사를 함께 수행합니다.
 - `SUPABASE_URL`: 해당 프로젝트의 Project URL. DB 연결 문자열과 다릅니다.
 - `SUPABASE_JWT_ISSUER`: 미설정 시 Project URL에서 계산합니다.
 - `SUPABASE_JWT_SECRET`: HS256 레거시 프로젝트만 설정합니다. JWKS signing key 프로젝트는 비워 둡니다. DB 비밀번호·API key와 다른 값입니다.
@@ -128,6 +129,13 @@ uv run python -m scripts.workflow_console --mode live --base-url http://127.0.0.
 uv run python -m pytest tests -q
 uv run python -m scripts.agent_demo --group-id YOUR_GROUP_ID
 uv run python -m scripts.evaluate_agent --output data/agent-evaluation.json
+```
+
+외부 축제·날씨 동기화 Worker는 API 서버와 별도 프로세스로 실행합니다. `DATABASE_URL`과
+`TOUR_API_SERVICE_KEY`를 설정하고 `db/external_sync_worker.sql`을 적용한 뒤 다음 명령을 실행합니다.
+
+```powershell
+uv run python -m app.sync_worker
 ```
 
 시연 스크립트는 `SUPABASE_ACCESS_TOKEN` 환경변수로 로그인 토큰을 받습니다. `--approve` 옵션은 실제 일정을 변경합니다. 토큰을 Git이나 문서에 저장하지 않습니다.

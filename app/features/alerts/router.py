@@ -91,12 +91,12 @@ async def alert_risk_response(alert_id: str, request: Request):
 @admin_router.post("/weather/sync", operation_id="syncWeatherAlerts")
 async def sync_weather(payload: dict, request: Request):
     require_development()
-    job = await get_repository(request).create_sync_job("weather_sync", payload)
+    job = await get_repository(request).create_sync_job("weather_sync", payload, requested_by=current_user_id(request))
     return success({"jobId": job["jobId"], "status": job["status"]}, request, status_code=202)
 
 
 @admin_router.post("/festival-notices/sync", operation_id="syncFestivalNotices")
 async def sync_festival_notices(payload: dict, request: Request):
     require_development()
-    job = await get_repository(request).create_sync_job("notice_sync", payload)
+    job = await get_repository(request).create_sync_job("notice_sync", payload, requested_by=current_user_id(request))
     return success({"jobId": job["jobId"], "status": job["status"]}, request, status_code=202)

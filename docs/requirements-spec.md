@@ -344,7 +344,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 - REQ-NFR-005 **[구현됨]** `/health`는 애플리케이션 상태를 반환한다.
 - REQ-NFR-006 **[구현됨]** `/health/db`는 DB 연결 및 필수 테이블 존재 여부를 반환한다.
 - REQ-NFR-007 **[구현됨]** `DATABASE_REQUIRED=true`이면 DB 연결 실패 또는 핵심 스키마 누락 시 시작을 실패시킨다.
-- REQ-NFR-008 **[보완 필요]** 외부 동기화 작업은 실제 worker, 재시도, timeout, 실패 원인, 중복 실행 방지 정책을 가져야 한다.
+- REQ-NFR-008 **[구현됨]** 외부 동기화 작업은 별도 Worker, lease 기반 큐 선점·복구, 지수 백오프 재시도, timeout, 실패 원인 기록, DB upsert 멱등성을 사용한다.
 - REQ-NFR-009 **[보완 필요]** 구조화 로그, 감사 로그, 지표, 알림을 운영 환경에 추가해야 한다.
 
 ### 6.3 보안
@@ -390,7 +390,7 @@ FestaMate는 축제 정보를 탐색하고, 사용자 조건에 맞는 동행자
 1. `app/core/store.py`에는 데모 인메모리 데이터와 저장소가 있으나, 현재 라우터는 `get_repository()`를 통해 `SupabaseRepository`만 사용한다. 따라서 `DATABASE_URL`이 없을 때 기능 API가 자동으로 인메모리 모드로 전환된다고 보기 어렵다. README 및 `docs/api-db-review.md`의 인메모리 fallback 설명과 현재 코드의 동작을 일치시켜야 한다.
 2. `DATABASE_URL`이 설정되지 않았거나 필수 테이블이 없으면 Repository 호출 시 기능 API가 런타임 오류를 낼 수 있다. 애플리케이션 시작 시 명확한 degraded mode를 선택하거나 DB를 필수화해야 한다.
 3. 관리자 API의 JWT 역할 클레임과 `is_admin()` RLS 정책은 Supabase Auth app metadata 설정과 함께 운영해야 한다.
-4. 동기화 API는 작업을 생성하지만 외부 수집·worker·비동기 상태 갱신은 구현 범위 밖이다.
+4. 동기화 API는 `external_sync_runs` 작업을 생성하고 별도 Worker가 외부 수집·DB 반영·비동기 상태 갱신을 수행한다. Worker는 `app.sync_worker`로 실행한다.
 5. 매칭은 규칙 기반 점수 계산이며, README에 언급된 OpenAI/LangGraph 연동은 현재 코드에 없다.
 6. WebSocket 연결 상태가 프로세스 로컬이며, 서버 수평 확장 시 메시지 방송이 분리될 수 있다.
 7. 목록 페이지네이션 일부는 전체 결과를 읽은 뒤 메모리에서 자르므로 데이터 증가 시 성능 저하 가능성이 있다.

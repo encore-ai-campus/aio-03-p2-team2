@@ -74,7 +74,7 @@ async def alternatives(festival_id: str, request: Request, group_id: str | None 
 @admin_router.post("/festivals/sync", operation_id="syncFestivals")
 async def sync_festivals(payload: dict, request: Request):
     require_development()
-    job = await get_repository(request).create_sync_job("festival_sync", payload)
+    job = await get_repository(request).create_sync_job("festival_sync", payload, requested_by=current_user_id(request))
     return success({"jobId": job["jobId"], "status": job["status"]}, request, status_code=202)
 
 

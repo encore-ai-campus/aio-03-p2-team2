@@ -6,7 +6,7 @@ from typing import Any, Iterable
 
 import asyncpg
 
-from app.core.repository import RepositoryBase, RepositoryError, _iso
+from app.core.repository import RepositoryBase, RepositoryError, _iso, assert_rpc_success
 
 
 class GroupRepositoryMixin(RepositoryBase):
@@ -116,24 +116,22 @@ class GroupRepositoryMixin(RepositoryBase):
                 await connection.execute("insert into group_schedules (group_id, items, version, validation_status, updated_by) values ($1,$2::jsonb,1,'valid',$3)", group_id, json.dumps([{"date": payload.get("conditions", {}).get("date") or _iso(festival["start_date"]), "time": payload.get("conditions", {}).get("start_time") or "13:00", "label": festival["name"], "description": "모임 기본 일정"}]), user_id)
         return await self.group(group_id)  # type: ignore[return-value]
 
-    async def update_group(self, group_id: str, values: dict, version: int) -> dict | None:
+    async def update_group(self, group_id: str, values: dict, version: int, leader_id: str) -> dict | None:
         fields = [(key, values[key]) for key in ("title", "postBody", "capacity") if key in values]
         if not fields:
             return await self.group(group_id)
-        mapping = {"title": "title", "postBody": "post_body", "capacity": "capacity"}
-        assignments = []
-        args: list[Any] = [group_id, version]
-        for index, (key, value) in enumerate(fields, start=3):
-            assignments.append(f"{mapping[key]} = ${index}"); args.append(value)
-        assignments.extend(["version = version + 1", "updated_at = now()"])
-        assignments.append("status = case when member_count >= capacity then 'full' else 'open' end")
-        row = await self._pool().fetchrow(
-            f"update groups set {', '.join(assignments)} where id = $1 and version = $2 "
-            "and (capacity >= member_count) and status not in ('closed','cancelled') returning id",
-            *args,
-        )
-        if not row:
-            return None
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                result = await connection.fetchval(
+                    "select public.rpc_update_group($1,$2,$3,$4,$5,$6)",
+                    group_id,
+                    leader_id,
+                    version,
+                    values.get("title"),
+                    values.get("postBody"),
+                    values.get("capacity"),
+                )
+                assert_rpc_success(result)
         return await self.group(group_id)
 
     async def add_comment(self, group_id: str, user_id: str, text: str) -> dict:
@@ -153,7 +151,29 @@ class GroupRepositoryMixin(RepositoryBase):
     async def join_request(self, group_id: str, request_id: str) -> asyncpg.Record | None:
         return await self._pool().fetchrow("select * from group_join_requests where id=$1 and group_id=$2", request_id, group_id)
 
-    async def create_join_request(self, group_id: str, user_id: str, message: str | None) -> dict:
+    async def create_join_request(self, group_id: str, user_id: str, message: str | None, version: int | None = None) -> dict:
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                result = await connection.fetchval(
+                    "select public.rpc_create_group_join_request($1,$2,$3,$4)",
+                    group_id,
+                    user_id,
+                    message,
+                    version,
+                )
+                result = assert_rpc_success(result)
+        if result.get("mode") == "approval":
+            item = await self.join_request(group_id, result["request_id"])
+            if not item:
+                raise RepositoryError("JOIN_REQUEST_NOT_FOUND", "참여 신청을 찾을 수 없습니다.", 503)
+            return {"request": self._join_request_view(item), "membership": None, "group": await self.group(group_id)}
+        group = await self.group(group_id)
+        member = next(item for item in group["members"] if item["userId"] == user_id)
+        return {"request": None, "membership": member, "group": group}
+
+        '''Legacy pre-RPC implementation retained only as migration reference.
+        if False:
+            return None
         async with self._pool().acquire() as connection:
             async with connection.transaction():
                 group = await connection.fetchrow("select * from groups where id=$1 for update", group_id)
@@ -181,7 +201,26 @@ class GroupRepositoryMixin(RepositoryBase):
         member = next(item for item in group["members"] if item["userId"] == user_id)
         return {"request": None, "membership": member, "group": group}
 
+        '''
+
     async def approve_join_request(self, group_id: str, request_id: str, leader_id: str, version: int) -> dict:
+        async with self._pool().acquire() as connection:
+            async with connection.transaction():
+                result = await connection.fetchval(
+                    "select public.rpc_approve_group_join_request($1,$2,$3,$4)",
+                    group_id,
+                    request_id,
+                    leader_id,
+                    version,
+                )
+                result = assert_rpc_success(result)
+        group_view = await self.group(group_id)
+        member = next(item for item in group_view["members"] if item["userId"] == result["user_id"])
+        return {"membership": member, "group": group_view}
+
+        '''Legacy pre-RPC implementation retained only as migration reference.
+        if False:
+            return None
         approved_user_id: str | None = None
         async with self._pool().acquire() as connection:
             async with connection.transaction():
@@ -209,6 +248,8 @@ class GroupRepositoryMixin(RepositoryBase):
         member = next(item for item in group_view["members"] if item["userId"] == approved_user_id)
         return {"membership": member, "group": group_view}
 
+        '''
+
     async def reject_join_request(self, group_id: str, request_id: str, leader_id: str, version: int, reason: str | None) -> dict | None:
         async with self._pool().acquire() as connection:
             async with connection.transaction():
@@ -234,6 +275,9 @@ class GroupRepositoryMixin(RepositoryBase):
     async def leave_group(self, group_id: str, user_id: str) -> None:
         async with self._pool().acquire() as connection:
             async with connection.transaction():
+                group = await connection.fetchrow("select id from groups where id=$1 for update", group_id)
+                if not group:
+                    raise RepositoryError("GROUP_NOT_FOUND", "모임을 찾을 수 없습니다.", 404)
                 member = await connection.fetchrow("select role from group_members where group_id=$1 and user_id=$2 and left_at is null", group_id, user_id)
                 if not member:
                     raise RepositoryError("GROUP_MEMBER_ONLY", "참여 멤버만 탈퇴할 수 있습니다.", 403)
