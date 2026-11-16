@@ -17,8 +17,10 @@ class SandboxRepository(DemoRepository):
         group["schedule"]["items"] = [deepcopy(group["schedule"]["current"])]
         return deepcopy(group)
 
-    async def create_join_request(self, group_id, user_id, message):
+    async def create_join_request(self, group_id, user_id, message, version=None):
         group = self.store.groups[group_id]
+        if version is not None:
+            self.version(group, version)
         if any(member["userId"] == user_id for member in group["members"]):
             raise RepositoryError("ALREADY_MEMBER", "이미 참여 중입니다.")
         if any(item["userId"] == user_id and item["status"] == "pending" for item in group["joinRequests"]):

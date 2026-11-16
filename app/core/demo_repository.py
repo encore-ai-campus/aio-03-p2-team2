@@ -88,9 +88,11 @@ class DemoRepository:
         return group
     def version(self,group,version):
         if group["version"] != version: raise RepositoryError("RESOURCE_VERSION_CONFLICT","모임 버전이 변경되었습니다.",409)
-    async def update_group(self,group_id,values,version):
+    async def update_group(self,group_id,values,version,leader_id=None):
         with self.store.lock:
             group = self.store.groups[group_id]
+            if leader_id is not None and group["leaderId"] != leader_id:
+                raise RepositoryError("LEADER_ONLY","모임장만 수행할 수 있습니다.",403)
             if group["version"] != version: return None
             group.update(values); group["version"] += 1
             self.store.update_status(group); self.persist(); return deepcopy(group)

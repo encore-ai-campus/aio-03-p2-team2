@@ -19,6 +19,9 @@ class MatchingConditions(APIModel):
     preferred_mbti: list[str] = []
     party_size: int | None = Field(default=None, ge=2, le=8)  # DB groups.capacity 2~8
     join_mode: Literal["approval", "instant"] | None = None
+    # 희망 나이대 (없으면 요청자 본인 나이대 기준), 성별 조건: 상관없음 / 동성 선호 / 동성만
+    age_band: Literal["10대", "20대", "30대", "40대", "50대"] | None = None
+    gender_preference: Literal["any", "same", "only_same"] = "any"
 
 
 class MatchingGroupInput(APIModel):
