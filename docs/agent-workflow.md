@@ -1,5 +1,29 @@
 # FestaMate 에이전트 워크플로우
 
+## 매칭 API와 에이전트의 공통 조건
+
+`matching` 실행의 `conditions`와 입력 대기의 `answers`에 `ageBand`(`10대`~`50대`), `genderPreference`(`any`, `same`, `only_same`), `preferredMbti`를 전달할 수 있습니다. OpenAI의 구조화 조건 해석과 규칙 모드도 나이대·성별 선호를 전달합니다. 예: `30대 동성만, 오후 3시부터 동행 추천`.
+
+요청자 본인의 나이대·성별은 인증된 사용자 ID로 DB에서 조회합니다. 입력 문장이나 모델 출력으로 본인 프로필을 덮어쓰지 않습니다. 나이대 조건을 생략하면 본인 나이대를 기준으로 계산하고, `only_same`인데 본인 성별이 없으면 `MATCHING_GENDER_REQUIRED`로 종료합니다. 프로필에 성별을 저장한 뒤 새 실행을 시작해야 합니다.
+
+직접 매칭 API와 에이전트는 동일한 `rank_candidates`를 사용합니다. 요청한 시작 시각에 합류할 수 없거나 가능 시간이 없는 후보는 양쪽 모두 제외합니다. 점수 가중치와 80점 기준은 유지합니다. 에이전트는 전체 후보를 먼저 평가한 뒤 상위 최대 50명의 근거만 모델에 전달하므로, 조회 순서상 50번째 이후에 있는 우수 후보도 누락되지 않습니다. 기본 추천 개수 5명과 동일한 조건·프로필·후보 데이터에서 결과 순서·총점·세부 점수를 비교합니다.
+
+```json
+{
+  "message": "동행 추천",
+  "intent": "matching",
+  "festivalId": "선택한 축제 ID",
+  "conditions": {
+    "date": "2030-05-10",
+    "startTime": "15:00",
+    "ageBand": "30대",
+    "genderPreference": "only_same"
+  }
+}
+```
+
+회귀 테스트: `python -m pytest tests/test_agent_matching_parity.py tests/test_matching_score.py -q`. 실제 HTTP 라우트와 그래프를 사용하고 저장소는 격리합니다. OpenAI 경로는 SDK 응답을 통제하며 실제 유료 API를 호출하지 않습니다. 일정 생성·추가 질문·승인·재검증·악천후 대응의 그래프 경로는 유지합니다.
+
 모집글·참여 승인·악천후 알림·대체 일정과 비교 응답 연결은 [전체 시나리오 호출 안내](connected-workflow.md)를 참고하세요. 매칭은 시작 시간이 누락되면 추가 질문합니다.
 
 구현 위치: `app/features/agents/`. 기존 기능별 구조에 `agents`를 추가했습니다. API는 입출력과 권한, 에이전트는 판단과 검증, repository는 저장을 담당합니다.

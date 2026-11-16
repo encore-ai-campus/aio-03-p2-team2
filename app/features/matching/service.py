@@ -181,7 +181,13 @@ def score_candidate(conditions: dict, user: dict, requester: dict | None = None)
 
 def rank_candidates(conditions: dict, users: list[dict], requester: dict | None = None, *,
                     top_k: int = 5, threshold: int = MATCH_THRESHOLD) -> list[dict]:
-    """필수 조건(동성만)으로 거른 뒤 점수를 매기고, 기준점 이상만 높은 순으로 돌려준다."""
+    """시작 시각·동성만 조건으로 거른 뒤 기준점 이상 후보를 높은 순으로 돌려준다."""
+    # A requested start time is a feasibility constraint in both matching entry points.
+    # Keep score_candidate's component calculation available independently.
+    start_time = conditions.get("startTime")
+    if start_time:
+        users = [user for user in users if (user.get("profile") or {}).get("availableFrom")
+                 and user["profile"]["availableFrom"] <= start_time]
     if (conditions.get("genderPreference") or "any") == "only_same":
         my_gender = ((requester or {}).get("profile") or {}).get("gender")
         if not my_gender:

@@ -12,6 +12,7 @@ class AgentState(TypedDict, total=False):
     conditions: dict
     explicit_conditions: dict
     context: dict
+    requester: dict | None
     missing: list[str]
     group: dict | None
     tools: list[str]

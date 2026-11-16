@@ -16,6 +16,9 @@ class Conditions(APIModel):
     interests: list[Annotated[str,Field(max_length=80)]] | None = Field(default=None, max_length=20)
     travel_style: str | None = Field(default=None, max_length=40)
     party_size: int | None = Field(default=None, ge=2, le=8)
+    age_band: Literal["10대", "20대", "30대", "40대", "50대"] | None = None
+    gender_preference: Literal["any", "same", "only_same"] | None = None
+    preferred_mbti: list[Annotated[str, Field(max_length=4)]] | None = Field(default=None, max_length=16)
     indoor_only: bool | None = None
     avoid_rain: bool | None = None
     region: str | None = Field(default=None, max_length=80)

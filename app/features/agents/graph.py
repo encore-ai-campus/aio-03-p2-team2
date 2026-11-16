@@ -48,6 +48,18 @@ class AgentNodes:
         except Exception:
             return self.update(state,"parse_request",status="failed",errors=[error("MODEL_UNAVAILABLE","조건 해석에 실패했습니다. 모델 설정 또는 입력을 확인해 주세요.")])
         group = None
+        requester = None
+        if intent == "matching":
+            user = await self.repository.user(state["user_id"])
+            if not user:
+                return self.update(state,"parse_request",status="failed",errors=[error("AUTH_USER_INVALID","요청자 프로필을 확인할 수 없습니다.")])
+            profile = user.get("profile") or {}
+            # Identity and demographic defaults come from the authenticated user's DB row,
+            # never from message text, remembered conditions or model output.
+            requester = {"id": user["id"], "profile": {key: profile.get(key) for key in ("ageBand", "gender")}}
+            if conditions.get("gender_preference") == "only_same" and not profile.get("gender"):
+                return self.update(state,"parse_request",intent=intent,conditions=conditions,status="failed",
+                    errors=[error("MATCHING_GENDER_REQUIRED","'동성만' 조건을 쓰려면 내 프로필에 성별을 입력해 주세요.")])
         festival_id = state.get("festival_id")
         if state.get("group_id"):
             group = await self.repository.group(state["group_id"])
@@ -70,7 +82,7 @@ class AgentNodes:
             missing.append("date")
         if intent == "matching" and not conditions.get("start_time"):
             missing.append("startTime")
-        return self.update(state,"parse_request",intent=intent,conditions=conditions,group=group,festival_id=festival_id,missing=missing,status="running")
+        return self.update(state,"parse_request",intent=intent,conditions=conditions,group=group,requester=requester,festival_id=festival_id,missing=missing,status="running")
 
     async def ask_user(self, state):
         questions = {"startTime": "몇 시에 참여하실 건가요?", "date": "어느 날짜에 참여하실 건가요?", "festivalId": "어떤 축제에 참여하실 건가요?", "groupId": "어느 모임의 일정을 만들까요?"}
