@@ -39,10 +39,28 @@ def test_unselected_conditions_are_excluded_not_free_points():
     assert all(part.get("excluded") for key, part in early["parts"].items() if key != "schedule")
 
 
-def test_missing_candidate_info_gets_zero_not_full():
+def test_missing_candidate_info_is_excluded_and_lowers_coverage():
     empty = score_candidate(FULL, user("empty"), ME)
-    assert empty["parts"]["budget"]["score"] == 0
-    assert empty["score"] == 0
+    assert empty["parts"]["budget"] == {"score": 0, "max": 0, "excluded": True, "missing": True, "requested": 15}
+    assert empty["coverage"] == 0.0
+    assert rank_candidates(FULL, [user("empty")], ME) == []
+
+
+def test_onboarding_only_candidate_can_still_match():
+    # 온보딩만 마친 사용자: 관심사·스타일·나이대·성별만 있음 (합류 시각·예산·인원 없음)
+    onboarded = user("onboarded", interests=["음악", "미식"], travelStyle="계획적으로", gender="여성", ageBand="20대")
+    result = score_candidate(FULL, onboarded, ME)
+    assert result["score"] == 100
+    assert result["coverage"] >= 0.5
+    assert [item["user"]["id"] for item in rank_candidates(FULL, [onboarded], ME)] == ["onboarded"]
+
+
+def test_candidate_with_too_little_info_is_not_recommended():
+    # 요청 가중치 대부분에 정보가 없고 한 항목만 맞는 후보는 100%여도 제외
+    thin = user("thin", travelStyle="계획적으로")
+    result = score_candidate(FULL, thin, ME)
+    assert result["score"] == 100 and result["coverage"] < 0.5
+    assert rank_candidates(FULL, [thin], ME) == []
 
 
 def test_age_band_same_adjacent_far():
