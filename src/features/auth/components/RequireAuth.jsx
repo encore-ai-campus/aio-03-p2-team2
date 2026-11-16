@@ -11,5 +11,9 @@ export default function RequireAuth() {
     // 원래 가려던 주소를 기억해 두었다가 로그인 후 그곳으로 보낸다
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
+  // 첫 로그인: 온보딩을 아직 안 거쳤으면 메인 화면보다 먼저 온보딩으로 보낸다
+  if (!session.user.user_metadata?.onboarded && location.pathname !== "/onboarding") {
+    return <Navigate to="/onboarding" replace />;
+  }
   return <Outlet />;
 }

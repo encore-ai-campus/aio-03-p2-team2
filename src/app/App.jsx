@@ -3,6 +3,8 @@ import { DemoProvider, paths, useDemo } from "./DemoProvider.jsx";
 import { AuthProvider } from "../features/auth/AuthProvider.jsx";
 import RequireAuth from "../features/auth/components/RequireAuth.jsx";
 import LoginPage from "../features/auth/pages/LoginPage.jsx";
+import OnboardingPage from "../features/auth/pages/OnboardingPage.jsx";
+import ProfilePage from "../features/auth/pages/ProfilePage.jsx";
 import AppLayout from "../shared/components/AppLayout.jsx";
 import FestivalExplorePage from "../features/festivals/pages/FestivalExplorePage.jsx";
 import MatchingPage from "../features/matching/pages/MatchingPage.jsx";
@@ -24,6 +26,7 @@ export default function App() {
           <Route path="login" element={<LoginPage />} />
           {/* 로그인해야 볼 수 있는 화면 */}
           <Route element={<RequireAuth />}>
+            <Route path="onboarding" element={<OnboardingPage />} />
             <Route element={<AppLayout />}>
               <Route index element={<HomeRedirect />} />
               <Route path="festivals" element={<FestivalExplorePage />} />
@@ -33,6 +36,7 @@ export default function App() {
               <Route path="schedules" element={<SchedulePage />} />
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="team" element={<TeamPage />} />
+              <Route path="profile" element={<ProfilePage />} />
               <Route path="*" element={<Navigate to="/festivals" replace />} />
             </Route>
           </Route>
