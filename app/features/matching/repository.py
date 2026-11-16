@@ -60,7 +60,7 @@ class MatchingRepositoryMixin(RepositoryBase):
         run_id = f"mat_{datetime.now(timezone.utc).strftime('%y%m%d%H%M%S%f')}"
         async with self._pool().acquire() as connection:
             async with connection.transaction():
-                await connection.execute("insert into matching_runs (id,user_id,festival_id,conditions,top_k,create_group,group_id,status,candidate_count,completed_at) values ($1,$2,$3,$4::jsonb,$5,$6,$7,'done',$8,now())", run_id, user_id, festival_id, json.dumps(conditions), top_k, create_group, group_id, len(candidates))
+                await connection.execute("insert into matching_runs (id,user_id,festival_id,conditions,top_k,create_group,group_id,status,candidate_count,completed_at) values ($1,$2,$3,$4::jsonb,$5,$6,$7,'completed',$8,now())", run_id, user_id, festival_id, json.dumps(conditions), top_k, create_group, group_id, len(candidates))
                 for rank, candidate in enumerate(candidates, start=1):
                     await connection.execute("insert into matching_candidates (run_id,candidate_user_id,rank,score,parts,reasons) values ($1,$2,$3,$4,$5::jsonb,$6)", run_id, candidate["user"]["id"], rank, candidate["score"], json.dumps(candidate["parts"]), candidate["reasons"])
         return await self.matching_run(run_id, user_id)  # type: ignore[return-value]

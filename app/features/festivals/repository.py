@@ -52,9 +52,9 @@ class FestivalRepositoryMixin(RepositoryBase):
             args.extend([f"%{keyword}%", f"%{keyword}%", f"%{keyword}%"])
             clauses.append(f"(name ilike ${len(args) - 2} or coalesce(description, '') ilike ${len(args) - 1} or array_to_string(tags, ' ') ilike ${len(args)})")
         if status == "available":
-            clauses.append("end_date >= current_date and risk_status <> 'cancelled'")
+            clauses.append("end_date >= kst_today() and risk_status <> 'cancelled'")
         elif status == "past":
-            clauses.append("end_date < current_date")
+            clauses.append("end_date < kst_today()")
         rows = await self._pool().fetch(
             f"select * from festivals_with_status where {' and '.join(clauses)} order by start_date asc, id asc",
             *args,
