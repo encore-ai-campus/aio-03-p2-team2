@@ -135,7 +135,7 @@ async def create_join_request(group_id: str, payload: JoinRequestCreate, request
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        result = await GroupService(repository).create_join_request(group_id, user_id, payload.message)
+        result = await GroupService(repository).create_join_request(group_id, user_id, payload.message, payload.version)
     except RepositoryError as error:
         raise repository_error(error) from error
     if result["request"]:

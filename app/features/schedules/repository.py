@@ -1,7 +1,7 @@
 """Persistence only. Planning and validation belong to features.agents."""
 import json
 
-from app.core.repository import RepositoryBase, RepositoryError, _hhmm
+from app.core.repository import RepositoryBase, RepositoryError, _hhmm, assert_rpc_success
 
 
 class ScheduleRepositoryMixin(RepositoryBase):
@@ -42,6 +42,20 @@ class ScheduleRepositoryMixin(RepositoryBase):
     async def commit_agent_proposal(self,group_id,proposal_id,user_id,group_version,schedule_version,availability):
         async with self._pool().acquire() as connection:
             async with connection.transaction():
+                result = await connection.fetchval(
+                    "select public.rpc_approve_schedule_proposal($1,$2,$3,$4,$5,$6::jsonb)",
+                    group_id,
+                    proposal_id,
+                    user_id,
+                    group_version,
+                    schedule_version,
+                    json.dumps(availability, ensure_ascii=False),
+                )
+                assert_rpc_success(result)
+        return await self.schedule(group_id)
+
+        # Kept below for reference while old deployments are migrated to the RPC.
+        if False:
                 group,schedule = await self._lock_agent_resources(connection,group_id,user_id)
                 proposal = await connection.fetchrow("select * from schedule_proposals where id=$1 and group_id=$2 for update",proposal_id,group_id)
                 if not proposal: raise RepositoryError("PROPOSAL_NOT_FOUND","일정 제안을 찾을 수 없습니다.",404)

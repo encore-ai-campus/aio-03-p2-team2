@@ -28,6 +28,7 @@ class CommentCreate(APIModel):
 
 class JoinRequestCreate(APIModel):
     message: str | None = Field(default=None, max_length=300)
+    version: int | None = None
 
 
 class VersionRequest(APIModel):
