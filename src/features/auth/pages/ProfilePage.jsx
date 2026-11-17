@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 import { useAuth } from "../AuthProvider.jsx";
 import {
-  BUDGETS, EMPTY_FORM, INTERESTS, JOIN_MODES, MBTIS, PARTY_SIZES, STYLES, TIMES,
+  AGE_BANDS, BUDGETS, EMPTY_FORM, GENDERS, INTERESTS, JOIN_MODES, MBTIS, PARTY_SIZES, STYLES, TIMES,
   fromProfile, toProfileBody, toggleInList,
 } from "../lib/profileOptions.js";
 import "../auth.css";
@@ -14,13 +14,17 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null); // { type: "error" | "notice", text }
+  const [riskAlert, setRiskAlert] = useState(false); // 악천후 알림 수신 (꺼져 있으면 알림이 생성되지 않음)
 
   const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   // 처음 열 때 저장된 값 불러오기
   useEffect(() => {
     apiFetch("/me")
-      .then((me) => setForm(fromProfile(me?.profile)))
+      .then((me) => {
+        setForm(fromProfile(me?.profile));
+        setRiskAlert(!!me?.notificationConsent?.riskAlert);
+      })
       .catch(() => setLoadError("저장된 프로필을 불러오지 못했어요. (백엔드 서버 확인 필요) 입력 후 저장은 할 수 있어요."));
   }, []);
 
@@ -38,6 +42,19 @@ export default function ProfilePage() {
     }
   }
 
+  // 알림 수신은 누르는 즉시 저장 (PATCH /me/notification-consents)
+  async function toggleRiskAlert() {
+    const next = !riskAlert;
+    setRiskAlert(next);
+    try {
+      await apiFetch("/me/notification-consents", { method: "PATCH", body: { riskAlert: next } });
+      setMsg({ type: "notice", text: next ? "악천후 알림을 켰어요 🔔" : "악천후 알림을 껐어요" });
+    } catch (err) {
+      setRiskAlert(!next);
+      setMsg({ type: "error", text: err.status ? `알림 설정을 바꾸지 못했어요 (${err.status} ${err.code || ""})` : "서버에 연결할 수 없어요." });
+    }
+  }
+
   return (
     <div className="profile-page">
       <div className="auth-card wide">
@@ -50,6 +67,23 @@ export default function ProfilePage() {
         <div className="pf-group">
           <b>🙂 나에 대해</b>
           <small>온보딩에서 입력한 정보예요.</small>
+        </div>
+
+        <div className="pf-section">
+          <div className="onb-label">🪪 기본 정보 <small className="muted">(선택 · 비워 두면 공개하지 않아요)</small></div>
+          <div className="onb-chips">
+            {GENDERS.map(({ value, emoji }) => (
+              <button key={value} type="button" className={`btn small ${form.gender === value ? "selected" : ""}`} onClick={() => set("gender", form.gender === value ? "" : value)}>
+                {emoji} {value}
+              </button>
+            ))}
+            <span className="muted" style={{ margin: "0 4px" }}>·</span>
+            {AGE_BANDS.map((a) => (
+              <button key={a} type="button" className={`btn small ${form.ageBand === a ? "selected" : ""}`} onClick={() => set("ageBand", form.ageBand === a ? "" : a)}>
+                {a}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="pf-section">
@@ -141,6 +175,18 @@ export default function ProfilePage() {
                 {emoji} {label}
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="pf-group">
+          <b>🔔 알림</b>
+          <small>참여 예정 모임 날짜에 악천후가 예보되면 알려 드리고, 대체 축제를 제안해요.</small>
+        </div>
+        <div className="pf-section">
+          <div className="onb-chips">
+            <button type="button" className={`btn small ${riskAlert ? "selected" : ""}`} aria-pressed={riskAlert} onClick={toggleRiskAlert}>
+              {riskAlert ? "☔ 악천후 알림 받는 중" : "☔ 악천후 알림 받기"}
+            </button>
           </div>
         </div>
 
