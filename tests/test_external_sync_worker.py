@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 
@@ -110,6 +112,29 @@ async def test_festival_worker_calls_tour_api_maps_and_upserts():
     assert repository.upserted[0]["venue"]["latitude"] == 37.57
     assert requests[0].url.params["eventStartDate"] == "20261101"
     assert requests[0].url.params["eventEndDate"] == "20261130"
+
+
+@pytest.mark.asyncio
+async def test_worker_accepts_json_encoded_job_params():
+    repository = FakeSyncRepository(job("festival_sync", {"startDate": "2026-11-01", "endDate": "2026-11-30"}))
+    repository.jobs["job_1"]["params"] = json.dumps(repository.jobs["job_1"]["params"])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "response": {
+                    "header": {"resultCode": "0000"},
+                    "body": {"totalCount": 0, "items": {"item": []}},
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        worker = ExternalSyncWorker(repository, settings(), http_client=client)
+        assert await worker.run_once() is True
+
+    assert repository.jobs["job_1"]["status"] == "succeeded"
 
 
 @pytest.mark.asyncio

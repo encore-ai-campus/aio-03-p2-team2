@@ -1,6 +1,25 @@
 -- Apply after the base FestaMate schema. This migration makes external sync
 -- jobs durable and adds storage for the latest daily weather forecast.
 
+-- The base schema used by some Supabase projects does not include the job
+-- table. Keep this migration self-contained so the Worker can be enabled on
+-- those projects without requiring a table named sync_jobs.
+create table if not exists public.external_sync_runs (
+    id text primary key default ('job_' || substr(md5(random()::text || clock_timestamp()::text), 1, 24)),
+    kind text not null,
+    status text not null default 'queued'
+        check (status in ('queued', 'running', 'succeeded', 'failed')),
+    params jsonb not null default '{}'::jsonb,
+    accepted integer not null default 0,
+    rejected integer not null default 0,
+    rejections jsonb not null default '[]'::jsonb,
+    error text,
+    requested_by text,
+    created_at timestamptz not null default now(),
+    started_at timestamptz,
+    finished_at timestamptz
+);
+
 alter table public.external_sync_runs
     add column if not exists attempts integer not null default 0,
     add column if not exists max_attempts integer not null default 3,

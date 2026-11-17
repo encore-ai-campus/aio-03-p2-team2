@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -14,7 +16,7 @@ from app.core.repositories import SupabaseRepository
 from app.features.sync.worker import ExternalSyncWorker
 
 
-async def main() -> None:
+async def main(*, once: bool = False, job_id: str | None = None) -> None:
     settings = get_settings()
     if not settings.database_url:
         raise RuntimeError("DATABASE_URL is required to run the external sync worker")
@@ -27,7 +29,15 @@ async def main() -> None:
         {"sub": "external-sync-worker", "app_metadata": {"role": "service_role"}}
     )
     try:
-        await worker.run_forever()
+        if once:
+            processed = await worker.run_once(job_id=job_id)
+            result = await worker.repository.sync_job(job_id) if job_id else None
+            print(json.dumps({"processed": processed, "jobId": job_id,
+                "status": result["status"] if result else None,
+                "accepted": result["accepted"] if result else None,
+                "rejected": result["rejected"] if result else None}, ensure_ascii=False))
+        else:
+            await worker.run_forever()
     finally:
         await worker.close()
         database.reset_auth_claims(auth_token)
@@ -35,5 +45,11 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Run queued external data synchronization jobs")
+    parser.add_argument("--once", action="store_true", help="Process at most one job and exit")
+    parser.add_argument("--job-id", help="Only process this queued job; requires --once")
+    args = parser.parse_args()
+    if args.job_id and not args.once:
+        parser.error("--job-id requires --once")
+    asyncio.run(main(once=args.once, job_id=args.job_id))
 
