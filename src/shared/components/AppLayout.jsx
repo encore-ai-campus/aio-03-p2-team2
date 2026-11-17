@@ -64,7 +64,7 @@ export default function AppLayout() {
               >
                 <span className="ico">{NAV_ICON[id] ? <i className={`ti ${NAV_ICON[id]}`} aria-hidden="true" /> : emoji}</span>
                 {label}
-                {id === "community" && countPending() > 0 && (
+                {liveBell === null && id === "community" && countPending() > 0 && (
                   <span className="pill red" style={{ marginLeft: "auto", padding: "3px 7px" }}>
                     {countPending()}
                   </span>
@@ -113,7 +113,7 @@ export default function AppLayout() {
           <Outlet />
         </main>
         <footer className="footer">
-          FESTA MATE V4.4 · 2026 Festival Discovery & AI Matching
+          FESTA MATE · 2026 Festival Discovery & AI Matching
         </footer>
       </div>
       <nav className="tabbar" aria-label="주요 메뉴">
