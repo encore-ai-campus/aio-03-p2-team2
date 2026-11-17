@@ -86,7 +86,8 @@ class DemoRepository:
             group["schedule"]["current"]["date"] = conditions["date"]
         if conditions.get("start_time"):
             group["schedule"]["current"]["time"] = conditions["start_time"]
-        group["schedule"]["current"]["endTime"] = "14:00"
+        current = group["schedule"]["current"]
+        current["endTime"] = conditions.get("end_time") or (datetime.fromisoformat(f"{current['date']}T{current['time']}") + timedelta(minutes=90)).strftime("%H:%M")
         group["schedule"]["items"] = [deepcopy(group["schedule"]["current"])]
         self.persist(); return deepcopy(group)
     def owned(self,group_id,user_id):

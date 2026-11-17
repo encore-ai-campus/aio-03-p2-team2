@@ -7,6 +7,7 @@ import logging
 
 from app.core.repository import RepositoryError
 from app.features.agents.tools import ToolFailure, observed
+from app.features.agents.weather import schedule_conditions, weather_risky
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +50,11 @@ class WeatherMonitor:
         if not items:
             raise RepositoryError("SCHEDULE_MISSING", "날씨를 확인할 일정이 없습니다.", 409)
         day = items[0]["date"]
-        state = dict(festival_id=row["festival_id"], conditions={"date":day}, tool_results={})
+        state = dict(festival_id=row["festival_id"], conditions=schedule_conditions(items), tool_results={})
         state["tool_results"]["get_festival"] = await self.agents.tools.invoke("get_festival", state)
         weather = observed("development_weather_simulation", {"date":day,"precipitationProbability":90,"weatherCode":95}, mode="simulation") if simulate else await self.agents.tools.invoke("get_weather", state)
         data = weather["data"]
-        risky = data.get("precipitationProbability", 0) >= 60 or data.get("weatherCode") in {65,67,75,77,82,85,86,95,96,99}
+        risky = weather_risky(data)
         created = []
         if risky and (weather["mode"] == "live" or simulate):
             event_key = f"{'weather-test' if simulate else 'weather'}:{group_id}:{row['festival_id']}:{day}"
@@ -62,7 +63,7 @@ class WeatherMonitor:
                     group = await connection.fetchrow("select festival_id from groups where id=$1 and status in ('open','full') for update", group_id)
                     schedule = await connection.fetchrow("select items from group_schedules where group_id=$1 for share", group_id)
                     latest = json.loads(schedule["items"]) if schedule and isinstance(schedule["items"], str) else schedule["items"] if schedule else []
-                    if not group or group["festival_id"] != row["festival_id"] or not latest or latest[0]["date"] != day:
+                    if not group or group["festival_id"] != row["festival_id"] or latest != items:
                         raise RepositoryError("RESOURCE_VERSION_CONFLICT", "모임 일정이 변경되었습니다. 다시 확인해 주세요.", 409)
                     created = await connection.fetch("""insert into alerts
                         (user_id,type,festival_id,group_id,severity,title,message,event_key,evidence,is_test)

@@ -51,7 +51,7 @@ class AgentService:
         if not user_id or not await self.repository.user(user_id):
             raise RepositoryError("AUTH_USER_INVALID","유효한 앱 사용자를 확인할 수 없습니다.",403)
 
-    async def start(self, user_id, payload: RunStart, *, target_festival_id=None):
+    async def start(self, user_id, payload: RunStart, *, target_festival_id=None, weather_review=None):
         await self.user(user_id)
         group = None
         if target_festival_id:
@@ -68,6 +68,10 @@ class AgentService:
                 raise RepositoryError("LEADER_ONLY","모임장만 일정 에이전트를 실행할 수 있습니다.",403)
             if payload.festival_id and payload.festival_id != group["festivalId"] and payload.festival_id != target_festival_id:
                 raise RepositoryError("FESTIVAL_GROUP_MISMATCH","모임에 연결된 축제로 요청해야 합니다.",400)
+        if weather_review and (not group or payload.intent != "risk_response" or
+                group["version"] != weather_review["groupVersion"] or group["festivalId"] != weather_review["festivalId"] or
+                group["schedule"] != weather_review["schedule"]):
+            raise RepositoryError("RESOURCE_VERSION_CONFLICT", "예보 조회 중 모임이 변경되었습니다. 날씨를 다시 확인해 주세요.", 409)
         session_id = payload.session_id or f"ses_{uuid4().hex}"
         await self.memory.session(session_id,user_id)
         if payload.remember is not None:
@@ -77,6 +81,7 @@ class AgentService:
         conditions = payload.conditions.model_dump(mode="json",exclude_none=True)
         initial = dict(run_id=run_id,session_id=session_id,user_id=user_id,message=payload.message,intent=payload.intent,group_id=payload.group_id,festival_id=payload.festival_id,conditions=conditions,explicit_conditions=conditions,iteration=0,trace=[],errors=[],repair={},status="running",tool_results={},result=None)
         initial.update(target_festival_id=target_festival_id, candidate_history=[], original_schedule=group.get("schedule") if group else None)
+        initial.update(weather_review=weather_review, weather_decision=None)
         await self.graph.ainvoke(initial,self.config(run_id))
         return await self.get(user_id,run_id)
 
@@ -98,6 +103,7 @@ class AgentService:
             "modelProvider": self.model.name, "repositoryMode": getattr(self.repository, "mode", "database"),
             "conditions": state["conditions"], "candidate": state.get("candidate"),
             "proposalId": state.get("proposal_id"), "result": state.get("result"),
+            "weatherDecision": state.get("weather_decision"),
             "errors": state.get("errors", []), "interrupt": interrupts[0] if interrupts else None,
             "iteration": state["iteration"], "trace": state["trace"], "toolCalls": state.get("tool_calls", []),
             "candidateHistory": history,
@@ -114,6 +120,14 @@ class AgentService:
                 raise RepositoryError("CHECKPOINT_STALE","최신 실행을 조회한 후 다시 요청해 주세요.",409)
             if not current["interrupt"]:
                 raise RepositoryError("RUN_NOT_WAITING","현재 실행은 입력 또는 승인 대기 상태가 아닙니다.",409)
+            weather_question = current["interrupt"]["type"] == "weather_confirmation"
+            if weather_question:
+                if payload.answers or payload.group_id or payload.festival_id or payload.decision in {"approve", "reject"}:
+                    raise RepositoryError("WEATHER_DECISION_REQUIRED", "keep 또는 alternatives로 답하거나 cancel로 종료해 주세요.", 400)
+                if not payload.weather_decision and not payload.message and payload.decision != "cancel":
+                    raise RepositoryError("WEATHER_DECISION_REQUIRED", "비 예보에 대한 진행 의사를 입력해 주세요.", 400)
+            elif payload.weather_decision is not None:
+                raise RepositoryError("WEATHER_DECISION_NOT_EXPECTED", "현재 실행은 날씨 확인 응답을 기다리고 있지 않습니다.", 400)
             approval = current["status"] == "waiting_approval"
             if approval:
                 if payload.decision not in {"approve","reject","cancel"}:
@@ -138,7 +152,8 @@ class AgentService:
         items = group["schedule"].get("items") or [group["schedule"].get("current")]
         if not items or not items[0]:
             return {"status":"conflict","errors":[{"code":"SCHEDULE_MISSING","message":"검증할 일정이 없습니다."}]}
-        state = dict(group_id=group_id,festival_id=group["festivalId"],conditions={"date":items[0]["date"]},tool_results={})
+        from .weather import schedule_conditions
+        state = dict(group_id=group_id,festival_id=group["festivalId"],conditions=schedule_conditions(items),tool_results={})
         for name in ("get_festival","get_availability","get_weather"):
             state["tool_results"][name] = await self.tools.invoke(name,state)
         errors = validate_plan({"summary":"기존 일정 검증","items":items},state["conditions"],state["tool_results"],"scheduling")

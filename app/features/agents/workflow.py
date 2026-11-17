@@ -1,5 +1,6 @@
 """Connect existing agent and group APIs without allowing model-owned writes."""
 from uuid import NAMESPACE_URL, uuid5
+from copy import deepcopy
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
@@ -87,8 +88,22 @@ class WorkflowService:
 
     async def risk(self, user_id, group_id):
         group = await self.leader_group(user_id, group_id)
+        from .weather import schedule_conditions
+        items = group["schedule"].get("items") or [group["schedule"]["current"]]
         return await self.agents.start(user_id, RunStart(message="악천후에 대비한 대체 축제를 추천해줘",
-            intent="risk_response", group_id=group_id, conditions=await self.conditions(user_id, group)))
+            intent="risk_response", group_id=group_id, conditions=await self.conditions(user_id, group, schedule_conditions(items))))
+
+    async def review_weather(self, user_id, group_id, monitor, *, simulate=False):
+        group = await self.leader_group(user_id, group_id)
+        check = await monitor.check(group_id, simulate=simulate)
+        from .weather import schedule_conditions
+        items = group["schedule"].get("items") or [group["schedule"]["current"]]
+        conditions = await self.conditions(user_id, group, schedule_conditions(items))
+        run = await self.agents.start(user_id, RunStart(message="모임 예보를 확인하고 진행 의사를 물어봐 주세요.",
+            intent="risk_response", group_id=group_id, conditions=conditions), weather_review={
+                "weather": check["weather"], "groupVersion": group["version"],
+                "festivalId": group["festivalId"], "schedule": deepcopy(group["schedule"])})
+        return {"weatherCheck": check, "run": run}
 
     async def select(self, user_id, run_id, payload):
         run = await self.agents.get(user_id, run_id)
@@ -134,3 +149,11 @@ async def check_weather(group_id: str, request: Request, payload: WeatherCheckRe
     service = WorkflowService(request.app.state.agents)
     await service.leader_group(current_user_id(request), group_id)
     return success(await request.app.state.weather_monitor.check(group_id, simulate=bool(payload and payload.simulate_risk)), request)
+
+
+@router.post("/groups/{group_id}/weather-review", status_code=201)
+async def review_weather(group_id: str, request: Request, payload: WeatherCheckRequest | None = None):
+    result = await WorkflowService(request.app.state.agents).review_weather(
+        current_user_id(request), group_id, request.app.state.weather_monitor,
+        simulate=bool(payload and payload.simulate_risk))
+    return success(result, request, status_code=201)

@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.core.demo_repository import DemoRepository
 from app.core.repository import RepositoryError
 from app.features.agents.tools import observed
+from app.features.agents.weather import schedule_conditions, weather_risky
 
 
 class SandboxRepository(DemoRepository):
@@ -60,27 +61,37 @@ class SandboxRepository(DemoRepository):
 
 
 class SandboxWeather:
-    def __init__(self, repository): self.repository = repository
+    def __init__(self, repository):
+        self.repository = repository
+        self.tools = None
 
     async def check(self, group_id, *, simulate=False):
         group = await self.repository.group(group_id)
-        day = group["schedule"]["current"]["date"]
-        evidence = observed("terminal_sandbox_weather", {"date":day,"precipitationProbability":90 if simulate else 20,"weatherCode":95 if simulate else 1}, mode="simulation")
-        count = 0
+        conditions = schedule_conditions(group["schedule"].get("items") or [group["schedule"]["current"]])
+        day = conditions["date"]
         if simulate:
+            evidence = observed("terminal_sandbox_weather", {"date":day,"startTime":conditions["start_time"],
+                "endTime":conditions["end_time"],"precipitationProbability":90,"weatherCode":95}, mode="simulation")
+        else:
+            state = {"festival_id":group["festivalId"], "conditions":conditions, "tool_results":{}}
+            state["tool_results"]["get_festival"] = await self.tools.invoke("get_festival", state)
+            evidence = await self.tools.invoke("get_weather", state)
+        risky = weather_risky(evidence["data"])
+        count = 0
+        if risky and (simulate or evidence["mode"] == "live"):
             for member in group["members"]:
                 user = await self.repository.user(member["userId"])
                 if not user["notificationConsent"].get("riskAlert"):
                     continue
-                key = f"sandbox-weather:{group_id}:{group['festivalId']}:{day}:{member['userId']}"
+                key = f"sandbox-weather:{evidence['mode']}:{group_id}:{group['festivalId']}:{day}:{member['userId']}"
                 if key in self.repository.store.alerts:
                     continue
                 self.repository.store.alerts[key] = dict(id=key, userId=member["userId"], groupId=group_id,
-                    festivalId=group["festivalId"], type="rain", severity="warning", title="[테스트] 악천후 알림",
-                    message="격리 시험용 악천후입니다.", status="unread", choice=None, isTest=True, evidence=evidence,
+                    festivalId=group["festivalId"], type="rain", severity="warning", title="[테스트] 악천후 알림" if simulate else "악천후 예보를 확인해 주세요",
+                    message="격리 시험용 악천후입니다." if simulate else "모임 시간에 악천후가 예보되었습니다.", status="unread", choice=None, isTest=simulate, evidence=evidence,
                     createdAt=datetime.now(timezone.utc).isoformat(), answeredAt=None)
                 count += 1
-        return {"risk":simulate,"createdAlertCount":count,"weather":evidence,"isTest":True}
+        return {"risk":risky,"createdAlertCount":count,"weather":evidence,"isTest":simulate}
 
 
 class RepairDemoModel:
@@ -100,7 +111,7 @@ class RepairDemoModel:
         return candidate
 
 
-def make_sandbox(provider):
+def make_sandbox(provider, weather_provider="demo"):
     from app.core.auth import JWTVerifier
     from app.core.config import Settings
     from app.features.agents.providers import OpenAIModel, RuleBasedModel
@@ -111,7 +122,7 @@ def make_sandbox(provider):
 
     source = Settings()
     config = source.model_copy(update={"database_url":None,"app_env":"test",
-        "agent_model_provider":provider,"agent_weather_provider":"demo","tour_api_service_key":None})
+        "agent_model_provider":provider,"agent_weather_provider":weather_provider,"tour_api_service_key":None})
     repo = SandboxRepository()
     day = datetime.now(timezone(timedelta(hours=9))).date()+timedelta(days=1)
     # Same dates make alternative-festival selection repeatable without inventing live facts.

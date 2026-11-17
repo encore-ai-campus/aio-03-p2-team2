@@ -39,3 +39,5 @@ class AgentState(TypedDict, total=False):
     candidate_history: list[dict]
     target_festival_id: str | None
     original_schedule: dict | None
+    weather_review: dict | None
+    weather_decision: str | None

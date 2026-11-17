@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import math
+
+from .weather import meeting_window, SEVERE_CODES
 import json
 from urllib.parse import unquote
 
@@ -81,17 +84,58 @@ class AgentTools:
         if venue.get("latitude") is None or venue.get("longitude") is None:
             raise ToolFailure("WEATHER_LOCATION_MISSING", "날씨 조회에 필요한 축제 좌표가 없습니다.")
         day = state["conditions"]["date"]
-        response = await self.http.get("https://api.open-meteo.com/v1/forecast", params={"latitude":venue["latitude"],"longitude":venue["longitude"],"daily":"precipitation_probability_max,weather_code","timezone":"Asia/Seoul","start_date":day,"end_date":day})
+        try:
+            latitude, longitude = float(venue["latitude"]), float(venue["longitude"])
+            if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise ToolFailure("WEATHER_LOCATION_MISSING", "유효한 축제 위도·경도가 필요합니다.") from None
+        try:
+            start, end = meeting_window(state, festival)
+        except ValueError:
+            raise ToolFailure("WEATHER_TIME_MISSING", "날씨를 확인할 같은 날짜의 모임 시작·종료 시간을 확인해 주세요.") from None
+        # Precipitation probability describes the PRECEDING hour. For 15:30–17:00,
+        # use the intervals ending at 16:00 and 17:00, not the one ending at 15:00.
+        first = start.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        last = end.replace(minute=0, second=0, microsecond=0)
+        if end.minute:
+            last += timedelta(hours=1)
+        expected = []
+        stamp = first
+        while stamp <= last:
+            expected.append(stamp.isoformat(timespec="minutes"))
+            stamp += timedelta(hours=1)
+        response = await self.http.get("https://api.open-meteo.com/v1/forecast", params={
+            "latitude": latitude, "longitude": longitude,
+            "hourly": "precipitation_probability,weather_code,wind_speed_10m",
+            "wind_speed_unit": "ms", "timezone": "Asia/Seoul",
+            "start_hour": expected[0], "end_hour": expected[-1]})
         if response.status_code >= 500 or response.status_code == 429:
             raise ToolFailure("TOOL_NETWORK_ERROR", "기상 API가 일시적으로 응답하지 않습니다.", True)
         if response.status_code != 200:
-            raise ToolFailure("WEATHER_DATE_UNAVAILABLE", "해당 날짜의 예보를 조회할 수 없습니다. 예보 가능 범위의 날짜를 선택해 주세요.")
-        daily = response.json()["daily"]
-        index = daily["time"].index(day)
-        probability = daily["precipitation_probability_max"][index]
-        if not isinstance(probability,(int,float)) or not 0 <= probability <= 100:
-            raise ToolFailure("TOOL_RESPONSE_INVALID", "해당 날짜의 강수 확률이 없습니다.")
-        return observed("Open-Meteo", {"date":day,"precipitationProbability":probability,"weatherCode":daily["weather_code"][index]}, mode="live", url="https://api.open-meteo.com/v1/forecast")
+            raise ToolFailure("WEATHER_DATE_UNAVAILABLE", "해당 시간의 예보를 조회할 수 없습니다. 예보 가능 범위의 날짜를 선택해 주세요.")
+        hourly = response.json()["hourly"]
+        rows = []
+        for stamp in expected:
+            if stamp not in hourly["time"]:
+                raise ToolFailure("WEATHER_DATE_UNAVAILABLE", "모임 시간 전체의 예보가 아직 제공되지 않습니다.")
+            index = hourly["time"].index(stamp)
+            probability = hourly["precipitation_probability"][index]
+            code = hourly["weather_code"][index]
+            wind = hourly["wind_speed_10m"][index]
+            if (not isinstance(probability, (int, float)) or not 0 <= probability <= 100
+                    or not isinstance(code, int) or code < 0
+                    or not isinstance(wind, (int, float)) or not math.isfinite(wind) or wind < 0):
+                raise ToolFailure("TOOL_RESPONSE_INVALID", "모임 시간대의 날씨 데이터가 누락되었거나 잘못되었습니다.")
+            rows.append({"time": stamp, "precipitationProbability": probability, "weatherCode": code, "windSpeed": wind})
+        codes = [row["weatherCode"] for row in rows]
+        return observed("Open-Meteo", {"date": day, "startTime": start.strftime("%H:%M"),
+            "endTime": end.strftime("%H:%M"), "timezone": "Asia/Seoul",
+            "latitude": latitude, "longitude": longitude,
+            "precipitationProbability": max(row["precipitationProbability"] for row in rows),
+            "weatherCode": max((code for code in codes if code in SEVERE_CODES), default=max(codes)),
+            "windSpeed": max(row["windSpeed"] for row in rows), "windSpeedUnit": "m/s",
+            "hourly": rows}, mode="live", url="https://api.open-meteo.com/v1/forecast")
 
     async def search_festivals(self, state):
         if not self.settings.tour_api_service_key:

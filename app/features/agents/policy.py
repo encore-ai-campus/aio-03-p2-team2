@@ -133,6 +133,8 @@ def _validate_plan(candidate: dict | None, conditions: dict, results: dict, inte
     upper = min([hours["close"], conditions.get("end_time") or "23:59"] + [row.get("availableUntil") or "23:59" for row in availability])
     previous_end = None
     for item in plan.items:
+        if weather and weather.get("startTime") and (item.time < weather["startTime"] or item.end_time > weather["endTime"]):
+            errors.append(error("WEATHER_TIME_CONFLICT", "일정이 확인한 예보 시간대를 벗어났습니다. 모임 시작·종료 시간을 확인해 주세요."))
         if item.date.isoformat() != target_date:
             errors.append(error("DATE_MISMATCH", "요청 날짜를 벗어났습니다.", expected=target_date))
         if item.time < lower or item.end_time > upper:
@@ -151,7 +153,13 @@ def rules_plan(conditions: dict, results: dict) -> dict:
     start = minutes(max(starts))
     if start + 90 >= 1440:
         return {"summary": "조건을 만족하는 시간이 없습니다.", "items": []}
+    end = min(start + 90, minutes(conditions.get("end_time") or "23:59"))
+    if end <= start:
+        return {"summary": "조건을 만족하는 시간이 없습니다.", "items": []}
+    if end <= start + 30:
+        return {"summary": "참여 가능 시간에 맞춘 축제 관람", "items": [
+            {"date": conditions["date"], "time": hhmm(start), "endTime": hhmm(end), "label": festival["name"], "description": "축제를 관람합니다."}]}
     return {"summary": "참여 가능 시간과 운영시간을 반영한 공동 일정", "items": [
         {"date": conditions["date"], "time": hhmm(start), "endTime": hhmm(start+30), "label": "모임 참석자 확인", "description": "축제 장소에서 참석자를 확인합니다."},
-        {"date": conditions["date"], "time": hhmm(start+30), "endTime": hhmm(start+90), "label": festival["name"], "description": "확인한 운영시간 안에서 축제를 관람합니다."},
+        {"date": conditions["date"], "time": hhmm(start+30), "endTime": hhmm(end), "label": festival["name"], "description": "확인한 운영시간 안에서 축제를 관람합니다."},
     ]}

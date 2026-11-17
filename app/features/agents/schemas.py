@@ -65,6 +65,7 @@ class ResumeRun(APIModel):
     festival_id: str | None = Field(default=None, max_length=100)
     answers: Conditions | None = None
     decision: Literal["approve", "reject", "cancel"] | None = None
+    weather_decision: Literal["keep", "alternatives"] | None = None
 
 
 class PlanItem(APIModel):

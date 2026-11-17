@@ -180,6 +180,17 @@ class WorkflowConsole:
         for item in items:
             self.io.write(f"  {item.get('date','')} {item.get('time','')}~{item.get('endTime','미정')} | {item.get('label','')}")
 
+    def show_weather(self, result):
+        evidence = result["weather"]
+        data = evidence["data"]
+        self.io.write(f"위험={result['risk']} / 새 알림={result['createdAlertCount']} / 날씨 출처={evidence['source']} / mode={evidence['mode']}")
+        self.io.write(f"  {data['date']} {data.get('startTime','')}~{data.get('endTime','')} (한국 시간)")
+        if "latitude" in data:
+            self.io.write(f"  실제 좌표: 위도 {data['latitude']} / 경도 {data['longitude']}")
+        self.io.write(f"  최대 강수확률 {data['precipitationProbability']}% / 날씨 코드 {data['weatherCode']}")
+        for row in data.get("hourly", []):
+            self.io.write(f"  {row['time']} | 직전 1시간 강수확률 {row['precipitationProbability']}% | 날씨 코드 {row['weatherCode']} | 풍속 {row['windSpeed']}m/s")
+
     def show_comparison(self, run):
         comparison = run.get("comparison") or {}
         self.io.write("\n[변경 전: 기존 일정]")
@@ -199,7 +210,12 @@ class WorkflowConsole:
             for error in run.get("errors", []): self.io.write(f"  {error['code']}: {error['message']}")
             if run["status"] not in {"waiting_input", "waiting_approval"}: return run
             payload = {"checkpointId":run["checkpointId"]}
-            if run["status"] == "waiting_approval":
+            if (run.get("interrupt") or {}).get("type") == "weather_confirmation":
+                self.io.write("에이전트 질문: " + run["interrupt"]["message"])
+                reply = self.io.required("진행 의사를 입력하세요: y/네=기존 축제 유지, n/아니요=대체 축제 추천, /cancel=현재 실행 취소")
+                if reply == "/cancel": payload["decision"] = "cancel"
+                else: payload["message"] = reply
+            elif run["status"] == "waiting_approval":
                 self.show_comparison(run)
                 payload["decision"] = self.io.choice("모임장 A의 일정 결정: approve=확정, reject=거절, cancel=취소", ["approve","reject","cancel"])
             else:
@@ -284,17 +300,27 @@ class WorkflowConsole:
         if run["status"] != "completed":
             self.io.write("일정이 확정되지 않아 여기서 중단합니다. 표시된 runId로 상태를 확인할 수 있습니다."); return
         self.io.write("\n8/9 악천후 알림 확인")
-        kind = self.io.choice("simulate=개발용 악천후 재현, actual=현재 설정의 날씨 조회", ["simulate","actual"], "simulate" if self.demo_model else "actual")
-        weather = await self.retry(lambda: self.api("POST", f"/api/v1/workflow/groups/{gid}/weather-check", "A", {"simulateRisk":kind == "simulate"}))
-        self.io.write(f"위험={weather['risk']} / 새 알림={weather['createdAlertCount']} / 날씨 출처={weather['weather']['mode']}")
+        kind = self.io.choice("both=예보 조회 후 악천후 재현, actual=예보 조회만, simulate=악천후 재현만", ["both","actual","simulate"], "both" if getattr(self, "live_weather", False) else "simulate" if self.demo_model else "actual")
+        risk = None
+        for check in (["actual","simulate"] if kind == "both" else [kind]):
+            self.io.write("[실제 설정의 예보 조회]" if check == "actual" else "[악천후 시뮬레이션: 실제 예보와 별도]")
+            review = await self.retry(lambda: self.api("POST", f"/api/v1/workflow/groups/{gid}/weather-review", "A", {"simulateRisk":check == "simulate"}))
+            self.show_weather(review["weatherCheck"])
+            risk = await self.drive(review["run"])
+            if risk["status"] != "completed":
+                self.io.write("날씨 확인이 완료되지 않았습니다. 기존 축제와 일정은 유지됩니다."); return
+            if risk.get("weatherDecision") == "keep":
+                self.io.write("기존 축제와 일정을 유지합니다. 대체 축제 검색은 실행하지 않았습니다.")
         for actor in ("A","B"):
             alerts = await self.retry(lambda: self.api("GET", "/api/v1/alerts", actor))
             group_alerts = [item for item in alerts["items"] if item.get("groupId") == gid]
             self.io.write(f"계정 {actor} 모임 알림: {len(group_alerts)}개")
             for alert in group_alerts: self.io.write(f"  {alert['title']} — {alert['message']}")
         self.io.write("\n9/9 대체 축제 선택 → 기존/새 일정 비교 → 승인")
-        if self.io.choice("대체 축제를 추천받을까요?", ["y","n"], "y") == "n": return
-        risk = await self.drive(await self.retry(lambda: self.api("POST", f"/api/v1/workflow/groups/{gid}/risk-response", "A")))
+        if risk.get("weatherDecision") == "keep":
+            self.io.write("전체 워크플로우 마지막 상태: completed / 기존 축제 유지")
+            self.io.write(f"최종 연결 축제: {festival['id']}")
+            return
         alternatives = (risk.get("candidate") or {}).get("items", [])
         if risk["status"] != "completed" or not alternatives:
             self.io.write("현재 조건의 대체 후보가 없습니다. 원본 일정은 유지됩니다."); return
@@ -334,11 +360,15 @@ async def console(args, terminal=None):
                     io.write(".env에 OPENAI_API_KEY와 OPENAI_MODEL을 설정하세요. API 없이 연습하려면 --provider rules를 사용하세요.")
                     return 2
             from scripts.workflow_sandbox import make_sandbox
-            app, accounts, model, weather = make_sandbox(args.provider)
+            weather_provider = getattr(args, "weather_provider", "demo")
+            app, accounts, model, weather = make_sandbox(args.provider, weather_provider)
             await stack.enter_async_context(app.router.lifespan_context(app))
             app.state.weather_monitor = weather
+            weather.tools = app.state.agents.tools
             client = await stack.enter_async_context(httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://sandbox", timeout=180))
-            io.write(f"[격리 데모] 모델={args.provider}. JWT·가입·날씨·저장소는 시험용입니다. 실제 FastAPI 경로와 에이전트 그래프를 실행합니다.")
+            io.write(f"[격리 데모] 모델={args.provider} / 날씨={weather_provider}. JWT·가입·저장소·축제는 시험용입니다. 실제 FastAPI 경로와 에이전트 그래프를 실행합니다.")
+            if weather_provider == "openmeteo":
+                io.write("날씨는 실제 좌표와 모임 시간으로 Open-Meteo를 호출합니다. 악천후 재현은 별도의 모의 데이터입니다.")
             io.write("공유 DB와 별도 서버는 사용하지 않습니다. 종료 시 시험 데이터는 사라집니다.")
             if args.provider == "openai": io.write("OpenAI는 실제 API를 호출하므로 비용이 발생합니다.")
         else:
@@ -346,6 +376,7 @@ async def console(args, terminal=None):
             io.write(f"[실제 API] {args.base_url} / 가입·프로필·모집글·신청·승인 결과가 서버 DB에 저장됩니다.")
             io.write("서버의 모델·날씨 설정을 사용합니다. 테스트할 두 계정을 준비하세요.")
         workflow = WorkflowConsole(client, io, accounts=accounts, demo_model=model)
+        workflow.live_weather = args.mode == "demo" and getattr(args, "weather_provider", "demo") == "openmeteo"
         try:
             await workflow.run()
         except ConsoleExit:
@@ -363,6 +394,7 @@ def main():
     parser = argparse.ArgumentParser(description="축제 탐색·대화 매칭·모집글·두 계정 참여·날씨·대체 일정 전체 테스트")
     parser.add_argument("--mode", choices=["demo","live"], default="demo", help="demo=격리 시험(기본), live=실행 중인 실제 API")
     parser.add_argument("--provider", choices=["rules","openai"], default="rules", help="demo 모드 모델. live는 서버 설정 사용")
+    parser.add_argument("--weather-provider", choices=["demo","openmeteo"], default="demo", help="격리 데이터로 실제 예보를 테스트하려면 openmeteo. live는 서버 설정 사용")
     parser.add_argument("--base-url", default="http://127.0.0.1:8000", help="live 모드 API 서버 주소")
     args = parser.parse_args()
     try:

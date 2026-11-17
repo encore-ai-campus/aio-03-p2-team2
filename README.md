@@ -63,6 +63,19 @@ OpenAI 모드에서는 `choose_tools`가 Function Calling으로 다음 도구를
 | `AGENT_WEATHER_PROVIDER=openmeteo` | 실제 예보 조회 |
 | `TOUR_API_SERVICE_KEY` 설정 | TourAPI 대체 축제 검색 |
 
+가상 축제 정보와 실제 날씨는 함께 사용할 수 있습니다. `AGENT_WEATHER_PROVIDER=openmeteo`이면
+축제의 `venue.latitude/longitude`와 모임 날짜·시작/종료 시간으로 Open-Meteo 시간별 예보를 조회합니다.
+종료 시간이 없는 초기 요청은 시작부터 90분을 사용하며 응답에 적용 시간을 표시합니다.
+저장된 일정의 날씨 확인과 자동 알림은 전체 일정의 시작~종료 시간을 사용합니다.
+강수확률은 해당 시간 구간의 최대값, 날씨 코드는 악천후 코드 우선으로 집계하며 풍속은 m/s로 제공합니다.
+좌표·예보 누락이나 조회 실패를 맑은 날씨로 처리하지 않습니다.
+시간별 강수확률은 직전 한 시간 기준이므로 15:30~17:00 모임에는 16시·17시 예보를 사용합니다.
+참고: [Open-Meteo API 문서](https://open-meteo.com/en/docs).
+
+기존 `POST /api/v1/workflow/groups/{group_id}/weather-check`의 `{"simulateRisk":true}`는
+개발 환경에서 외부 날씨 API 호출 없이 악천후 알림을 생성하는 기능으로 유지됩니다.
+설정 변경 후 백엔드를 재시작하세요. 실제 축제 API 키는 이 날씨 연동에 필요하지 않습니다.
+
 OpenAI 모드에는 `OPENAI_API_KEY`, `OPENAI_MODEL`이 필요합니다. 매칭 점수·대체 후보 정렬은 규칙 기반입니다. `DemoRepository`와 인메모리 체크포인터는 테스트에서만 명시적으로 주입합니다. 프론트의 DemoProvider/localStorage는 별도 실제 API 연동이 필요합니다.
 
 ## 폴더 구조
@@ -110,6 +123,31 @@ uv run python -m scripts.agent_console --provider rules
 ```powershell
 uv run python -m scripts.workflow_console
 ```
+
+가상 축제·계정을 유지하면서 실제 Open-Meteo 예보와 악천후 시뮬레이션을 차례로 시험하려면:
+
+```powershell
+uv run python -m scripts.workflow_console --mode demo --provider rules --weather-provider openmeteo
+```
+
+별도 서버와 Supabase 로그인 없이 실제 FastAPI 경로·LangGraph를 실행합니다. 날씨는 실제 외부 API,
+축제·계정·알림 저장소는 격리 시험 데이터이며 종료 시 사라집니다. `rules`는 LLM 호출 없는 모드입니다.
+화면 안내에 따라 값을 입력하고, 시간 질문에는 `오후 3시부터 가능해`, 참여·일정 승인에는 `approve`를 입력하세요.
+날씨 단계에서 `both`를 선택하면 실제 예보(좌표·적용 시간·시간별 강수확률·풍속)를 표시한 다음
+악천후를 별도로 재현합니다. 대체 축제를 고르면 해당 축제의 좌표로도 실제 예보를 다시 조회합니다.
+Enter는 표시된 기본값을 사용하며, 모임 정원은 2~8명을 선택할 수 있습니다.
+Open-Meteo 연결 실패는 오류로 표시하며 가짜 예보로 대체하지 않습니다.
+
+비 예보 확인은 `POST /api/v1/workflow/groups/{group_id}/weather-review`로 시작합니다.
+요청 본문은 기존 날씨 확인처럼 `{"simulateRisk":false}`이며, 응답은 `weatherCheck`와 `run`을 포함합니다.
+비 또는 악천후 예보가 있으면 LangGraph가 `weather_confirmation` 입력 대기로 멈춥니다.
+`POST /api/v1/agents/runs/{runId}/resume`에 `checkpointId`와 `weatherDecision`을 보내세요.
+`keep`은 기존 축제·일정을 유지하고, `alternatives`는 같은 실행에서 대체 축제 추천으로 이어집니다.
+`message`에 `네`/`아니요`로 답할 수도 있습니다. 모호한 답변은 다시 묻고, 조회 이후 일정이 바뀌면 재확인을 요구합니다.
+대체 축제 선택 후에는 기존 일정 초안·모임장 승인 절차를 거쳐야 변경됩니다.
+터미널도 비 예보가 있으면 `y/네` 또는 `n/아니요`를 묻습니다. `아니요` 뒤에는 추가 추천 확인 없이 후보가 나옵니다.
+약한 비의 날씨 코드도 질문 대상으로 삼으며 기존 강수확률 60% 이상 등의 알림 기준은 유지됩니다.
+기존 `weather-check`와 직접 `risk-response` API도 계속 사용할 수 있습니다.
 
 기본값은 공유 DB와 별도 서버가 필요 없는 격리 데모입니다. 단계마다 입력 형식과 예시를 보여주며 축제 선택 → 시간 되묻기 → 매칭 후보 → 모집글 → B 계정 참여 신청 → A 계정 승인 → 공동 일정 → 악천후 알림 → 대체 축제·수정 전후 비교까지 진행합니다. Enter는 표시된 기본값, `/exit` 또는 Ctrl+C는 종료입니다.
 

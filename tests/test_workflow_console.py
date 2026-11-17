@@ -17,6 +17,7 @@ class GuidedTerminal(Terminal):
         if "시작 시간을 답하세요" in prompt: return "오후 3시부터 가능해"
         if "참여를 승인할까요" in prompt: return "approve"
         if "모임장 A의 일정 결정" in prompt: return "approve"
+        if "진행 의사를 입력" in prompt: return "아니요"
         if default is not None: return default
         # Only search permits an empty default in the complete demo.
         if "검색어" in prompt: return ""
@@ -39,6 +40,57 @@ async def test_full_interactive_demo_uses_real_routes_graph_and_two_accounts():
     assert "변경 전: 기존 일정" in output
     assert "변경 후: 현재 초안" in output
     assert "마지막 상태: completed" in output
+
+
+@pytest.mark.asyncio
+async def test_interactive_real_weather_then_simulation_and_alternative_coordinates(monkeypatch):
+    from datetime import datetime, timedelta
+    original_get = httpx.AsyncClient.get
+    locations = []
+    async def forecast(client, url, **kwargs):
+        if url != "https://api.open-meteo.com/v1/forecast":
+            return await original_get(client, url, **kwargs)
+        params = kwargs["params"]
+        locations.append((params["latitude"], params["longitude"]))
+        stamp = datetime.fromisoformat(params["start_hour"])
+        end = datetime.fromisoformat(params["end_hour"])
+        times = []
+        while stamp <= end:
+            times.append(stamp.isoformat(timespec="minutes"))
+            stamp += timedelta(hours=1)
+        return httpx.Response(200, json={"hourly": {"time": times,
+            "precipitation_probability": [10]*len(times), "weather_code": [1]*len(times),
+            "wind_speed_10m": [2]*len(times)}})
+    monkeypatch.setattr(httpx.AsyncClient, "get", forecast)
+    terminal = GuidedTerminal()
+    result = await console(Namespace(mode="demo",provider="rules",weather_provider="openmeteo",base_url="http://unused"), terminal)
+    assert result == 0
+    output = "\n".join(terminal.output)
+    assert "mode=live" in output
+    assert "mode=simulation" in output
+    assert "전체 워크플로우 마지막 상태: completed" in output
+    assert "최종 연결 축제: fst_demo_food" in output
+    assert (35.1587, 129.1604) in locations
+    assert (35.1532, 129.1188) in locations
+    assert "계정 A 모임 알림: 1개" in output
+    assert "계정 B 모임 알림: 1개" in output
+
+
+@pytest.mark.asyncio
+async def test_interactive_yes_keeps_original_festival():
+    class KeepTerminal(GuidedTerminal):
+        def read(self, prompt, default=None, secret=False):
+            if "진행 의사를 입력" in prompt:
+                self.prompts.append(prompt)
+                return "네"
+            return super().read(prompt, default, secret)
+    terminal = KeepTerminal()
+    assert await console(Namespace(mode="demo",provider="rules",base_url="http://unused"), terminal) == 0
+    output = "\n".join(terminal.output)
+    assert "그래도 이 축제로 진행할까요?" in output
+    assert "대체 축제 검색은 실행하지 않았습니다" in output
+    assert "최종 연결 축제: fst_demo_music" in output
+    assert not any("대체 축제 선택:" in prompt for prompt in terminal.prompts)
 
 
 class InputTerminal(Terminal):
@@ -107,7 +159,7 @@ async def test_live_second_account_rejects_same_identity():
 
 def test_real_cli_entrypoint_accepts_terminal_text_for_entire_flow():
     answers = ["", "", "", "", "", "", "", "", "", "오후 3시부터 가능해",
-               "", "", "", "", "", "approve", "", "approve", "", "", "", "", "approve"]
+               "", "", "", "", "", "approve", "", "approve", "", "아니요", "", "", "approve"]
     result = subprocess.run([sys.executable, "-m", "scripts.workflow_console"],
         input="\n".join(answers)+"\n", capture_output=True, encoding="utf-8", timeout=40,
         cwd=Path(__file__).resolve().parents[1])

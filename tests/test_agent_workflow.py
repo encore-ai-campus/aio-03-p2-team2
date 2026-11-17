@@ -305,11 +305,11 @@ async def test_tour_api_adapter_does_not_expose_key(tmp_path):
 async def test_weather_http_adapter(tmp_path):
     repo,day=seed(); config=settings(tmp_path,agent_weather_provider="openmeteo")
     async def response(request):
-        assert request.url.params["start_date"] == day
-        return httpx.Response(200,json={"daily":{"time":[day],"precipitation_probability_max":[65],"weather_code":[61]}})
+        assert request.url.params["start_hour"] == f"{day}T16:00"
+        return httpx.Response(200,json={"hourly":{"time":[f"{day}T16:00",f"{day}T17:00"],"precipitation_probability":[65,20],"weather_code":[61,1],"wind_speed_10m":[3,2]}})
     async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as http:
         tools=AgentTools(repo,config,http_client=http)
-        result=await tools.get_weather({"conditions":{"date":day},"tool_results":{"get_festival":{"data":await repo.festival("fst_demo_music")}}})
+        result=await tools.get_weather({"conditions":{"date":day,"start_time":"15:00","end_time":"17:00"},"tool_results":{"get_festival":{"data":await repo.festival("fst_demo_music")}}})
         assert result["mode"] == "live" and result["data"]["precipitationProbability"] == 65
 
 @pytest.mark.asyncio

@@ -14,6 +14,7 @@ from .schemas import Conditions
 from .state import AgentState
 from .tools import ToolFailure
 from .tool_registry import bound_arguments, validate_tool_request
+from .weather import needs_weather_confirmation
 
 
 class AgentNodes:
@@ -92,6 +93,37 @@ class AgentNodes:
             return self.update(state,"ask_user",status="cancelled")
         conditions = Conditions.model_validate(answer.get("answers") or {}).model_dump(mode="json",exclude_none=True)
         return self.update(state,"ask_user",conditions={**state["conditions"],**conditions},explicit_conditions={**state.get("explicit_conditions",{}),**conditions},group_id=answer.get("group_id") or state.get("group_id"),festival_id=answer.get("festival_id") or state.get("festival_id"),message=answer.get("message") or state["message"],errors=[],repair={},status="running")
+
+    async def confirm_weather(self, state):
+        review = state["weather_review"]
+        group = await self.repository.group(state["group_id"])
+        if not group or group["leaderId"] != state["user_id"]:
+            raise RepositoryError("LEADER_ONLY", "현재 모임장만 날씨에 대한 진행 의사를 결정할 수 있습니다.", 403)
+        if (group["version"] != review["groupVersion"] or group["festivalId"] != review["festivalId"]
+                or group["schedule"] != review["schedule"]):
+            raise RepositoryError("RESOURCE_VERSION_CONFLICT", "모임 일정이 변경되었습니다. 날씨 확인을 다시 시작해 주세요.", 409)
+        weather = review["weather"]
+        decision = "keep"
+        if needs_weather_confirmation(weather["data"]):
+            while True:
+                answer = interrupt({"type": "weather_confirmation", "weather": weather,
+                    "message": "모임 시간에 비 또는 악천후가 예보되어 있습니다. 그래도 이 축제로 진행할까요?",
+                    "choices": [{"value": "keep", "label": "네, 기존 축제 유지"},
+                                {"value": "alternatives", "label": "아니요, 대체 축제 추천"}]})
+                if answer.get("decision") == "cancel":
+                    return self.update(state, "confirm_weather", status="cancelled")
+                decision = answer.get("weather_decision")
+                if not decision:
+                    text = (answer.get("message") or "").strip().lower().rstrip(".!。")
+                    decision = ("keep" if text in {"y", "yes", "네", "예", "응", "괜찮아", "괜찮아요", "진행", "진행할게요"}
+                                else "alternatives" if text in {"n", "no", "아니", "아니요", "싫어", "싫어요", "안 괜찮아요", "대체", "대체 축제", "대체 축제 추천해줘"} else None)
+                if decision in {"keep", "alternatives"}:
+                    break
+        if decision == "keep":
+            return self.update(state, "confirm_weather", weather_decision=decision, status="completed",
+                result={"kind": "weather_decision", "action": "keep", "festivalId": group["festivalId"],
+                        "weather": weather, "summary": "기존 축제와 일정을 유지합니다."})
+        return self.update(state, "confirm_weather", weather_decision=decision, status="running", errors=[])
 
     async def plan_tools(self, state):
         group = await self.repository.group(state["group_id"]) if state.get("group_id") else None
@@ -269,12 +301,13 @@ class AgentNodes:
 
 def build_graph(nodes: AgentNodes, checkpointer):
     graph = StateGraph(AgentState)
-    names = ["load_context","parse_request","ask_user","plan_tools","choose_tools","execute_tools","generate_candidate","validate_candidate","reflect_and_repair","save_proposal","await_approval","revalidate_and_commit","finalize"]
+    names = ["load_context","parse_request","ask_user","confirm_weather","plan_tools","choose_tools","execute_tools","generate_candidate","validate_candidate","reflect_and_repair","save_proposal","await_approval","revalidate_and_commit","finalize"]
     for name in names:
         graph.add_node(name,getattr(nodes,name))
     graph.add_edge(START,"load_context")
     graph.add_edge("load_context","parse_request")
-    graph.add_conditional_edges("parse_request",lambda s: "finalize" if s["status"] == "failed" else "ask_user" if s["missing"] else "plan_tools",path_map=['finalize', 'ask_user', 'plan_tools'])
+    graph.add_conditional_edges("parse_request",lambda s: "finalize" if s["status"] == "failed" else "ask_user" if s["missing"] else "confirm_weather" if s.get("weather_review") else "plan_tools",path_map=['finalize', 'ask_user', 'confirm_weather', 'plan_tools'])
+    graph.add_conditional_edges("confirm_weather", lambda s: "plan_tools" if s.get("weather_decision") == "alternatives" else "finalize", path_map=["plan_tools", "finalize"])
     graph.add_conditional_edges("ask_user",lambda s: "finalize" if s["status"] == "cancelled" else "parse_request",path_map=['finalize', 'parse_request'])
     graph.add_edge("plan_tools", "choose_tools")
     graph.add_conditional_edges("choose_tools", lambda s: "finalize" if s["status"] == "failed" else
