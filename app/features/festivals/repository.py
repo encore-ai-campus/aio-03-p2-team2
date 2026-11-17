@@ -214,13 +214,27 @@ class FestivalRepositoryMixin(RepositoryBase):
 
     @staticmethod
     def _job_view(row: asyncpg.Record) -> dict:
+        params = FestivalRepositoryMixin._decode_json(row["params"], {})
+        rejections = FestivalRepositoryMixin._decode_json(row["rejections"], [])
         return {
             "jobId": row["id"], "status": row["status"], "kind": row["kind"],
-            "params": row["params"],
-            "accepted": row["accepted"], "rejected": row["rejected"], "rejections": row["rejections"],
+            "params": params if isinstance(params, dict) else {},
+            "accepted": row["accepted"], "rejected": row["rejected"],
+            "rejections": rejections if isinstance(rejections, list) else [],
             "error": row["error"], "createdAt": _iso(row["created_at"]),
             "startedAt": _iso(row["started_at"]), "finishedAt": _iso(row["finished_at"]),
             "attempts": row["attempts"], "maxAttempts": row["max_attempts"],
             "nextAttemptAt": _iso(row["next_attempt_at"]), "lockedAt": _iso(row["locked_at"]),
             "workerId": row["worker_id"],
         }
+
+    @staticmethod
+    def _decode_json(value: Any, default: Any) -> Any:
+        if value is None:
+            return default
+        if isinstance(value, (str, bytes, bytearray)):
+            try:
+                return json.loads(value)
+            except (TypeError, ValueError):
+                return default
+        return value
