@@ -192,3 +192,9 @@ DB 통합 테스트는 별도로 준비한 시험 DB의 `TEST_AGENT_DATABASE_URL
 OpenAI 도구 선택 변경·시험 결과: [Function Calling 통합](docs/agent-tool-calling.md).
 
 상세 노드·API 계약: [에이전트 워크플로우](docs/agent-workflow.md).
+
+TourAPI 수집에서 `includeDetails=true`이면 상세 `playtime`의 명확한 일일 운영시간
+(예: `10:00~18:00`, `매일 10시~18시`)을 축제 기간의 날짜별 `operatingHours`로 저장합니다.
+일별 상이·휴무 조건·여러 시간대·야간 등 복잡한 표현은 추정하지 않으며, 재수집 시 기존에
+확인된 운영시간은 유지합니다. 새 축제에 확정 운영시간이 없으면 기존 검증대로 추가 확인이 필요합니다.
+TourAPI 키를 설정하지 않은 환경에서도 기존 날씨 도구·가상 축제 테스트는 계속 사용할 수 있습니다.
