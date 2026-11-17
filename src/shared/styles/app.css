@@ -2220,3 +2220,276 @@ h3 {
 /* 지난 달 버튼 흐리게 + 지난 달 안내 (11/17 16:52) */
 .month-button.is-past:not(.active){color:#b9aea8;background:#faf8f7}
 .fx-none{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+/* ===== 2차 디자인 A: 챗봇 축제 고르기·STEP 진행·채팅 높이 (11/17 23:40) ===== */
+/* 축제 고르기: 검색 + 한 줄 목록(최대 5개) — 큰 카드 6개로 채팅창이 길어지던 문제 */
+.ai-pick{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.ai-pick-search{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:#fcfaf9}
+.ai-pick-search i{color:#b0a49e;font-size:16px}
+.ai-pick-search input{border:0;outline:0;background:transparent;font:inherit;font-size:13.5px;flex:1;min-width:0}
+.ai-pick-search:focus-within{border-color:#f5b4a6;background:#fff}
+.ai-pick-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ai-pick-list li+li{border-top:1px solid #f6efec}
+.ai-pick-list button{width:100%;display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:8px 6px;border:0;background:transparent;text-align:left;border-radius:8px;cursor:pointer;font:inherit}
+.ai-pick-list button:hover{background:var(--coral-softer)}
+.ai-pick-list button:disabled{opacity:.6;cursor:default}
+.ai-pick-list b{font-size:13.5px;font-weight:600;color:var(--ink,#2a2421);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ai-pick-list small{flex:none;font-size:12px;color:var(--sub)}
+.ai-pick-empty{margin:4px 6px;font-size:13px;color:var(--sub)}
+.ai-pick-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 6px 0;font-size:12px;color:var(--sub)}
+.ai-pick-foot a{color:var(--coral2);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:2px}
+/* STEP 진행: 지난 단계는 체크 */
+.how-steps.path li.done i,.match-layout.live .how-steps.path li.done i{background:#fff;border-color:var(--coral);color:var(--coral)}
+.how-steps.path li.done small{color:#b9897a}
+
+
+/* ===== 2차 디자인 A: 후보 0명 안내·낮은 화면 맞춤 (11/17 23:55) ===== */
+.cand-none{text-align:center;background:#fff;border:1px dashed #f1d9d0;border-radius:16px;padding:28px 22px;margin-top:14px}
+.cand-none>i{font-size:30px;color:var(--coral);display:block;margin-bottom:8px}
+.cand-none h3{margin:0 0 6px;font-size:17px}
+.cand-none p{margin:0;color:var(--sub);font-size:13.5px;line-height:1.6}
+.cand-none-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+.cand-none-btn{display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:11px;border:1px solid var(--line);background:#fff;color:var(--ink,#2a2421);font:inherit;font-size:13.5px;font-weight:600;text-decoration:none;cursor:pointer}
+.cand-none-btn:hover{border-color:#f5b4a6}
+.cand-none-btn.primary{background:var(--coral);border-color:var(--coral);color:#fff}
+.cand-none-btn.primary:hover{background:var(--coral2)}
+
+/* ===== 매칭 v3: 작업 공간(분할 패널) — 목업 확정본 (11/18 01:20) ===== */
+/* 페이지: 최대 폭 1120px 가운데 정렬 → 바깥 여백 확보 */
+.mp-v3{max-width:1120px;margin:0 auto}
+.mp-v3 .mp-head{margin:4px 0 20px}
+.mp-v3 .fest-ctx{margin-bottom:20px}
+/* 작업 공간: 흰 컨테이너 하나 + 세로 구분선, 높이 = 화면 남은 높이 → 좌우 끝선 항상 일치 */
+.mp-v3 .match-layout.live{display:grid;grid-template-columns:44% 56%;gap:0;align-items:stretch;height:clamp(460px,calc(100dvh - 300px),760px);background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 1px 2px rgba(42,36,33,.03);overflow:hidden;margin:0}
+.mp-v3 .match-layout.live>.match-main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.mp-v3 .match-layout.live .mtabs-card{flex:1;min-height:0;display:flex;flex-direction:column;border:0;border-radius:0;box-shadow:none;background:transparent;overflow:hidden}
+.mp-v3 .mtabs-card>div:not(.mtabs){flex:1;min-height:0;display:flex;flex-direction:column}
+.mp-v3 .mtabs-card>div[hidden]{display:none}
+.mp-v3 .tab-form{overflow-y:auto}
+/* 왼쪽 챗봇: 머리·조건 요약 고정 / 대화만 스크롤 / 입력창 바닥 고정 */
+.mp-v3 .mtabs-card .ai-inline{flex:1;min-height:0;display:flex;flex-direction:column;margin:0;border:0;border-radius:0;box-shadow:none;background:transparent}
+.mp-v3 .mtabs-card .ai-inline .ai-head{flex:none;padding:16px 24px 0;border-bottom:0}
+.mp-v3 .mtabs-card .ai-inline .ai-head small{display:none}
+.mp-v3 .mtabs-card .ai-confirm{flex:none;margin:12px 24px 0;padding:10px 14px;border:0;border-radius:12px;background:#fbf8f6}
+.mp-v3 .mtabs-card .ai-inline .ai-msgs,.mp-v3 .mtabs-card .ai-inline:not(.active) .ai-msgs{flex:1;min-height:0;max-height:none;overflow-y:auto;padding:20px 24px;gap:16px;background:#fff}
+/* 메시지는 아래(입력창 쪽)부터 쌓임 */
+.mp-v3 .mtabs-card .ai-msgs>:first-child{margin-top:auto}
+.mp-v3 .mtabs-card .ai-col{gap:8px}
+.mp-v3 .mtabs-card .ai-bubble{max-width:78%;padding:11px 15px;font-size:15px;line-height:1.55}
+.mp-v3 .mtabs-card .ai-compose{flex:none;padding:14px 24px 18px;border-top:1px solid var(--line);margin:0}
+.mp-v3 .mtabs-card .ai-foot{display:none}
+/* 오른쪽 패널 공통: 머리 고정 / 본문 스크롤 / 바닥 고정 */
+.mp-v3 .match-layout.live .match-results.box{display:flex;flex-direction:column;min-height:0;padding:0;margin:0;background:#fff;border:0;border-left:1px solid var(--line);border-radius:0;box-shadow:none;position:static;contain:none;overflow:hidden}
+.mp-v3 .ws-head{flex:none;padding:18px 24px 12px;border-bottom:1px solid var(--line)}
+.mp-v3 .ws-head p{margin:6px 0 0;color:var(--sub);font-size:13.5px}
+.mp-v3 .ws-title{display:flex;justify-content:space-between;align-items:baseline}
+.mp-v3 .ws-title h2{font-size:19px;margin:0}.mp-v3 .ws-title h2 span{font-size:14px;color:#9a908a;font-weight:400;margin-left:6px}
+.mp-v3 .ws-body{flex:1;min-height:0;overflow-y:auto}
+.mp-v3 .ws-pad{padding:20px 24px}
+.mp-v3 .ws-foot{flex:none;max-height:70%;overflow-y:auto}
+/* 빈 상태 */
+.mp-v3 .ws-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:32px}
+.mp-v3 .ws-empty-ic{width:64px;height:64px;border-radius:20px;background:var(--coral-softer);color:var(--coral);display:grid;place-items:center;font-size:30px;margin-bottom:18px}
+.mp-v3 .ws-empty h2{font-size:19px;margin:0 0 6px}.mp-v3 .ws-empty p{color:var(--sub);font-size:14.5px;margin:0 0 26px}
+.mp-v3 .ws-mini{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#9a908a;flex-wrap:wrap;justify-content:center}
+.mp-v3 .ws-mini span{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:#f7f3f1}
+.mp-v3 .ws-mini span.done{color:var(--sub)}.mp-v3 .ws-mini span.done i{color:var(--coral)}
+.mp-v3 .ws-mini span.now{background:var(--coral-soft);color:var(--coral2);font-weight:600}
+.mp-v3 .ws-mini-bar{width:14px;border-top:1px solid #e5dbd6}
+/* 후보 고르기 */
+.mp-v3 .pick-count{font-size:13.5px;color:var(--sub)}.mp-v3 .pick-count b{color:var(--coral2)}
+.mp-v3 .pick-list{display:flex;flex-direction:column;gap:8px;padding:14px 24px}
+.mp-v3 .pick-card{display:flex;gap:12px;align-items:center;width:100%;padding:11px 14px;border:1px solid var(--line);border-radius:16px;background:#fff;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:background .15s,border-color .15s,opacity .15s}
+.mp-v3 .pick-card:hover{background:#fff8f5;border-color:#f6cfc4}
+.mp-v3 .pick-card:focus-visible{outline:2px solid var(--coral);outline-offset:2px}
+.mp-v3 .pick-card[aria-checked="true"]{background:var(--coral-softer);border-color:var(--coral)}
+.mp-v3 .pick-card.dim{opacity:.45}
+.mp-v3 .pick-ava{width:36px;height:36px;border-radius:50%;background:var(--coral-soft);color:var(--coral2);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none;overflow:hidden}
+.mp-v3 .pick-ava img{width:100%;height:100%;object-fit:cover}
+.mp-v3 .pick-body{flex:1;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mp-v3 .pick-body>b{font-size:15px}
+.mp-v3 .pick-tags{display:flex;gap:6px;flex-wrap:wrap}
+.mp-v3 .pick-tag{font-size:12.5px;color:#5c524d;background:#f7f3f1;border-radius:8px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px}
+.mp-v3 .pick-tag i{font-size:13px;color:#9a908a}
+.mp-v3 .pick-tag.hit{background:var(--coral-soft);color:var(--coral2)}.mp-v3 .pick-tag.hit i{color:var(--coral2)}
+.mp-v3 .pick-box{width:22px;height:22px;border-radius:7px;border:1.5px solid #e3d9d4;display:grid;place-items:center;color:#fff;font-size:15px;flex:none;margin-left:auto}
+.mp-v3 .pick-card[aria-checked="true"] .pick-box{background:var(--coral);border-color:var(--coral)}
+.mp-v3 .pick-limit{font-size:12.5px;color:var(--coral2);padding:0 24px;margin:-6px 0 0}
+.mp-v3 .pick-tip{margin:4px 24px 20px;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:#fbf8f6;font-size:13.5px;color:var(--sub)}
+.mp-v3 .pick-tip>i{font-size:20px;color:var(--coral);flex:none}
+.mp-v3 .pick-tip b{color:var(--ink);font-weight:600}
+.mp-v3 .pick-tip button{margin-left:auto;white-space:nowrap;border:0;background:none;color:var(--coral2);font:inherit;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:2px}
+.mp-v3 .pick-foot{padding:14px 24px;border-top:1px solid var(--line);background:#fffdfc;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.mp-v3 .pick-info{flex:1;min-width:220px;font-size:13.5px;line-height:1.6}
+.mp-v3 .pick-info .k{color:#9a908a}
+.mp-v3 .pick-foot .cta-btn{width:auto;padding:13px 22px;border-radius:14px;font-size:15.5px}
+.mp-v3 .pick-foot form{flex-basis:100%}
+.mp-v3 .cand-skel{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.mp-v3 .cand-skel span{height:58px;border-radius:16px;background:linear-gradient(90deg,#f7f3f1,#fbf8f6,#f7f3f1);background-size:200% 100%;animation:skel 1.2s infinite}
+@keyframes skel{to{background-position:-200% 0}}
+.mp-v3 .cand-none{margin-top:16px}
+/* 1100px 이하: 위아래로 쌓고 높이는 내용 따라 */
+@media(max-width:1100px){
+.mp-v3 .match-layout.live{grid-template-columns:1fr;height:auto}
+.mp-v3 .match-layout.live .match-results.box{border-left:0;border-top:1px solid var(--line)}
+.mp-v3 .mtabs-card .ai-inline .ai-msgs{max-height:60vh}
+}
+
+/* 매칭 v3 보완 (11/18 01:10): 챗봇 머리 한 줄로 축소·확인한 조건 한 줄 → 대화 영역 확보 */
+.mp-v3 .mtabs-card .ai-inline .ai-head{padding:10px 20px 0;min-height:0}
+.mp-v3 .mtabs-card .ai-inline .ai-head>.ai-ava,.mp-v3 .mtabs-card .ai-inline .ai-head>div:not(.ai-tools){display:none}
+.mp-v3 .mtabs-card .ai-inline .ai-head .ai-tools{margin-left:auto;display:flex;gap:6px;align-items:center}
+.mp-v3 .mtabs-card .ai-confirm{display:flex;align-items:center;gap:10px;margin:10px 20px 0;padding:9px 14px}
+.mp-v3 .mtabs-card .ai-confirm>div{display:flex;align-items:baseline;gap:8px;min-width:0;flex:1}
+.mp-v3 .mtabs-card .ai-confirm>div b{white-space:nowrap;font-size:13px}
+.mp-v3 .mtabs-card .ai-confirm>div span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-size:13.5px}
+.mp-v3 .mtabs-card .ai-confirm button{white-space:nowrap;flex:none}
+.mp-v3 .mtabs-card .ai-inline .ai-msgs,.mp-v3 .mtabs-card .ai-inline:not(.active) .ai-msgs{padding:16px 20px}
+.mp-v3 .mtabs-card .ai-compose{padding:12px 20px 14px}
+/* 태그 줄바꿈 최소화 */
+.mp-v3 .pick-tag{white-space:nowrap}
+
+/* 매칭 v3 보완 2 (11/18 01:15): 목업 여백 비율 복원·챗봇 도구를 탭 줄로 */
+/* 축제 카드: 살구 면 → 흰 카드(목업과 동일) */
+.mp-v3 .fest-ctx{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:none;padding:14px 24px 14px 14px;margin-bottom:24px}
+/* 작업 공간: 아래 28px 여백 남기고 끝남 */
+.mp-v3 .match-layout.live{height:clamp(440px,calc(100dvh - 340px),740px);margin-bottom:28px}
+/* 탭: 왼쪽 정렬 + 오른쪽에 「실제 에이전트·새 대화」 → 챗봇 머리 줄 없앰 */
+.mp-v3 .mtabs-card{position:relative}
+.mp-v3 .mtabs{display:flex;background:#fff;padding:0 8px}
+.mp-v3 .mtabs button{flex:none;padding:15px 16px;background:none}
+.mp-v3 .mtabs button.on{background:none}
+.mp-v3 .mtabs-card .ai-inline .ai-head{position:absolute;top:10px;right:16px;padding:0;border:0;z-index:2;background:none}
+.mp-v3 .mtabs-card .ai-inline .ai-head .ai-tools button{padding:5px 10px;font-size:12.5px}
+/* 패널 안 여백 24px로 복원 */
+.mp-v3 .mtabs-card .ai-confirm{margin:14px 24px 0}
+.mp-v3 .mtabs-card .ai-inline .ai-msgs,.mp-v3 .mtabs-card .ai-inline:not(.active) .ai-msgs{padding:20px 24px}
+.mp-v3 .mtabs-card .ai-compose{padding:14px 24px 18px}
+
+/* 매칭 v3 보완 3 (11/18 01:20): 좁아진 왼쪽 칸(44%)에 맞춘 「직접 설정하기」 폼 */
+.mp-v3 .tab-form{padding:18px 24px 22px}
+.mp-v3 .tab-form .form-req{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.mp-v3 .tab-form .form-req .field{min-width:0}
+.mp-v3 .tab-form .form-req select,.mp-v3 .tab-form .form-req input{width:100%;min-width:0}
+.mp-v3 .tab-form .opt-rows{padding:4px 14px 8px}
+.mp-v3 .tab-form .opt-row{grid-template-columns:1fr;gap:8px;padding:12px 0}
+.mp-v3 .tab-form .opt-label{padding-top:0}
+.mp-v3 .tab-form .opt-label small{display:inline;margin-left:6px}
+.mp-v3 .tab-form .grid-chips.g5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.mp-v3 .tab-form .grid-chips.g8{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mp-v3 .tab-form .seg button{font-size:13.5px;padding:9px 4px}
+
+/* ===== 매칭 v3 정리 (11/18 01:30): 머리글 한 줄 + 작업 공간이 한 화면(높이 680px 기준)에 들어가게 ===== */
+.mp-v3 .mp-top{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 0 20px}
+.mp-v3 .mp-top-title h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin:0 0 2px}
+.mp-v3 .mp-top-title p{margin:0;color:var(--sub);font-size:14.5px}
+.mp-v3 .mp-fest{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:8px 16px 8px 8px;min-width:0;max-width:520px}
+.mp-v3 .mp-fest-thumb{width:52px;height:40px;border-radius:10px;overflow:hidden;flex:none;background:var(--coral-softer);display:grid;place-items:center}
+.mp-v3 .mp-fest-thumb img{width:100%;height:100%;object-fit:cover}
+.mp-v3 .mp-fest-txt{display:flex;flex-direction:column;min-width:0}
+.mp-v3 .mp-fest-txt b{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-v3 .mp-fest-txt small{font-size:12.5px;color:var(--sub);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.mp-v3 .mp-fest-txt small i{color:#239b70;font-size:13px}
+.mp-v3 .mp-fest-change{margin-left:8px;flex:none;font-size:13px;font-weight:600;color:var(--coral2);text-decoration:none;border:1px solid #f6cfc4;border-radius:10px;padding:6px 10px}
+.mp-v3 .mp-fest-change:hover{background:var(--coral-softer)}
+/* 작업 공간 높이: 상단바 64 + 위 여백 + 머리글 + 아래 여백 → 남은 높이 전부 */
+.mp-v3 .match-layout.live{height:clamp(400px,calc(100dvh - 210px),780px);margin-bottom:0}
+/* 「직접 설정하기」 폼: 안쪽 상자 없이 패널 안에서 정리, 매칭 버튼은 아래 고정 */
+.mp-v3 .tab-form{padding:0}
+.mp-v3 .tab-form .form-body{display:flex;flex-direction:column;gap:14px;min-height:100%;padding:20px 24px 0;margin:0;border:0;background:none;box-shadow:none}
+.mp-v3 .tab-form .form-group-title{margin:0;font-size:14px;font-weight:700}
+.mp-v3 .tab-form .form-req{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 12px;background:none;border:0;padding:0;border-radius:0}
+.mp-v3 .tab-form .opt-fold{order:2;margin:0;border-radius:14px}
+.mp-v3 .tab-form .form-run{order:3;position:sticky;bottom:0;margin:auto -24px 0;padding:12px 24px 14px;background:#fff;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;z-index:1}
+.mp-v3 .tab-form .form-run .btn.primary{padding:11px 20px}
+.mp-v3 .tab-form .form-run .score-info{font-size:13px}
+.mp-v3 .tab-form .form-run .run-hint{flex-basis:100%;margin:0}
+
+/* ===== 매칭 v3 보완 4 (11/18 01:40): 영상 피드백 반영 ===== */
+/* 1) 페이지 스크롤 없앰: 상단바 64 + 위 여백 24 + 머리글 87 + 아래 여백·푸터 → 작업 공간이 남은 높이를 정확히 채움 */
+.mp-v3 .match-layout.live{height:max(460px,calc(100dvh - 232px));max-height:none}
+/* 2) 챗봇 첫 메시지는 위에서부터 시작(아래 붙이기 해제) — 대화가 길어지면 자동으로 맨 아래로 스크롤 */
+.mp-v3 .mtabs-card .ai-msgs>:first-child{margin-top:0}
+.mp-v3 .mtabs-card .ai-inline .ai-msgs,.mp-v3 .mtabs-card .ai-inline:not(.active) .ai-msgs{padding:18px 24px}
+/* 3) 「처음부터 다시」 버튼: 탭 줄 오른쪽, 눈에 띄는 보조 버튼 */
+.mp-v3 .mtabs-card .ai-inline .ai-head .ai-tools button{background:#fff;border:1px solid var(--line);color:var(--ink,#2b2522);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.mp-v3 .mtabs-card .ai-inline .ai-head .ai-tools button:hover{border-color:#f6cfc4;color:var(--coral2);background:var(--coral-softer)}
+/* 4) 추천 카드: 이름 아래에 조건 태그(모든 카드 동일), 이름-태그 간격 좁히고 카드 위아래 여백 확보 */
+.mp-v3 .pick-card{padding:14px 16px;align-items:center}
+.mp-v3 .pick-body{flex-direction:column;align-items:flex-start;flex-wrap:nowrap;gap:6px}
+.mp-v3 .pick-body>b{line-height:1.25}
+.mp-v3 .pick-list{gap:10px}
+/* 보완 2) 필수 조건: 한 상자로 묶고 라벨-입력 간격·항목 간격 좁힘 */
+.mp-v3 .tab-form .form-req{background:#fbf8f6;border:1px solid var(--line);border-radius:14px;padding:14px;gap:10px 12px}
+.mp-v3 .tab-form .form-req .field{display:flex;flex-direction:column;gap:5px;margin:0}
+.mp-v3 .tab-form .form-req .field label{margin:0;font-size:13px;font-weight:600}
+.mp-v3 .tab-form .form-body{gap:12px}
+/* 탭 전환 시 부드럽게 나타남 */
+@keyframes mpTabIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+.mp-v3 .mtabs-card>div:not([hidden]):not(.mtabs){animation:mpTabIn .22s ease-out}
+.mp-v3 .tab-form .opt-fold{scroll-margin-top:12px}
+.mp-v3 .tab-form .opt-fold[open]>summary~*{animation:mpTabIn .22s ease-out}
+
+/* ===== 매칭 v3 보완 5 (11/18 01:50): 여백 복원(목업 기준) + 챗봇 첫 화면·실시간 모션 ===== */
+/* 전체 폭을 줄이고 위 여백을 늘려 화면 가운데에 안정적으로 */
+.mp-v3{max-width:1000px;padding-top:8px}
+.mp-v3 .mp-top{margin-bottom:22px}
+/* 한 상자 → 두 카드(사이 20px). 두 카드 높이·끝선은 동일 */
+.mp-v3 .match-layout.live{grid-template-columns:minmax(0,46fr) minmax(0,54fr);gap:20px;background:transparent;border:0;border-radius:0;box-shadow:none;overflow:visible;height:max(460px,calc(100dvh - 240px))}
+.mp-v3 .match-layout.live>.match-main,.mp-v3 .match-layout.live .match-results.box{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 1px 2px rgba(42,36,33,.03);overflow:hidden}
+.mp-v3 .match-layout.live .mtabs-card{position:relative}
+/* 칸 안쪽 여백 26px로 통일 */
+.mp-v3 .ws-head{padding:20px 26px 14px}
+.mp-v3 .ws-pad{padding:20px 26px}
+.mp-v3 .pick-list{padding:16px 26px}
+.mp-v3 .mtabs-card .ai-inline .ai-msgs,.mp-v3 .mtabs-card .ai-inline:not(.active) .ai-msgs{padding:20px 26px}
+.mp-v3 .mtabs-card .ai-compose{padding:14px 26px 18px}
+.mp-v3 .mtabs-card .ai-confirm{margin:14px 26px 0}
+/* 챗봇 첫 화면: 대화 칸 가운데(위아래·좌우)에 인사 + 예시 */
+.mp-v3 .mtabs-card .ai-msgs>.ai-intro{margin:auto}
+.mp-v3 .ai-intro{display:flex;flex-direction:column;align-items:center;text-align:center;max-width:360px;padding:8px 0}
+.mp-v3 .ai-intro-ava{width:52px;height:52px;border-radius:16px;background:var(--coral-softer);display:grid;place-items:center;margin-bottom:14px}
+.mp-v3 .ai-intro-ava img{width:30px;height:30px;object-fit:contain}
+.mp-v3 .ai-intro-hi{margin:0 0 4px;font-size:14px;color:var(--sub)}
+.mp-v3 .ai-intro h3{margin:0 0 6px;font-size:18px;font-weight:700;line-height:1.45;letter-spacing:-.01em;min-height:1.45em}
+.mp-v3 .ai-intro-sub{margin:0 0 18px;font-size:13.5px;color:var(--sub)}
+.mp-v3 .ai-intro-chips{display:flex;flex-direction:column;align-items:center;gap:8px}
+.mp-v3 .ai-intro-chips .ai-chip{white-space:normal}
+/* 실시간 모션: 메시지가 스르륵 올라옴(내 메시지는 오른쪽에서), 칩·목록은 글자가 다 써진 뒤 */
+@keyframes aiUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes aiRight{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+@keyframes aiBlink{50%{opacity:0}}
+.mp-v3 .mtabs-card .ai-row{animation:aiUp .35s cubic-bezier(.2,.7,.3,1) both}
+.mp-v3 .mtabs-card .ai-row.user{animation-name:aiRight}
+.mp-v3 .mtabs-card .ai-row.bot .ai-col>:not(.ai-bubble){animation:aiUp .35s ease-out .75s both}
+.mp-v3 .ai-intro>*{animation:aiUp .45s cubic-bezier(.2,.7,.3,1) both}
+.mp-v3 .ai-intro>:nth-child(2){animation-delay:.08s}
+.mp-v3 .ai-intro>:nth-child(3){animation-delay:.14s}
+.mp-v3 .ai-intro>:nth-child(4){animation-delay:.7s}
+.mp-v3 .ai-intro-chips>*{animation:aiUp .35s ease-out both}
+.mp-v3 .ai-intro-chips>:nth-child(1){animation-delay:.8s}
+.mp-v3 .ai-intro-chips>:nth-child(2){animation-delay:.88s}
+.mp-v3 .ai-intro-chips>:nth-child(3){animation-delay:.96s}
+.mp-v3 .ai-caret{display:inline-block;width:2px;height:1em;margin-left:2px;vertical-align:-2px;background:var(--coral);animation:aiBlink .9s steps(1) infinite}
+@media(prefers-reduced-motion:reduce){.mp-v3 .ai-row,.mp-v3 .ai-intro>*,.mp-v3 .ai-intro-chips>*,.mp-v3 .ai-col>*{animation:none!important}}
+@media(max-width:1100px){.mp-v3 .match-layout.live{height:auto}}
+/* 첫 화면 높이 압축: 낮은 화면(대화 칸 약 290px)에서도 예시 3개까지 스크롤 없이 */
+.mp-v3 .ai-intro{padding:0}
+.mp-v3 .ai-intro-ava{width:40px;height:40px;border-radius:13px;margin-bottom:10px}
+.mp-v3 .ai-intro-ava img{width:24px;height:24px}
+.mp-v3 .ai-intro-hi{display:none}
+.mp-v3 .ai-intro h3{font-size:16.5px;margin-bottom:4px}
+.mp-v3 .ai-intro-sub{font-size:13px;margin-bottom:14px}
+.mp-v3 .ai-intro-chips{gap:6px}
+.mp-v3 .ai-intro-chips .ai-chip{padding:7px 14px;font-size:13px}
+/* 후보 카드 (11/18 01:45): 합류 시각은 이름 옆 회색 보조 정보, 태그는 「어떤 사람인지」 3개만 한 줄 */
+.mp-v3 .pick-name{display:flex;align-items:center;gap:8px;min-width:0}
+.mp-v3 .pick-name b{font-size:15px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mp-v3 .pick-time{flex:none;display:inline-flex;align-items:center;gap:3px;font-size:12.5px;font-weight:500;color:#9a908a;font-variant-numeric:tabular-nums}
+.mp-v3 .pick-time i{font-size:13px}
+.mp-v3 .pick-tags{flex-wrap:nowrap;overflow:hidden;max-width:100%}
+/* 「더 잘 맞는 동행」 안내 (11/18 01:50): 후보 카드와 같은 좌우선, 아이콘은 제목 줄에 맞춤, 설명은 한 줄 */
+.mp-v3 .pick-tip{margin:2px 26px 20px;align-items:center;gap:12px;padding:14px 18px}
+.mp-v3 .pick-tip>i{align-self:flex-start;margin-top:1px;font-size:18px;line-height:1.4}
+.mp-v3 .pick-tip>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;line-height:1.4}
+.mp-v3 .pick-tip>div span{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -31,6 +31,7 @@ export function toCandidateModel(c) {
     score: c.score,
     parts,
     reasons: c.reasons || [],
+    profile: c.profile || {}, // 연령대·관심사·여행 스타일·합류 시각 (백엔드 candidate_profile)
   };
 }
 

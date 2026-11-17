@@ -50,6 +50,16 @@ export default function MatchingPage() {
   const [agentRun, setAgentRun] = useState(null);
   // 실서버 모드: 왼쪽 카드 탭 (챗봇으로 찾기 / 직접 설정하기)
   const [tab, setTab] = useState("chat");
+  const [optOpen, setOptOpen] = useState(false);
+  // 결과의 「조건 더하기」: 직접 설정하기로 넘어가며 선택 조건을 펼쳐 보여 준다
+  const openMore = () => {
+    setTab("form");
+    setOptOpen(true);
+    requestAnimationFrame(() =>
+      document.querySelector(".mp-v3 .tab-form .opt-fold")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
+  const [chatStage, setChatStage] = useState(0); // 챗봇 진행 단계 → 오른쪽 STEP 안내 (0 조건 말하기 · 1 되묻기 · 2 추천)
   const directResult = useApi && run.key === conditionKey(state.festivalId, pr) ? run : null;
   const apiResult = useApi ? agentRun || directResult : null;
   const showDemoResult = !useApi && state.matchingDone;
@@ -196,14 +206,16 @@ export default function MatchingPage() {
                 <i className="ti ti-info-circle" aria-hidden="true" /> 점수 계산 방식
               </summary>
               <div className="score-grid">
-                <span>일정 25%</span>
+                <span>합류 시간 20%</span>
                 <span>관심사 20%</span>
-                <span>예산 20%</span>
+                <span>예산 15%</span>
                 <span>여행 스타일 15%</span>
-                <span>MBTI 10%</span>
+                <span>연령대 10%</span>
                 <span>희망 인원 10%</span>
+                <span>성별 5%</span>
+                <span>MBTI 5%</span>
               </div>
-              <p>선택 조건을 비워 두면 그 항목은 빼고, 나머지로 100점 기준을 다시 계산해요.</p>
+              <p>선택 조건을 비워 두면 그 항목은 빼고 나머지로 100점 기준을 다시 계산해요. 60% 이상인 동행을 추천해요.</p>
             </details>
             {useApi ? (
               <button type="button" className="btn primary" disabled={run.status === "loading"} onClick={runApiMatch}>
@@ -222,7 +234,14 @@ export default function MatchingPage() {
           </div>
 
           {/* 선택 조건: 기본 접힘 · 한 줄에 한 항목(왼쪽 소제목 / 오른쪽 선택) */}
-          <details className="opt-fold">
+          <details
+            className="opt-fold"
+            open={optOpen}
+            onToggle={(e) => {
+              const open = e.currentTarget.open;
+              if (open !== optOpen) setOptOpen(open);
+            }}
+          >
             <summary>
               <span className="opt-title">
                 <i className="ti ti-help-circle" aria-hidden="true" /> 더 잘 맞는 동행을 찾으려면 <em>(선택)</em>
@@ -335,26 +354,31 @@ export default function MatchingPage() {
   if (!DEMO_MODE && source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
   if (!DEMO_MODE && source === "demo") return <ApiError />;
   return (
-    <>
+    <div className={useApi ? "mp-v3" : undefined}>
       {/* 실서버 모드: v3 머리글 — 제목·설명 왼쪽, 진행 단계 오른쪽 (실제 진행한 단계까지만 ✓) */}
+      {/* 실서버 모드: 머리글 한 줄 — 제목 왼쪽, 지금 고른 축제 오른쪽 (진행 상황은 오른쪽 패널이 보여 줌) */}
       {useApi ? (
-        <div className="mp-head">
-          <div>
+        <div className="mp-top">
+          <div className="mp-top-title">
             <h1>AI 동행 매칭</h1>
-            <p>방문 시간과 취향을 바탕으로 잘 맞는 동행을 추천해 드려요 🙌</p>
+            <p>방문 시간과 취향이 잘 맞는 동행을 추천해 드려요</p>
           </div>
-          <ol className="mp-steps" aria-label="매칭 진행 단계">
-            {["조건 확인", "동행 추천", "모집글 작성", "신청·승인"].map((x, i) => {
-              const doneCount = apiResult?.status === "done" ? 2 : agentRun ? 1 : 0;
-              const cls = i < doneCount ? "done" : i === doneCount ? "cur" : "";
-              return (
-                <li key={x} className={cls}>
-                  {i < doneCount ? <i className="ti ti-circle-check" aria-hidden="true" /> : <span>{String(i + 1).padStart(2, "0")}</span>}
-                  {x}
-                </li>
-              );
-            })}
-          </ol>
+          {chosen && (
+            <div className="mp-fest">
+              <span className="mp-fest-thumb">
+                {chosen.imageUrl || chosen.thumbnailUrl ? <img src={chosen.imageUrl || chosen.thumbnailUrl} alt="" /> : <span>{chosen.emoji || "🎪"}</span>}
+              </span>
+              <span className="mp-fest-txt">
+                <b>{chosen.name}</b>
+                <small>
+                  {[chosen.region, chosen.city].filter(Boolean).join(" ")}
+                  {pr.date ? ` · ${dayLabel(pr.date)}${pr.start ? ` ${pr.start}` : ""}` : ""}
+                  <i className="ti ti-circle-check" aria-hidden="true" title="축제 정보 실시간 조회" />
+                </small>
+              </span>
+              <Link to="/festivals" className="mp-fest-change">축제 변경</Link>
+            </div>
+          )}
         </div>
       ) : (
         pageHead(
@@ -362,32 +386,6 @@ export default function MatchingPage() {
           "💞 AI 동행 매칭",
           "가고 싶은 축제와 원하는 동행을 말로 적으면 AI가 조건을 정리해 추천하고, 공개 모집글과 모임방을 만들어요.",
         )
-      )}
-
-      {/* 실서버 모드: 지금 고른 축제 카드 */}
-      {useApi && chosen && (
-        <div className="fest-ctx">
-          <div className="fest-ctx-thumb">
-            {chosen.imageUrl || chosen.thumbnailUrl ? <img src={chosen.imageUrl || chosen.thumbnailUrl} alt="" /> : <span className="fest-ctx-emoji">{chosen.emoji || "🎪"}</span>}
-          </div>
-          <div className="fest-ctx-name">
-            <h3>{chosen.name}</h3>
-            <span>
-              {[chosen.region, chosen.city].filter(Boolean).join(" ")}
-              {chosen.start ? ` · ${chosen.start.slice(5).replace("-", ".")} – ${(chosen.end || chosen.start).slice(5).replace("-", ".")}` : ""}
-            </span>
-            <small className="fest-ctx-src">
-              <i className="ti ti-circle-check" aria-hidden="true" /> 축제 정보 · 실시간 조회
-            </small>
-          </div>
-          <div className="fest-ctx-visit">
-            <small>방문 예정</small>
-            <b>{pr.date ? `${dayLabel(pr.date)}${pr.start ? ` · ${pr.start}` : ""}` : "아직 정하지 않았어요"}</b>
-          </div>
-          <Link to="/festivals" className="fest-ctx-change">
-            축제 변경 <i className="ti ti-chevron-right" aria-hidden="true" />
-          </Link>
-        </div>
       )}
 
       {/* 데모 모드 진행 단계 (기존) */}
@@ -422,6 +420,7 @@ export default function MatchingPage() {
           selectedDate={chosen && pr.date >= chosen.start && pr.date <= chosen.end ? pr.date : undefined}
           pill={pill}
           onResult={setAgentRun}
+          onStage={setChatStage}
           onEditConditions={() => setTab("form")}
           onPickFestival={(id) =>
             mutate((s) => {
@@ -464,9 +463,9 @@ export default function MatchingPage() {
       )}
       </div>
 
-      <section className="box pad match-results">
+      <section className={`box pad match-results${apiResult ? " has-result" : ""}`}>
         {apiResult ? (
-          <ApiResults run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} pill={pill} joinLabel={AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]} />
+          <ApiResults key={apiResult.runId || apiResult.key} run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} joinLabel={AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]} onEdit={openMore} />
         ) : showDemoResult ? (
           <>
           {matchingGroup && (
@@ -525,6 +524,27 @@ export default function MatchingPage() {
           </div>
           </>
         ) : (
+          useApi ? (
+          <div className="ws-empty">
+            <span className="ws-empty-ic"><i className="ti ti-users" aria-hidden="true" /></span>
+            <h2>추천 동행이 여기에 나타나요</h2>
+            <p>대화로 축제·날짜·시간을 정하면 잘 맞는 동행을 찾아 드려요.</p>
+            <div className="ws-mini" aria-label="진행 단계">
+              {["조건 말하기", "빠진 조건 되묻기", "동행 추천"].map((x, i) => {
+                const now = tab === "chat" ? chatStage : 0;
+                return (
+                  <Fragment key={x}>
+                    {i > 0 && <i className="ws-mini-bar" aria-hidden="true" />}
+                    <span className={i === now ? "now" : i < now ? "done" : ""}>
+                      {i < now && <i className="ti ti-check" aria-hidden="true" />}
+                      {x}
+                    </span>
+                  </Fragment>
+                );
+              })}
+            </div>
+          </div>
+          ) : (
           <div className="match-idle">
             <div className="cand-head">
               <h2>추천 동행</h2>
@@ -535,25 +555,30 @@ export default function MatchingPage() {
                 ["ti-message-circle", "조건 말하기", "가고 싶은 축제와 원하는 동행을 편하게 말해요"],
                 ["ti-help-circle", "빠진 조건 되묻기", "날짜·시간처럼 꼭 필요한 것만 AI가 다시 물어봐요"],
                 ["ti-users", "동행 추천", "합류 시간과 취향이 잘 맞는 순서로 보여 드려요"],
-              ].map(([icon, title, desc], i) => (
-                <li key={title} className={i === 0 ? "now" : ""}>
-                  <i className={`ti ${icon}`} aria-hidden="true" />
+              ].map(([icon, title, desc], i) => {
+                // 직접 설정 탭은 대화 단계와 무관 → STEP 1 표시
+                const now = tab === "chat" ? chatStage : 0;
+                return (
+                <li key={title} className={i === now ? "now" : i < now ? "done" : ""}>
+                  <i className={`ti ${i < now ? "ti-check" : icon}`} aria-hidden="true" />
                   <div>
                     <small>
                       STEP {i + 1}
-                      {i === 0 ? " · 지금" : ""}
+                      {i === now ? " · 지금" : i < now ? " · 완료" : ""}
                     </small>
                     <b>{title}</b>
                     <span>{desc}</span>
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ol>
           </div>
+          )
         )}
       </section>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -583,107 +608,164 @@ function ScoreWhy({ parts }) {
 
 // 실제 API 매칭 결과 — v3: 후보 목록(합류 시각·공통점) + 「이 조건으로 모집할까요?」 박스
 const REASON_ICON = (r) => (/합류|시/.test(r) ? "ti-clock" : /나이/.test(r) ? "ti-user" : /관심|취향/.test(r) ? "ti-heart" : /예산/.test(r) ? "ti-wallet" : /스타일/.test(r) ? "ti-walk" : "ti-check");
-function ApiResults({ run, festival, profile, summary, pill, joinLabel }) {
-  const head = (right) => (
-    <div className="cand-head">
-      <h2>
-        추천 동행 {right != null && <span>{right}</span>}
-      </h2>
-    </div>
-  );
+function ApiResults({ run, festival, profile, summary, joinLabel, onEdit }) {
+  const [picked, setPicked] = useState([]); // 함께하고 싶은 동행 id (모집글 초안에 들어감)
   if (run.status === "loading")
     return (
-      <>
-        {head()}
-        <div className="empty match-empty">
-          <div className="big">⏳</div>
-          <h3>잘 맞는 동행을 찾고 있어요</h3>
+      <div className="ws-body ws-pad">
+        <div className="ws-title"><h2>추천 동행</h2></div>
+        <div className="cand-skel" aria-busy="true" aria-label="잘 맞는 동행을 찾는 중">
+          {[0, 1, 2].map((i) => <span key={i} />)}
         </div>
-      </>
+      </div>
     );
   if (run.status === "error")
     return (
-      <>
-        {head()}
-        <div className="note">
-          <strong>매칭하지 못했어요</strong>
-          <br />
-          {run.error}
-        </div>
-      </>
+      <div className="ws-body ws-pad">
+        <div className="ws-title"><h2>추천 동행</h2></div>
+        <div className="note"><strong>매칭하지 못했어요</strong><br />{run.error}</div>
+      </div>
     );
   const candidates = run.result?.candidates || [];
   const date = run.conditions?.date || profile.date;
   const start = run.conditions?.startTime || profile.start;
-  const party = run.partySize || profile.party;
+  const party = Number(run.partySize || profile.party) || 2;
+  const max = Math.max(party - 1, 1); // 나를 뺀 모집 인원까지 고를 수 있음
   const dl = (iso) => {
     const d = new Date(iso + "T00:00:00");
-    return `${d.getMonth() + 1}.${d.getDate()} ${"일월화수목금토"[d.getDay()]}`;
+    return `${d.getMonth() + 1}.${d.getDate()}(${"일월화수목금토"[d.getDay()]})`;
   };
+  if (!candidates.length)
+    return (
+      <div className="ws-body ws-pad">
+        <div className="ws-title"><h2>추천 동행 <span>0명</span></h2></div>
+        <div className="cand-none">
+          <i className="ti ti-user-search" aria-hidden="true" />
+          <h3>이 조건에 맞는 동행이 아직 없어요</h3>
+          <p>
+            {[date && dl(date), start && `${start} 시작`].filter(Boolean).join(" · ") || "지금 조건"}으로는 잘 맞는 동행을 찾지 못했어요.
+            <br />
+            조건을 바꿔 보거나, 모집글을 먼저 올려 동행을 기다려 보세요.
+          </p>
+          <div className="cand-none-actions">
+            {onEdit && (
+              <button type="button" className="cand-none-btn" onClick={onEdit}>
+                <i className="ti ti-adjustments-horizontal" aria-hidden="true" /> 조건 바꾸기
+              </button>
+            )}
+            <Link to="/groups" className="cand-none-btn primary">
+              <i className="ti ti-pencil-plus" aria-hidden="true" /> 커뮤니티에 모집글 올리기
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  const toggle = (id) =>
+    setPicked((cur) => {
+      if (cur.includes(id)) return cur.filter((x) => x !== id);
+      if (max === 1) return [id]; // 1명 모집이면 선택이 옮겨감
+      return cur.length < max ? [...cur, id] : cur; // 여러 명이면 최대 수까지 중복 선택
+    });
+  const full = max > 1 && picked.length >= max;
+  const names = candidates.filter((o) => picked.includes(o.id)).map((o) => o.name);
+  const postSummary = [summary, names.length && `함께하고 싶은 동행: ${names.join(", ")}`].filter(Boolean).join("\n");
   return (
     <>
-      {head(`${candidates.length}명`)}
-      <p className="cand-sub">합류 시간과 관심사가 비슷한 순서예요.</p>
-      {candidates.length ? (
-        <div className="cand-list">
-          {candidates.map((o) => (
-            <div className="cand" key={o.id}>
-              <span className="cand-ava">
-                {o.avatarUrl ? <img src={o.avatarUrl} alt="" /> : (o.name || "?").slice(0, 1)}
-              </span>
-              <div className="cand-body">
-                <div className="cand-top">
-                  <b>{o.name}</b>
-                  <span className="cand-pct">매칭 {o.score}%</span>
-                </div>
-                {o.reasons.map((r) => (
-                  <div className="cand-meta" key={r}>
-                    <i className={`ti ${REASON_ICON(r)}`} aria-hidden="true" /> {r}
-                  </div>
-                ))}
-                <details className="ratio-detail">
-                  <summary>점수 상세 보기</summary>
-                  <div className="ratio">
-                    {Object.entries(o.parts).map(([k, v]) => (
-                      <span key={k}>
-                        {k} {v}
+      <div className="ws-head">
+        <div className="ws-title">
+          <h2>추천 동행 <span>{candidates.length}명</span></h2>
+          <div className="pick-count">선택 <b>{picked.length}</b> / {max}명</div>
+        </div>
+        <p>함께하고 싶은 동행을 골라 주세요. 모집글에 함께 담겨요.</p>
+      </div>
+      <div className="ws-body">
+        <div className="pick-list" role="group" aria-label="추천 동행 선택">
+          {candidates.map((o) => {
+            const on = picked.includes(o.id);
+            return (
+              <button
+                type="button"
+                key={o.id}
+                role="checkbox"
+                aria-checked={on}
+                className={`pick-card${full && !on ? " dim" : ""}`}
+                onClick={() => toggle(o.id)}
+              >
+                <span className="pick-ava">{o.avatarUrl ? <img src={o.avatarUrl} alt="" /> : (o.name || "?").slice(0, 1)}</span>
+                <span className="pick-body">
+                  <span className="pick-name">
+                    <b>{o.name}</b>
+                    {o.profile?.availableFrom && (
+                      <span className="pick-time" title={`${o.profile.availableFrom}부터 합류 가능`}>
+                        <i className="ti ti-clock" aria-hidden="true" />
+                        {String(o.profile.availableFrom).slice(0, 5)}~
+                      </span>
+                    )}
+                  </span>
+                  <span className="pick-tags">
+                    {candidateTags(o, profile).map(([icon, text, hit]) => (
+                      <span className={`pick-tag${hit ? " hit" : ""}`} key={text}>
+                        <i className={`ti ${icon}`} aria-hidden="true" />
+                        {text}
                       </span>
                     ))}
-                  </div>
-                </details>
-              </div>
+                  </span>
+                </span>
+                <span className="pick-box" aria-hidden="true"><i className="ti ti-check" /></span>
+              </button>
+            );
+          })}
+        </div>
+        {full && <p className="pick-limit">최대 {max}명까지 고를 수 있어요</p>}
+        {onEdit && (
+          <div className="pick-tip">
+            <i className="ti ti-sparkles" aria-hidden="true" />
+            <div>
+              <b>더 잘 맞는 동행을 찾고 싶다면</b>
+              <span>관심사·스타일·예산을 더하면 더 정확해져요</span>
             </div>
-          ))}
+            <button type="button" onClick={onEdit}>조건 더하기 <i className="ti ti-chevron-right" aria-hidden="true" /></button>
+          </div>
+        )}
+      </div>
+      <div className="ws-foot pick-foot">
+        <div className="pick-info">
+          <div>
+            <span className="k">일정</span> {date ? `${dl(date)} ${start || ""}` : "미정"} · <span className="k">모집</span> 나 포함 {party}명{joinLabel ? ` · ${joinLabel}` : ""}
+          </div>
+          <div>
+            <span className="k">함께할 동행</span> {names.length ? <b>{names.join(", ")}</b> : "아직 고르지 않았어요"}
+          </div>
         </div>
-      ) : (
-        <div className="empty">조건에 맞는 동행이 아직 없어요. 조건을 바꿔 다시 찾아보세요.</div>
-      )}
-      {candidates.length > 0 && (
-        <div className="cta-box">
-          <h3>이 조건으로 동행을 모집할까요? ✍️</h3>
-          <p>확인한 조건을 바탕으로 모집글 초안을 만들어요.</p>
-          <dl>
-            <dt>방문 일정</dt>
-            <dd>{date ? `${dl(date)}${start ? ` · ${start}` : ""}` : "미정"}</dd>
-            <dt>모집 인원</dt>
-            <dd>
-              {party ? `나 포함 ${party}명` : "정원은 다음 단계에서 정해요"}
-              {joinLabel ? ` · ${joinLabel}` : ""}
-            </dd>
-          </dl>
-          <CreatePostBox
-            cta
-            festival={festival}
-            runId={run.runId}
-            partySize={party}
-            joinMode={recruitmentJoinMode(run.runId, profile.joinMode)}
-            summary={summary}
-            date={date}
-            startTime={start}
-          />
-          <div className="cta-foot">게시 전에 내용을 확인하고 수정할 수 있어요.</div>
-        </div>
-      )}
+        <CreatePostBox
+          cta
+          key={postSummary}
+          festival={festival}
+          runId={run.runId}
+          partySize={party}
+          joinMode={recruitmentJoinMode(run.runId, profile.joinMode)}
+          summary={postSummary}
+          date={date}
+          startTime={start}
+        />
+      </div>
     </>
   );
+}
+
+// 후보 카드 태그: 프로필 요약(합류 시각·연령대·여행 스타일·관심사) — 내 조건과 겹치는 값은 강조
+function candidateTags(o, mine = {}) {
+  const p = o.profile || {};
+  const text = (o.reasons || []).join(" ");
+  const hitInterests = (text.match(/관심사 \d+개 일치\(([^)]*)\)/)?.[1] || "").split(",").map((x) => x.trim()).filter(Boolean);
+  const tags = [];
+  if (p.ageBand) tags.push(["ti-user", p.ageBand, /같은 나이대/.test(text)]);
+  // 강조 기준: 이번 검색 조건과 겹침(추천 이유) 또는 내 프로필(온보딩 선호)과 같음
+  if (p.travelStyle) tags.push(["ti-route", p.travelStyle, /여행 스타일 같음/.test(text) || (!!mine.style && (String(mine.style).includes(p.travelStyle) || p.travelStyle.includes(mine.style)))]);
+  // 관심사는 한 태그로 묶어 줄바꿈을 줄임 (예: 음악 · 미식)
+  const ints = (p.interests || []).slice(0, 2);
+  const myInts = mine.interests || [];
+  if (ints.length) tags.push(["ti-heart", ints.join(" · "), ints.some((x) => hitInterests.includes(x) || myInts.includes(x))]);
+  if (!tags.length) (o.reasons || []).forEach((r) => tags.push([REASON_ICON(r), r, true]));
+  return tags;
 }
