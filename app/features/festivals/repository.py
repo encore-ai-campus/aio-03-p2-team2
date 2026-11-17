@@ -139,13 +139,14 @@ class FestivalRepositoryMixin(RepositoryBase):
         )
         return self._job_view(row)
 
-    async def claim_next_sync_job(self, worker_id: str, *, lease_seconds: int, max_attempts: int) -> dict | None:
+    async def claim_next_sync_job(self, worker_id: str, *, lease_seconds: int, max_attempts: int, job_id: str | None = None) -> dict | None:
         row = await self._pool().fetchrow(
             """
             with candidate as (
                 select id
                 from external_sync_runs
                 where status = 'queued'
+                  and ($3::text is null or id = $3)
                   and (next_attempt_at is null or next_attempt_at <= now())
                   and attempts < least(max_attempts, $2)
                 order by created_at asc, id asc
@@ -167,6 +168,7 @@ class FestivalRepositoryMixin(RepositoryBase):
             """,
             worker_id,
             max_attempts,
+            job_id,
         )
         return self._job_view(row) if row else None
 
@@ -214,13 +216,29 @@ class FestivalRepositoryMixin(RepositoryBase):
 
     @staticmethod
     def _job_view(row: asyncpg.Record) -> dict:
+        params = FestivalRepositoryMixin._decode_json(row["params"], {})
+        rejections = FestivalRepositoryMixin._decode_json(row["rejections"], [])
         return {
             "jobId": row["id"], "status": row["status"], "kind": row["kind"],
-            "params": row["params"],
-            "accepted": row["accepted"], "rejected": row["rejected"], "rejections": row["rejections"],
+            "params": params,
+            "accepted": row["accepted"], "rejected": row["rejected"],
+            "rejections": rejections if isinstance(rejections, list) else [],
             "error": row["error"], "createdAt": _iso(row["created_at"]),
             "startedAt": _iso(row["started_at"]), "finishedAt": _iso(row["finished_at"]),
             "attempts": row["attempts"], "maxAttempts": row["max_attempts"],
             "nextAttemptAt": _iso(row["next_attempt_at"]), "lockedAt": _iso(row["locked_at"]),
             "workerId": row["worker_id"],
         }
+
+    @staticmethod
+    def _decode_json(value: Any, default: Any) -> Any:
+        if value is None:
+            return default
+        if isinstance(value, (str, bytes, bytearray)):
+            try:
+                return json.loads(value)
+            except (TypeError, ValueError):
+                # Preserve invalid parameters so the Worker fails explicitly instead of
+                # silently executing a different request with default search conditions.
+                return value
+        return value
