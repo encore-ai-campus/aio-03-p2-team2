@@ -1,0 +1,41 @@
+/* 「＋ 직접 모임 만들기」 창 — 접두어 ng- (app.css 미수정, .modal 기본 스타일 위에 추가) */
+.ng-modal{max-width:560px;display:flex;flex-direction:column;gap:14px;animation:ng-in .2s ease-out}
+@keyframes ng-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.ng-modal .modal-head{margin-bottom:0}
+.ng-modal .modal-head h2{font-size:19px;font-weight:700;color:#2A2421}
+.ng-x{width:34px;height:34px;display:grid;place-items:center;border:1px solid #F1E7E2;border-radius:9px;background:#fff;color:#6F6762;font-size:16px;cursor:pointer}
+.ng-x:hover{color:#D9503B;border-color:#FFD9CF}
+.ng-lead{margin:-4px 0 0;font-size:12.5px;color:#6F6762}
+.ng-lead i{color:#F06A55}
+.ng-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ng-field label,.ng-label{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:650;color:#2A2421}
+.ng-field label em{font-style:normal;font-size:11px;font-weight:600;color:#D9503B}
+.ng-field label span{font-size:11px;font-weight:500;color:#6F6762}
+.ng-field label .ng-count{margin-left:auto}
+.ng-field input,.ng-field textarea{width:100%;border:1px solid #EAE3DF;border-radius:10px;padding:10px 12px;font:inherit;font-size:13.5px;color:#2A2421;background:#fff}
+.ng-field textarea{resize:vertical;line-height:1.55;min-height:110px}
+.ng-field input:focus,.ng-field textarea:focus{outline:none;border-color:#F06A55;box-shadow:0 0 0 3px #FFEAE4}
+.ng-field input[type=date],.ng-field input[type=time]{cursor:pointer}
+.ng-field input:disabled{cursor:not-allowed;background:#FCFAF9;color:#B0A59F}
+.ng-search{position:relative}
+.ng-search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#B0A59F}
+.ng-search input{padding-left:32px}
+.ng-fest-list{max-height:188px;overflow-y:auto;border:1px solid #F1E7E2;border-radius:10px;padding:4px}
+.ng-fest{position:relative;display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;border:0;background:none;border-radius:8px;padding:8px 34px 8px 10px;font:inherit;cursor:pointer}
+.ng-fest:hover{background:#FFF5F1}
+.ng-fest.on{background:#FFEAE4}
+.ng-fest-name{font-size:13px;font-weight:600;color:#2A2421}
+.ng-fest-meta{font-size:11.5px;color:#6F6762}
+.ng-fest i{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#F06A55;font-size:18px}
+.ng-empty{padding:14px;text-align:center;font-size:12.5px;color:#6F6762}
+.ng-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ng-hint{margin:-8px 0 0;font-size:11.5px;color:#6F6762}
+.ng-caps{display:flex;flex-wrap:wrap;gap:6px}
+.ng-caps button{min-width:48px;padding:8px 10px;border:1px solid #EAE3DF;border-radius:10px;background:#fff;font:inherit;font-size:13px;font-weight:600;color:#6F6762;cursor:pointer}
+.ng-caps button.on{border-color:#F06A55;background:#FFF5F1;color:#D9503B}
+.ng-example{margin-left:auto;border:0;background:none;padding:0;font:inherit;font-size:12px;font-weight:600;color:#F06A55;text-decoration:underline;cursor:pointer}
+.ng-error{display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;background:#FFF5F1;border:1px solid #F6DDD4;font-size:13px;color:#D9503B}
+.ng-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+.cm-notice.ok{background:#E6F5EE;border-color:#CDEBDD;color:#1F7A57}
+@media(max-width:560px){.ng-two{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.ng-modal{animation:none}}

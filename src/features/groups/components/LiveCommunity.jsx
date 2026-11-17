@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { addComment, approveJoin, getGroup, listGroups, listJoinRequests, rejectJoin, requestJoin } from "../api/groupsApi.js";
+import LiveNewGroupModal from "./LiveNewGroupModal.jsx";
 
 const ERROR_TEXT = {
   ALREADY_MEMBER: "이미 참여 중인 모임이에요.",
@@ -44,7 +45,7 @@ const MineBadge = () => (
   </span>
 );
 
-export default function LiveCommunity({ festivals, onFail }) {
+export default function LiveCommunity({ festivals, onFail, newOpen, onCloseNew }) {
   const me = useMe();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -60,6 +61,17 @@ export default function LiveCommunity({ festivals, onFail }) {
   const [requests, setRequests] = useState([]); // 모임장일 때만 불러오는 대기 신청 목록
   const [requested, setRequested] = useState(() => new Set()); // 내가 이번에 신청한 모임 (상세 응답엔 신청 목록이 없음)
   const festival = (id) => festivals.find((f) => f.id === id);
+  const [created, setCreated] = useState(""); // 방금 만든 모집글 id → 상세에 안내
+
+  // 「＋ 직접 모임 만들기」 완료 → 창 닫고 새 글 상세로 이동, 목록 새로 불러오기
+  const onCreated = (group) => {
+    onCloseNew?.();
+    setCreated(group.id);
+    setParams({ groupId: group.id });
+    window.scrollTo(0, 0);
+    loadList();
+  };
+  const newModal = newOpen ? <LiveNewGroupModal festivals={festivals} onClose={onCloseNew} onCreated={onCreated} /> : null;
 
   // 상세에서 확인한 최신 값(인원·신청 대기) — 목록 API 값이 늦게 반영돼도 목록에 덮어쓴다
   const patchRef = useRef(null);
@@ -149,7 +161,13 @@ export default function LiveCommunity({ festivals, onFail }) {
   const where = (f) => (f ? [f.region, f.city].filter(Boolean).join(" ") || "지역 미정" : "지역 미정");
   const pct = (item) => Math.min(100, ((item.memberCount || 0) / (item.capacity || 1)) * 100);
 
-  if (!groups) return <div className="empty">모임 불러오는 중…</div>;
+  if (!groups)
+    return (
+      <>
+        <div className="empty">모임 불러오는 중…</div>
+        {newModal}
+      </>
+    );
 
   // ===== 2단계: 글 상세 =====
   if (selectedId) {
@@ -162,6 +180,7 @@ export default function LiveCommunity({ festivals, onFail }) {
 
     return (
       <div className="cm-detail-page">
+        {newModal}
         <button type="button" className="cm-back" onClick={backToList}>
           <i className="ti ti-arrow-left" aria-hidden="true" /> 목록으로
         </button>
@@ -258,6 +277,11 @@ export default function LiveCommunity({ festivals, onFail }) {
                 <span>{g.status === "open" ? "참여 신청 가능" : "모집 종료 (게시글 유지)"}</span>
               </div>
 
+              {created === g.id && !notice ? (
+                <div className="cm-notice ok" role="status">
+                  <i className="ti ti-circle-check" aria-hidden="true" /> 모집글이 올라갔어요. 참여 신청이 오면 여기서 승인할 수 있어요.
+                </div>
+              ) : null}
               {notice && (
                 <div className="cm-notice" role="status">
                   {notice}
@@ -373,6 +397,7 @@ export default function LiveCommunity({ festivals, onFail }) {
 
   return (
     <>
+      {newModal}
       <div className="cm-toolbar">
         <div className="cm-filters" role="tablist" aria-label="모집 상태">
           {FILTERS.map(([v, label]) => (
