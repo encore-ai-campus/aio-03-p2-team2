@@ -277,6 +277,9 @@ export default function LiveCommunity({ festivals, onFail }) {
                     <button type="button" className="btn primary cm-cta" onClick={() => navigate(`/schedules?groupId=${encodeURIComponent(g.id)}`)}>
                       <i className="ti ti-calendar-event" aria-hidden="true" /> 공동 일정 {isLeader ? "만들기" : "보기"} →
                     </button>
+                    <button type="button" className="btn cm-cta" onClick={() => navigate(`/chat?groupId=${encodeURIComponent(g.id)}`)}>
+                      <i className="ti ti-message-circle" aria-hidden="true" /> 모임 채팅방 →
+                    </button>
                   </>
                 ) : myPending ? (
                   <div className="cm-state wait">

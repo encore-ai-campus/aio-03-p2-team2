@@ -223,6 +223,11 @@ export default function LiveSchedule({ festivals, onFail }) {
                     {m.user.displayName}
                   </span>
                 ))}
+                {isMember ? (
+                  <button type="button" className="btn small" onClick={() => navigate(`/chat?groupId=${encodeURIComponent(group.id)}`)}>
+                    <i className="ti ti-message-circle" aria-hidden="true" /> 채팅방
+                  </button>
+                ) : null}
               </div>
             </>
           ) : (
