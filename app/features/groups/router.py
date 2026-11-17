@@ -37,12 +37,20 @@ def repository_error(error: RepositoryError) -> APIError:
     return APIError(error.status_code, error.code, error.message, error.details)
 
 
+def meeting_summary(group: dict) -> dict:
+    """Expose the saved meeting's date/time without publishing the full schedule."""
+    schedule = group.get("schedule") or {}
+    current = schedule.get("current") or next(iter(schedule.get("items") or []), None) or {}
+    return {"date": current.get("date"), "startTime": current.get("time")}
+
+
 @router.get("", operation_id="listGroups")
 async def list_groups(request: Request, festival_id: str | None = Query(default=None, alias="festivalId"), status: str | None = None, keyword: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize")):
     groups = await get_repository(request).list_groups(festival_id=festival_id, status=status, keyword=keyword)
     items = []
     for group in groups:
         item = dict(group)
+        item.update(meeting_summary(group))
         item.pop("members", None)
         item.pop("joinRequests", None)
         item.pop("comments", None)
@@ -69,6 +77,7 @@ async def create_group(payload: GroupCreate, request: Request):
 @router.get("/{group_id}", operation_id="getGroup")
 async def get_group_detail(group_id: str, request: Request):
     group = dict(await get_group(group_id, get_repository(request)))
+    group.update(meeting_summary(group))
     for key in ("joinRequests","schedule","messages"):
         group.pop(key,None)
     return success(group, request)
