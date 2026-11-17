@@ -6,11 +6,8 @@ import { AI_LABEL } from "./aiParse.js";
 // - 필수(축제 → 시작 시간 → 희망 인원): 비어 있으면 하나씩 계속 다시 묻고 매칭하지 않음
 // - 선택(예산·관심사·여행 스타일·MBTI): 처음 한 번만 한꺼번에 묻고, 이후 비어 있으면 점수에서 제외
 
-export const REQUIRED = ["festival", "start", "party"];
 export const OPTIONAL = ["budget", "interests", "style", "mbti"];
 export const OPTIONAL_LABEL = { budget: "예산", interests: "관심사", style: "여행 스타일", mbti: "MBTI" };
-
-export const emptyAiChat = () => ({ open: false, busy: false, messages: [], draft: {} });
 
 export function aiPush(state, msg) {
   const c = state.aiChat;

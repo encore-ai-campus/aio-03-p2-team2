@@ -12,7 +12,6 @@ import CommunityPage from "../features/groups/pages/CommunityPage.jsx";
 import ChatPage from "../features/chat/pages/ChatPage.jsx";
 import SchedulePage from "../features/schedules/pages/SchedulePage.jsx";
 import AlertsPage from "../features/alerts/pages/AlertsPage.jsx";
-import TeamPage from "../shared/pages/TeamPage.jsx";
 function HomeRedirect() {
   const { state } = useDemo();
   return <Navigate to={paths[state.page] || paths.discover} replace />;
@@ -35,7 +34,6 @@ export default function App() {
               <Route path="chat" element={<ChatPage />} />
               <Route path="schedules" element={<SchedulePage />} />
               <Route path="alerts" element={<AlertsPage />} />
-              <Route path="team" element={<TeamPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="*" element={<Navigate to="/festivals" replace />} />
             </Route>
