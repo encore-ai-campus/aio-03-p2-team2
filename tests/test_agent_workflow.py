@@ -298,7 +298,7 @@ async def test_tour_api_adapter_does_not_expose_key(tmp_path):
         return httpx.Response(200,json={"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{"contentid":"123","title":"공식 축제","eventstartdate":day.replace("-",""),"eventenddate":day.replace("-","")}]}}}})
     async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as http:
         result=await AgentTools(repo,config,http_client=http).search_festivals({"conditions":{"date":day}})
-        assert result["data"][0]["id"] == "123"
+        assert result["data"][0]["id"] == "fst_tour_123"
         assert "test-secret" not in str(result)
 
 @pytest.mark.asyncio
