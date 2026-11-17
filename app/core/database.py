@@ -37,6 +37,23 @@ _auth_claims: contextvars.ContextVar[dict[str, Any] | None] = contextvars.Contex
 )
 
 
+def _encode_json(value: Any) -> str:
+    # 기존 코드는 json.dumps(...) 한 문자열을 넘기므로 문자열은 그대로 통과시켜 이중 인코딩을 막는다.
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+
+
+async def _init_connection(connection: asyncpg.Connection) -> None:
+    """jsonb/json 을 Python dict·list 로 주고받도록 등록 (기본값은 문자열이라 .get() 등에서 실패)."""
+    for type_name in ("jsonb", "json"):
+        await connection.set_type_codec(
+            type_name,
+            schema="pg_catalog",
+            encoder=_encode_json,
+            decoder=json.loads,
+            format="text",
+        )
+
+
 class _ScopedAcquire:
     def __init__(self, database: "Database") -> None:
         self.database = database
@@ -117,6 +134,7 @@ class Database:
                 min_size=self.settings.database_pool_min_size,
                 max_size=self.settings.database_pool_max_size,
                 command_timeout=10,
+                init=_init_connection,
             )
             check_result = await self.check()
             self.status = check_result["status"]
