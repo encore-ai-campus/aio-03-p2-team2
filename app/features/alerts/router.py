@@ -26,12 +26,21 @@ async def own_alert(alert_id: str, user_id: str, repository: SupabaseRepository)
     return alert
 
 
-@router.get("/jobs/{job_id}", operation_id="getSyncJob")
-async def get_sync_job(job_id: str, request: Request):
+async def _sync_job_response(job_id: str, request: Request):
     job = await get_repository(request).sync_job(job_id)
     if not job:
         raise APIError(404, "SYNC_JOB_NOT_FOUND", "수집 작업을 찾을 수 없습니다.")
     return success(job, request)
+
+
+@router.get("/jobs/{job_id}", operation_id="getSyncJob")
+async def get_sync_job(job_id: str, request: Request):
+    return await _sync_job_response(job_id, request)
+
+
+@admin_router.get("/jobs/{job_id}", operation_id="getAdminSyncJob")
+async def get_admin_sync_job(job_id: str, request: Request):
+    return await _sync_job_response(job_id, request)
 
 
 @router.get("", operation_id="listAlerts")

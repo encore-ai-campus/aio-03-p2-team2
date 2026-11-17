@@ -172,6 +172,10 @@ uv run python -m scripts.evaluate_agent --output data/agent-evaluation.json
 외부 축제·날씨 동기화 Worker는 API 서버와 별도 프로세스로 실행합니다. `DATABASE_URL`과
 `TOUR_API_SERVICE_KEY`를 설정하고 `db/external_sync_worker.sql`을 적용한 뒤 다음 명령을 실행합니다.
 
+Before starting the worker, apply both `db/supabase_auth_rls.sql` and
+`db/external_sync_worker.sql` in Supabase SQL Editor. The queue table is named
+`external_sync_runs`; there is no separate `sync_jobs` table.
+
 ```powershell
 uv run python -m app.sync_worker
 ```

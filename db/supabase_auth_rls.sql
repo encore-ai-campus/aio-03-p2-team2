@@ -5,6 +5,25 @@
 
 begin;
 
+-- Keep auth/RLS setup applicable to projects whose base schema omitted the
+-- external worker queue. The canonical table name is external_sync_runs;
+-- sync_jobs is not used by the API or Worker.
+create table if not exists public.external_sync_runs (
+    id text primary key default ('job_' || substr(md5(random()::text || clock_timestamp()::text), 1, 24)),
+    kind text not null,
+    status text not null default 'queued'
+        check (status in ('queued', 'running', 'succeeded', 'failed')),
+    params jsonb not null default '{}'::jsonb,
+    accepted integer not null default 0,
+    rejected integer not null default 0,
+    rejections jsonb not null default '[]'::jsonb,
+    error text,
+    requested_by text,
+    created_at timestamptz not null default now(),
+    started_at timestamptz,
+    finished_at timestamptz
+);
+
 alter table public.users
     add column if not exists auth_user_id uuid;
 
