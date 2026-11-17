@@ -634,7 +634,8 @@ export const INIT_GROUPS = [
     logs: [],
   },
 ];
-export const STORAGE_KEY = "festamate_v4_4_261112_demo";
+// 저장 키를 바꾸면 모든 브라우저의 이전 데모 데이터가 무시되고 기본값으로 시작한다
+export const STORAGE_KEY = "festamate_v4_4_261117_demo";
 export const clone = (x) => JSON.parse(JSON.stringify(x));
 export const defaults = () => ({
   page: "discover",
@@ -646,7 +647,7 @@ export const defaults = () => ({
   category: "all",
   keyword: "",
   festivalId: null,
-  selectedGroup: "g2",
+  selectedGroup: null,
   matchingDone: false,
   matchScores: [],
   matchFestivalId: null,
@@ -661,7 +662,8 @@ export const defaults = () => ({
     start: "",
     joinMode: "approval",
   },
-  groups: clone(INIT_GROUPS),
+  // 기본 데모 모임 없이 시작 (INIT_GROUPS 는 일정 충돌 시나리오·테스트용으로만 남김)
+  groups: [],
   weather: {
     type: null,
     choice: null,
