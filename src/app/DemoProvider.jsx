@@ -24,7 +24,6 @@ export const paths = {
   room: "/chat",
   schedule: "/schedules",
   alerts: "/alerts",
-  team: "/team",
 };
 export const useDemo = () => useContext(Context);
 const model0Today = () => {
