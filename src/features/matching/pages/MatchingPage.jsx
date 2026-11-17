@@ -1,4 +1,5 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { useMe } from "../../auth/hooks/useMe.js";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import AiChatPanel from "../components/AiChatPanel.jsx";
 import AgentChatPanel from "../components/AgentChatPanel.jsx";
@@ -12,6 +13,12 @@ const MBTIS = [
   "ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP",
   "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ",
 ];
+
+// "2026-11-17" → "11/17(화)"
+const dayLabel = (iso) => {
+  const d = new Date(iso + "T00:00:00");
+  return `${d.getMonth() + 1}/${d.getDate()}(${"일월화수목금토"[d.getDay()]})`;
+};
 
 // v4.4 · 왼쪽: 챗봇(메인) + 접힌 직접 조건 설정 / 오른쪽: 추천 동행 후보
 export default function MatchingPage() {
@@ -54,6 +61,7 @@ export default function MatchingPage() {
   const chosen = state.festivalId ? findFestival(state.festivalId) : null;
   const summaryItems = [
     chosen?.name,
+    pr.date && dayLabel(pr.date),
     pr.start && pr.start + " 시작",
     pr.party && pr.party + "명",
     pr.budget && pr.budget + "만원",
@@ -64,6 +72,53 @@ export default function MatchingPage() {
   const summary = summaryItems.length
     ? [...summaryItems, AI_JOIN[pr.joinMode]].join(" · ")
     : "아직 설정한 조건이 없어요 · 챗봇에 말하거나 여기서 직접 설정하세요";
+
+  // 챗봇(에이전트) 매칭 결과가 있으면 챗봇에서 받은 조건으로 요약한다
+  const ac = agentRun?.conditions;
+  const agentBits = ac
+    ? [
+        ac.date && dayLabel(ac.date),
+        ac.startTime && ac.startTime + " 시작",
+        ac.partySize && ac.partySize + "명",
+      ].filter(Boolean)
+    : [];
+  const foldSummary = agentBits.length ? [chosen?.name, ...agentBits, AI_JOIN[pr.joinMode]].filter(Boolean).join(" · ") : summary;
+  // 모집글 본문은 바로 위 줄에 축제명이 있으므로 축제명 없이
+  const postSummary = agentBits.length ? [...agentBits, AI_JOIN[pr.joinMode]].filter(Boolean).join(" · ") : summary;
+
+  // ① 온보딩에서 고른 내 선호(관심사·스타일·예산·인원·합류 시각·입장 방식)를 빈 칸에 한 번 채운다
+  const me = useMe();
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!useApi || !me?.profile || prefilled.current) return;
+    prefilled.current = true;
+    const p = me.profile;
+    mutate((s) => {
+      const t = s.profile;
+      if (!t.interests?.length && p.interests?.length) t.interests = [...p.interests];
+      if (!t.style && p.travelStyle) t.style = p.travelStyle;
+      if (!t.budget && p.budgetManwon) t.budget = String(p.budgetManwon);
+      if (!t.party && p.preferredPartySize) t.party = String(p.preferredPartySize);
+      if (!t.start && p.availableFrom) t.start = String(p.availableFrom).slice(0, 5);
+      if (p.defaultJoinMode) t.joinMode = p.defaultJoinMode;
+    });
+  }, [useApi, me, mutate]);
+
+  // ② 챗봇(에이전트)이 확정한 조건은 폼에 덮어써서 바로 수정할 수 있게 한다
+  const agentCond = agentRun?.conditions;
+  useEffect(() => {
+    if (!agentCond) return;
+    mutate((s) => {
+      const t = s.profile;
+      if (agentCond.date) t.date = agentCond.date;
+      if (agentCond.startTime) t.start = String(agentCond.startTime).slice(0, 5);
+      if (agentCond.partySize) t.party = String(agentCond.partySize);
+      if (agentCond.budgetManwon) t.budget = String(agentCond.budgetManwon);
+      if (agentCond.interests?.length) t.interests = [...agentCond.interests];
+      if (agentCond.travelStyle) t.style = agentCond.travelStyle;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentCond]);
 
   const setFormOpen = (open) =>
     mutate((s) => {
@@ -131,7 +186,7 @@ export default function MatchingPage() {
       >
         <summary>
           <span className="form-fold-title">직접 조건 설정</span>
-          <span className="form-fold-sum">{summary}</span>
+          <span className="form-fold-sum">{foldSummary}</span>
           <span className="form-fold-cta">{state.formOpen ? "접기" : "수정"}</span>
         </summary>
         <div className="form-body">
@@ -145,6 +200,21 @@ export default function MatchingPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div className="field">
+            <label htmlFor="match-date">참여 날짜</label>
+            <input
+              id="match-date"
+              type="date"
+              min={chosen?.start}
+              max={chosen?.end}
+              value={pr.date || ""}
+              onChange={(e) =>
+                mutate((s) => {
+                  s.profile.date = e.target.value;
+                })
+              }
+            />
           </div>
           <div className="field">
             <label htmlFor="match-style">여행 스타일</label>
@@ -255,7 +325,7 @@ export default function MatchingPage() {
 
       <section className="box pad match-results">
         {apiResult ? (
-          <ApiResults run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={summary} pill={pill} />
+          <ApiResults run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} pill={pill} />
         ) : showDemoResult ? (
           <>
           {matchingGroup && (
