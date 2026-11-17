@@ -11,6 +11,8 @@ export const answerAlert = (alertId, answer) => apiFetch(`/alerts/${enc(alertId)
 
 // PATCH /me/notification-consents — 악천후 알림 수신 동의 (꺼져 있으면 알림이 생성되지 않음)
 export const enableRiskAlert = () => apiFetch("/me/notification-consents", { method: "PATCH", body: { riskAlert: true } });
+// 악천후 알림 켜기/끄기 (GET /me 의 notificationConsent.riskAlert 와 같은 값)
+export const setRiskAlert = (on) => apiFetch("/me/notification-consents", { method: "PATCH", body: { riskAlert: !!on } });
 
 // POST /workflow/groups/{id}/weather-check — 모임 일정 날짜의 날씨 확인 (모임장만)
 // simulateRisk: true 면 개발 환경에서 시험용 악천후 알림 생성 (제목 [테스트], isTest=true)
@@ -29,3 +31,12 @@ export const riskResponseForGroup = (groupId) => apiFetch(`/workflow/groups/${en
 //    (안 보내면 기존 일정 날짜로 검증해서 FESTIVAL_UNAVAILABLE "축제 기간 또는 취소 상태를 확인해야 합니다")
 export const selectAlternative = (runId, festivalId, date) =>
   apiFetch(`/workflow/risk-runs/${enc(runId)}/select`, { method: "POST", body: { festivalId, conditions: date ? { date } : {} } });
+
+// POST /workflow/groups/{id}/weather-review — 날씨 확인 + 「그래도 진행할까요?」 (모임장만)
+// 응답 { weatherCheck: { date, risk, weather, createdAlertCount, isTest }, run: 에이전트 실행 }
+// 비 예보면 run.status = waiting_input, run.interrupt.type = "weather_confirmation"
+//   → resumeAgentRun(runId, { checkpointId, weatherDecision: "keep" | "alternatives" })
+//   keep = 기존 축제 유지(완료) / alternatives = 대체 축제 추천 결과(candidate.items)로 완료 → selectAlternative 흐름
+// 비 예보가 없으면 질문 없이 바로 completed(keep)
+export const weatherReview = (groupId, simulateRisk = false) =>
+  apiFetch(`/workflow/groups/${enc(groupId)}/weather-review`, { method: "POST", body: { simulateRisk } });

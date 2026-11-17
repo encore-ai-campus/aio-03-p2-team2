@@ -1944,3 +1944,202 @@ h3 {
 .sc-mini span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#4a413d}
 .sc-mini li.chg b,.sc-mini li.chg span{color:var(--coral2)}
 .sc-mini li.chg span{font-weight:600}
+
+/* ===== 알림: 「그래도 진행할까요?」 카드 (11/17 15:24) ===== */
+.wq-card{margin-top:14px;background:#fff;border:1.5px solid #f5b4a6;border-radius:16px;padding:18px 20px;color:var(--ink)}
+.wq-tag{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:#1f5a96;background:#e8f1fb;border-radius:7px;padding:3px 8px}
+.wq-tag i{font-size:15px}
+.wq-card h2{margin:10px 0 4px;font-size:19px;font-weight:700;color:var(--ink)}
+.wq-card p{margin:0;font-size:14px;color:var(--sub);line-height:1.6}
+.wq-facts{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13.5px;color:#4a413d}
+.wq-facts span{display:inline-flex;align-items:center;gap:4px}.wq-facts i{font-size:16px;color:#b3a9a3}
+.wq-btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.wq-btns .btn{flex:1;justify-content:center;padding:12px;border-radius:12px;font-size:14.5px;min-width:160px}
+
+/* ===== AI 알림 v3: 날씨 카드 | 단계별 결과 (11/17 15:35) ===== */
+.al-card{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)}
+.al-notice{margin:0 0 14px}
+.al-weather{padding:28px 32px;display:flex;flex-direction:column}
+.al-wx-empty{display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:18px 0 6px;padding:20px;border:1.5px dashed #eadfd9;border-radius:16px;background:#fffcfa}
+.al-wx-empty i{font-size:32px;color:#c9c0bb;margin-bottom:4px}
+.al-wx-empty b{font-size:16px}.al-wx-empty span{font-size:14px;color:var(--sub)}
+.al-wx-now{display:flex;align-items:center;gap:16px;margin-top:16px;padding:18px;border-radius:16px;background:#f6f8fb;position:relative}
+.al-wx-now.sun{background:#fff8e8}.al-wx-now.rain{background:#eef4fb}.al-wx-now.storm{background:#efedf8}
+.al-wx-ico{width:68px;height:68px;border-radius:18px;background:#fff;display:grid;place-items:center;font-size:40px;flex:none;color:#6f6762}
+.al-wx-now.sun .al-wx-ico{color:#d9930d}.al-wx-now.rain .al-wx-ico{color:#2f6db3}.al-wx-now.storm .al-wx-ico{color:#5a4fb0}
+.al-wx-now b{display:block;font-size:22px;font-weight:700;letter-spacing:-.02em}
+.al-wx-now span{font-size:14px;color:var(--sub)}
+.al-wx-risk{position:absolute;top:12px;right:12px}
+.al-hourly{margin-top:18px}
+.al-hourly-title{font-size:13.5px;font-weight:600;color:#4a413d}
+.al-bars{display:flex;align-items:flex-end;gap:8px;height:110px;margin-top:8px}
+.al-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}
+.al-bar em{font-style:normal;font-size:12px;font-weight:600;color:#4a413d}
+.al-bar span{width:100%;max-width:40px;border-radius:6px 6px 2px 2px;background:#a9c8ea;display:block}
+.al-bar span.hi{background:#2f6db3}
+.al-bar small{font-size:12px;color:#a39b95}
+.al-source{display:flex;align-items:center;gap:5px;margin:14px 0 0;font-size:12.5px;color:#8a7f79}
+.al-source i{font-size:15px}
+.al-wx-btns{display:flex;gap:8px;margin-top:auto;padding-top:20px}
+.al-wx-btns .btn{flex:1;justify-content:center;display:flex;align-items:center;gap:5px;padding:12px;border-radius:12px;font-size:14.5px}
+.al-hint{margin:8px 0 0;font-size:12.5px;color:#a39b95;line-height:1.5}
+/* 질문 */
+.al-q h2{margin:12px 0 6px;font-size:26px;font-weight:700;letter-spacing:-.03em;color:var(--ink)}
+.al-q p{margin:0;font-size:15px;color:var(--sub);line-height:1.6}
+.al-q .wq-tag{font-size:13px;padding:4px 10px}
+.al-q-choices{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.al-choice{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;text-align:left;border:1px solid #eadfd9;background:#fff;border-radius:16px;padding:18px 20px;cursor:pointer;font:inherit;color:var(--ink)}
+.al-choice b{font-size:17px;font-weight:700}
+.al-choice span{grid-column:1;font-size:13.5px;color:var(--sub)}
+.al-choice i{grid-row:1/3;grid-column:2;font-size:22px;color:#c9c0bb}
+.al-choice:hover{border-color:#f5b4a6;background:#fffcfa}
+.al-choice.pri{background:var(--coral);border-color:var(--coral);color:#fff}
+.al-choice.pri span{color:#ffe7e0}.al-choice.pri i{color:#fff}
+.al-choice.pri:hover{background:var(--coral2)}
+.al-choice:disabled{opacity:.6;cursor:default}
+/* 유지 결과 */
+.al-done{display:flex;flex-direction:column;align-items:flex-start}
+.al-done-ico{width:52px;height:52px;border-radius:50%;background:#dff3ea;color:#1f7a57;display:grid;place-items:center;font-size:26px}
+.al-done h2{margin:14px 0 6px;font-size:24px;font-weight:700}
+.al-done p{margin:0 0 18px;font-size:15px;color:var(--sub);line-height:1.6}
+/* 대체 축제 목록 */
+.al-alts{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.al-alts button{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;font:inherit;color:var(--ink);cursor:pointer}
+.al-alts button:hover{border-color:#f5b4a6}
+.al-alts button:disabled{opacity:.6;cursor:default}
+.al-alt-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.al-alt-main b{font-size:15.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-alt-main small{display:flex;align-items:center;gap:3px;font-size:13px;color:var(--sub)}
+.al-alt-go{font-size:13px;font-weight:600;color:var(--coral2);white-space:nowrap}
+.al-alts button>i{font-size:18px;color:#c9c0bb}
+.al-compare{margin-top:16px}
+.al-step .cm-back{margin-bottom:6px}
+/* 참여자 알림 */
+.al-member{margin-top:24px;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:24px 28px}
+.al-alert{display:flex;gap:14px;padding:16px 0;border-top:1px solid #f6f0ec;margin-top:12px}
+.al-alert-ico{width:44px;height:44px;border-radius:12px;background:#eef4fb;color:#2f6db3;display:grid;place-items:center;font-size:23px;flex:none}
+.al-alert-body{flex:1;min-width:0}
+.al-alert-body b{font-size:16px}
+.al-alert-body p{margin:3px 0 12px;font-size:14px;color:var(--sub)}
+.al-alert-btns{display:flex;gap:8px;flex-wrap:wrap}
+.al-alert-btns .btn{padding:11px 16px;border-radius:12px}
+@media(max-width:1100px){.al-card{grid-template-columns:1fr}}
+
+/* ===== AI 알림: 오른쪽 기본 = 확정된 모임 일정 (11/17 15:40) ===== */
+.al-panel .sc-tl{margin-top:16px}
+.al-who{margin-top:24px;padding-top:18px;border-top:1px solid #f6ddd4}
+.al-who-title{display:flex;align-items:center;gap:5px;font-size:13.5px;font-weight:600;color:#4a413d;margin-bottom:8px}
+.al-who-title i{font-size:16px;color:#b3a9a3}
+.al-who .cm-members span{background:#fff}
+.al-go{align-self:flex-start;margin-top:8px}
+
+/* ===== AI 알림: 하늘색 맥락 색·자동 날씨·알림 토글·대체 축제 카드 (11/17 15:52) ===== */
+/* 화면별 맥락 색: 알림 = 하늘색 (버튼 등 브랜드 요소는 코랄 유지) */
+.al-group{background:#f2f7fd;border-color:#dde9f6}
+.al-group .sc-group-ico{background:#e1edfa;color:#2f6db3}
+.al-group .sc-group-change{color:#2f6db3}
+.al-group .sc-group-change select{border-color:#d3e3f4}
+.al-card .sc-side{background:#f5f9fe;border-left-color:#e3edf8}
+.al-card .sc-tl-time b{color:#2f6db3}
+.al-card .sc-tl-body{border-left-color:#d3e3f4}
+.al-card .sc-tl-body:before{border-color:#2f6db3}
+.al-card .al-who{border-top-color:#e3edf8}
+/* 날씨 아이콘 크기 고정 */
+.al-wx-ico i{font-size:40px;line-height:1}
+.al-wx-empty i{font-size:32px}
+.al-spin{animation:alSpin 1s linear infinite;display:inline-block}
+@keyframes alSpin{to{transform:rotate(360deg)}}
+/* 비 예보 배너 (오른쪽 칸 위) */
+.al-riskbar{width:100%;display:flex;align-items:center;gap:12px;text-align:left;border:1.5px solid #f5b4a6;background:#fff;border-radius:14px;padding:14px 16px;margin-bottom:22px;font:inherit;color:var(--ink);cursor:pointer}
+.al-riskbar>i{font-size:28px;color:#2f6db3;flex:none}
+.al-riskbar span{flex:1;display:flex;flex-direction:column;gap:2px}
+.al-riskbar b{font-size:16px}.al-riskbar small{font-size:13.5px;color:var(--sub)}
+.al-riskbar em{font-style:normal;font-weight:600;color:#fff;background:var(--coral);border-radius:10px;padding:9px 14px;white-space:nowrap}
+.al-riskbar:hover em{background:var(--coral2)}
+/* 알림 받는 참여자 + 토글 */
+.al-who-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.al-who-head .al-who-title{margin:0}
+.al-who-link{font-size:13px;font-weight:600;color:#2f6db3;text-decoration:none}
+.al-who-link:hover{text-decoration:underline}
+.al-toggle-row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border:1px solid #e3edf8;border-radius:14px;padding:12px 14px;margin:6px 0 12px}
+.al-toggle-row span{display:flex;flex-direction:column;gap:2px}
+.al-toggle-row b{font-size:14.5px}.al-toggle-row small{font-size:12.5px;color:var(--sub)}
+.al-switch{position:relative;width:48px;height:28px;border-radius:999px;border:0;background:#d9d2ce;cursor:pointer;flex:none;padding:0;transition:background .15s}
+.al-switch span{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transition:left .15s}
+.al-switch.on{background:#2f9b6f}
+.al-switch.on span{left:23px}
+.al-switch:disabled{opacity:.6;cursor:default}
+/* 대체 축제: 2칸 카드 */
+.al-alts{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px!important}
+.al-alts li{display:flex;flex-direction:column;gap:5px;background:#fff;border:1px solid #e3edf8;border-radius:16px;padding:16px 16px 14px}
+.al-alt-name{font-size:17px;font-weight:700;line-height:1.35;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:46px}
+.al-alt-meta{display:flex;align-items:center;gap:4px;font-size:14px;color:var(--sub)}
+.al-alt-meta i{font-size:16px;color:#9fb6cf}
+.al-alt-btn{margin-top:8px;justify-content:center;padding:10px;border-radius:10px;font-weight:600;color:var(--coral2);border-color:#f5c4b3}
+.al-alt-btn:hover{background:var(--coral-softer)}
+@media(max-width:1300px){.al-alts{grid-template-columns:1fr}}
+
+/* ===== AI 알림: 한 화면 맞춤·중립 색 원복·촘촘한 목록 (11/17 16:02) ===== */
+/* 넓은 면적은 기본 색으로 — 하늘색은 날씨 상자 안에만 */
+.al-card .sc-side{background:#fcfaf9;border-left-color:var(--line);padding:24px 28px}
+.al-card .sc-tl-time b{color:var(--coral2)}
+.al-card .sc-tl-body{border-left-color:#f6ddd4}
+.al-card .sc-tl-body:before{border-color:var(--coral)}
+.al-card .sc-tl{margin-top:12px}
+.al-card .sc-tl-body{padding-bottom:12px}
+.al-card .al-who{border-top-color:var(--line);margin-top:16px;padding-top:14px}
+.al-toggle-row{border-color:var(--line);padding:10px 14px;margin:4px 0 10px}
+.al-who-link{color:var(--coral2)}
+/* 왼쪽 날씨: 높이 줄이기, 버튼은 날씨 바로 아래 */
+.al-weather{padding:24px 28px}
+.al-wx-now{margin-top:12px;padding:14px 16px;gap:14px}
+.al-wx-ico{width:52px;height:52px;border-radius:14px}
+.al-wx-ico i{font-size:30px}
+.al-wx-now b{font-size:20px}
+.al-wx-now span{font-size:13.5px}
+.al-wx-risk{top:10px;right:10px}
+.al-wx-now.storm .al-wx-risk,.al-wx-now.rain .al-wx-risk{background:#faeece;color:#7a4b06}
+.al-wx-empty{margin:12px 0 0;padding:16px}
+.al-hourly{margin-top:12px}
+.al-hourly-title{font-size:13px}
+.al-hourly-line{margin:2px 0 0;font-size:13.5px;color:#4a413d}
+.al-bars{height:56px;gap:6px;margin-top:6px}
+.al-bar span{max-width:28px}
+.al-bar small{font-size:11px}
+.al-source{margin-top:10px}
+.al-wx-btns{margin-top:14px;padding-top:0}
+.al-wx-btns .btn{padding:11px;font-size:14px}
+.al-hint{margin-top:6px}
+.al-wx-empty i{font-size:28px}
+/* 질문·결과 카드 크기 조정 */
+.al-q h2{font-size:22px;margin:10px 0 4px}
+.al-q p{font-size:14px}
+.al-q-choices{margin-top:16px;gap:8px}
+.al-choice{padding:14px 16px;border-radius:14px}
+.al-choice b{font-size:16px}
+.al-done h2{font-size:21px;margin:12px 0 4px}
+.al-done p{margin-bottom:14px;font-size:14px}
+.al-riskbar{margin-bottom:16px;padding:12px 14px}
+/* 대체 축제: 촘촘한 줄 목록 */
+.al-rows{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.al-rows button{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px;font:inherit;color:var(--ink);cursor:pointer}
+.al-rows button:hover{border-color:#f5b4a6;background:#fffcfa}
+.al-rows button:disabled{opacity:.6;cursor:default}
+.al-row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.al-row-main b{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.al-row-main small{display:flex;align-items:center;gap:3px;font-size:13px;color:var(--sub)}
+.al-row-main small i{font-size:14px;color:#b3a9a3}
+.al-row-go{font-size:13.5px;font-weight:600;color:var(--coral2);white-space:nowrap}
+.al-rows button>i{font-size:17px;color:#c9c0bb}
+.al-more{margin-top:6px;border:0;background:none;color:var(--sub);font-size:13.5px;font-weight:600;padding:4px 2px;cursor:pointer}
+.al-more:hover{color:var(--coral2)}
+
+/* ===== AI 알림: 왼쪽 날씨 카드 정렬 (11/17 16:06) ===== */
+/* 두 칸 윗선을 같은 높이로, 왼쪽 내용은 위로 붙여 정렬 */
+.al-card{align-items:stretch}
+.al-weather,.al-card .sc-side{padding-top:22px}
+.al-weather{justify-content:flex-start}
+.al-weather .sc-h{margin:0;line-height:1.3}
+.al-wx-now{margin-top:10px;align-items:flex-start}
+.al-wx-now>div{flex:1;min-width:0;padding-top:2px}
+.al-wx-risk{position:static;align-self:flex-start;flex:none}

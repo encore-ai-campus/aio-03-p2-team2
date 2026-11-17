@@ -27,16 +27,16 @@ export default function AlertsPage() {
     options = alternativeFestivals(ref);
   return (
     <>
+      {/* 실서버 모드: 머리글·진행 단계는 LiveAlerts 안에서 그린다 */}
+      {!apiFailed ? (
+        <LiveAlerts festivals={festivals} onFail={onFail} />
+      ) : (
+      <>
       {pageHead(
         "AI RISK MONITOR & FALLBACK",
         "🔔 AI 알림·대체 축제",
         "악천후·취소·외부 변경 상황에서 사용자 의사를 먼저 확인하고 대안을 안내해요.",
       )}
-
-      {!apiFailed ? (
-        <LiveAlerts festivals={festivals} pill={pill} onFail={onFail} />
-      ) : (
-      <>
       <div
         className="two"
         style={{
