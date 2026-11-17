@@ -61,3 +61,13 @@ def test_rpc_result_accepts_jsonb_text_from_asyncpg():
     with pytest.raises(RepositoryError) as invalid:
         assert_rpc_success("not json")
     assert invalid.value.code == "DATABASE_RPC_INVALID"
+
+
+def test_jsonb_codec_encoder_does_not_double_encode():
+    import json as _json
+
+    from app.core.database import _encode_json
+
+    # 기존 코드처럼 json.dumps 한 문자열은 그대로, dict/list 는 JSON 으로
+    assert _encode_json('{"a": 1}') == '{"a": 1}'
+    assert _json.loads(_encode_json({"a": 1, "b": ["축제"]})) == {"a": 1, "b": ["축제"]}
