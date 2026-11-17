@@ -1,3 +1,4 @@
+import { DEMO_MODE } from "./demoMode.js";
 import {
   BASE_PROFILES,
   INIT_GROUPS,
@@ -512,11 +513,17 @@ export function createDemoModel(
       case "festival":
         state.festivalId = id;
         state.matchingDone = false;
-        if (active(festival(id))) nav("match");
-        else
+        {
+          // 실제 API 축제는 데모 목록에 없으므로 찾지 못하면 그대로 매칭으로 이동
+          // (예전엔 데모 첫 축제로 대체돼 「지난 축제예요」가 잘못 떴음)
+          // 실서버 모드: 카드에서 이미 진행/예정만 버튼을 주므로 바로 이동 (데모 id와 겹쳐도 오판 없음)
+          const picked = DEMO_MODE ? state.festivals.find((x) => x.id === id) : null;
+          if (!picked || active(picked)) nav("match");
+          else
           notify(
             "지난 축제예요. 아카이브 정보는 검색에서 계속 확인할 수 있어요.",
           );
+        }
         break;
       case "interest":
         state.profile.interests = state.profile.interests.includes(id)
@@ -541,7 +548,7 @@ export function createDemoModel(
       case "clearFilters":
         state.month = 0;
         state.keyword = "";
-        state.status = "all";
+        state.status = "available"; // 기본은 참여 가능한 축제만
         state.region = "all";
         state.category = "all";
         break;
