@@ -4,7 +4,7 @@ from typing import Any
 
 import asyncpg
 
-from app.core.repository import RepositoryBase, _hhmm, _time
+from app.core.repository import RepositoryBase, RepositoryError, _hhmm, _time
 
 
 class AuthRepositoryMixin(RepositoryBase):
@@ -116,6 +116,38 @@ class AuthRepositoryMixin(RepositoryBase):
                     *args,
                 )
         return await self.user(user_id)
+
+    async def onboarding_completed(self, user_id: str) -> bool | None:
+        """Return onboarding completion; None until db/002_onboarding.sql is applied."""
+        try:
+            completed_at = await self._pool().fetchval(
+                "select onboarding_completed_at from user_profiles where user_id = $1",
+                user_id,
+            )
+        except asyncpg.UndefinedColumnError:
+            return None
+        return completed_at is not None
+
+    async def complete_onboarding(self, user_id: str) -> bool:
+        """Mark onboarding as done once (saved or skipped); repeated calls keep the first time."""
+        try:
+            async with self._pool().acquire() as connection:
+                async with connection.transaction():
+                    await connection.execute(
+                        "insert into user_profiles (user_id) values ($1) on conflict (user_id) do nothing",
+                        user_id,
+                    )
+                    await connection.execute(
+                        "update user_profiles set onboarding_completed_at = coalesce(onboarding_completed_at, now()), updated_at = now() where user_id = $1",
+                        user_id,
+                    )
+        except asyncpg.UndefinedColumnError as exc:
+            raise RepositoryError(
+                "ONBOARDING_MIGRATION_REQUIRED",
+                "온보딩 완료 컬럼이 없습니다. db/002_onboarding.sql을 먼저 적용해 주세요.",
+                503,
+            ) from exc
+        return True
 
     async def update_consents(self, user_id: str, values: dict[str, Any]) -> dict | None:
         if not await self.user(user_id):

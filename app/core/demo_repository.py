@@ -40,6 +40,14 @@ class DemoRepository:
             self.store.users[user_id]["profile"].update(values)
             self.persist()
             return self.store.user(user_id)
+    async def onboarding_completed(self,user_id):
+        user = self.store.users.get(user_id)
+        return bool(user and user.get("onboardingCompletedAt"))
+    async def complete_onboarding(self,user_id):
+        with self.store.lock:
+            self.store.users[user_id].setdefault("onboardingCompletedAt", now_iso())
+            self.persist()
+            return True
     async def update_consents(self,user_id,values):
         with self.store.lock:
             self.store.users[user_id]["notificationConsent"].update(values)
