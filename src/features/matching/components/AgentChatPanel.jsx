@@ -76,7 +76,7 @@ const ERROR_TEXT = {
   AUTH_USER_NOT_LINKED: "로그인 계정이 앱 사용자와 연결되지 않았어요. 다시 로그인해 주세요.",
 };
 
-export default function AgentChatPanel({ festivals, festivalId, onPickFestival, onResult, pill }) {
+export default function AgentChatPanel({ festivals, festivalId, selectedDate, onPickFestival, onResult, pill }) {
   const [messages, setMessages] = useState([]);
   const [run, setRun] = useState(null); // 마지막 에이전트 응답
   const [busy, setBusy] = useState(false);
@@ -171,7 +171,8 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
       );
     }
     return call(
-      () => startAgentRun({ message: value, festivalId: festivalId || undefined, sessionId: run?.sessionId }),
+      () => startAgentRun({ message: value, festivalId: festivalId || undefined, sessionId: run?.sessionId,
+        conditions: selectedDate ? { date: selectedDate } : {} }),
       value,
     );
   }

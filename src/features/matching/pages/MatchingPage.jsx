@@ -4,6 +4,7 @@ import { useDemo } from "../../../app/DemoProvider.jsx";
 import AiChatPanel from "../components/AiChatPanel.jsx";
 import AgentChatPanel from "../components/AgentChatPanel.jsx";
 import { AI_JOIN } from "../lib/aiParse.js";
+import { recruitmentJoinMode } from "../lib/matchingConditions.js";
 import { SOURCE_LABEL, useFestivals } from "../../festivals/hooks/useFestivals.js";
 import { conditionKey, useMatchingRun } from "../hooks/useMatchingRun.js";
 import CreatePostBox from "../../groups/components/CreatePostBox.jsx";
@@ -43,10 +44,13 @@ export default function MatchingPage() {
   const runApiMatch = () => {
     const missing = [
       !all.some((x) => x.id === state.festivalId) && "축제",
+      !pr.date && "참여 날짜",
       !pr.start && "시작 시간",
       !pr.party && "희망 인원",
     ].filter(Boolean);
     if (missing.length) return setFormMsg(`필수 조건을 입력해 주세요: ${missing.join(", ")}`);
+    const selected = findFestival(state.festivalId);
+    if (pr.date < selected.start || pr.date > selected.end) return setFormMsg("참여 날짜는 축제 운영 기간 안에서 선택해 주세요.");
     setFormMsg("");
     setAgentRun(null);
     execute(state.festivalId, pr);
@@ -82,9 +86,9 @@ export default function MatchingPage() {
         ac.partySize && ac.partySize + "명",
       ].filter(Boolean)
     : [];
-  const foldSummary = agentBits.length ? [chosen?.name, ...agentBits, AI_JOIN[pr.joinMode]].filter(Boolean).join(" · ") : summary;
+  const foldSummary = agentBits.length ? [chosen?.name, ...agentBits, AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]].filter(Boolean).join(" · ") : summary;
   // 모집글 본문은 바로 위 줄에 축제명이 있으므로 축제명 없이
-  const postSummary = agentBits.length ? [...agentBits, AI_JOIN[pr.joinMode]].filter(Boolean).join(" · ") : summary;
+  const postSummary = agentBits.length ? [...agentBits, AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]].filter(Boolean).join(" · ") : summary;
 
   // ① 온보딩에서 고른 내 선호(관심사·스타일·예산·인원·합류 시각·입장 방식)를 빈 칸에 한 번 채운다
   const me = useMe();
@@ -163,6 +167,7 @@ export default function MatchingPage() {
         <AgentChatPanel
           festivals={all}
           festivalId={state.festivalId}
+          selectedDate={chosen && pr.date >= chosen.start && pr.date <= chosen.end ? pr.date : undefined}
           pill={pill}
           onResult={setAgentRun}
           onPickFestival={(id) =>
@@ -503,8 +508,10 @@ function ApiResults({ run, festival, profile, summary, pill }) {
           festival={festival}
           runId={run.runId}
           partySize={run.partySize || profile.party}
-          joinMode={profile.joinMode || "approval"}
+          joinMode={recruitmentJoinMode(run.runId, profile.joinMode)}
           summary={summary}
+          date={run.conditions?.date || profile.date}
+          startTime={run.conditions?.startTime || profile.start}
         />
       </div>
       <div className="note" style={{ marginTop: "15px" }}>

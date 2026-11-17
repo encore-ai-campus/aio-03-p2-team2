@@ -11,8 +11,8 @@ export const getGroup = (id) => apiFetch(`/groups/${enc(id)}`);
 
 // POST /groups — 모집글(모임) 생성. 만든 사람이 모임장
 // title 1~45자, postBody 1~2000자, capacity 2~8, joinMode approval|instant
-export const createGroup = ({ festivalId, title, postBody, capacity, joinMode }) =>
-  apiFetch("/groups", { method: "POST", body: { festivalId, title, postBody, capacity, joinMode } });
+export const createGroup = ({ festivalId, title, postBody, capacity, joinMode, date, startTime }) =>
+  apiFetch("/groups", { method: "POST", body: { festivalId, title, postBody, capacity, joinMode, date, startTime } });
 
 // GET /groups/{id}/join-requests — 모임장만 (아니면 403 LEADER_ONLY)
 export const listJoinRequests = (id, status = "pending") =>
