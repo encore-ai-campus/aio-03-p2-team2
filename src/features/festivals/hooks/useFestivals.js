@@ -2,6 +2,7 @@
 // source: "loading" | "api" | "demo"(서버 연결 실패) | "empty"(DB에 축제 없음)
 import { useEffect, useState } from "react";
 import { fetchAllFestivals } from "../api/festivalsApi.js";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
 
 export function useFestivals(demoFestivals) {
   const [result, setResult] = useState({ festivals: null, source: "loading", error: null });
@@ -23,7 +24,9 @@ export function useFestivals(demoFestivals) {
     };
   }, []);
 
-  return { festivals: result.festivals ?? demoFestivals, source: result.source, error: result.error };
+  // 데모 모드가 아니면 로딩·실패 중에도 예시 축제를 섞지 않는다 (빈 목록 + source로 화면이 상태를 그림)
+  const fallback = DEMO_MODE ? demoFestivals : [];
+  return { festivals: result.festivals ?? fallback, source: result.source, error: result.error, demoMode: DEMO_MODE };
 }
 
 export const SOURCE_LABEL = {

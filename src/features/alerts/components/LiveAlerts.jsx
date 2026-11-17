@@ -346,6 +346,15 @@ export default function LiveAlerts({ festivals, onFail }) {
   const data = wx?.weather?.data;
   const look = weatherLook(data?.weatherCode);
   const hourly = (data?.hourly || []).slice(0, 8);
+  // 시뮬레이션·데모는 시간별 값이 없어서 모임 시간대를 같은 값으로 채운다 (출처 줄에 「시연용」 표시)
+  const hours = hourly.length
+    ? hourly
+    : data && startT
+      ? Array.from({ length: Math.max(1, Number((endT || startT).slice(0, 2)) - Number(startT.slice(0, 2)) + 1) }, (_, i) => {
+          const hh = String(Number(startT.slice(0, 2)) + i).padStart(2, "0");
+          return { time: `${data.date || day}T${hh}:00`, precipitationProbability: data.precipitationProbability, weatherCode: data.weatherCode };
+        })
+      : [];
   const weatherCard = (
     <section className="al-weather">
       <h2 className="sc-h">모임 시간 날씨</h2>
@@ -368,26 +377,28 @@ export default function LiveAlerts({ festivals, onFail }) {
               </b>
               <span>
                 {dayLabel(data?.date || wx.date)}
-                {data?.startTime ? ` ${data.startTime}–${data.endTime}` : ""}
+                {data?.startTime ? ` ${data.startTime}–${data.endTime}` : startT ? ` ${startT}–${endT}` : ""}
                 {data?.windSpeed != null ? ` · 바람 ${data.windSpeed}${data.windSpeedUnit || "m/s"}` : ""}
               </span>
             </div>
             <span className={`cm-badge ${wx.risk ? "approval" : "open"} al-wx-risk`}>{wx.risk ? "악천후 주의" : "진행 문제 없음"}</span>
           </div>
-          {hourly.length > 0 && (
-            <div className="al-hourly">
-              <span className="al-hourly-title">시간별 강수 확률</span>
-              <p className="al-hourly-line">{hourly.map((h) => `${String(h.time).slice(11, 13)}시 ${h.precipitationProbability}%`).join(" · ")}</p>
-              {Math.max(...hourly.map((h) => h.precipitationProbability)) >= 30 && (
-                <div className="al-bars">
-                  {hourly.map((h) => (
-                    <div key={h.time} className="al-bar">
-                      <span style={{ height: `${Math.max(6, h.precipitationProbability)}%` }} className={h.precipitationProbability >= 60 ? "hi" : ""} />
-                      <small>{String(h.time).slice(11, 13)}</small>
+          {hours.length > 0 && (
+            <div className="al-hours" aria-label="시간별 예보">
+              {hours.map((h) => {
+                const hl = weatherLook(h.weatherCode);
+                const p = h.precipitationProbability ?? 0;
+                return (
+                  <div key={h.time} className={`al-hour ${p >= 60 ? "hi" : ""}`}>
+                    <small>{String(h.time).slice(11, 13)}시</small>
+                    <i className={`ti ${hl.icon}`} aria-hidden="true" />
+                    <div className="al-hour-bar">
+                      <span style={{ height: `${Math.max(4, p)}%` }} />
                     </div>
-                  ))}
-                </div>
-              )}
+                    <b>{p}%</b>
+                  </div>
+                );
+              })}
             </div>
           )}
           <p className="al-source">

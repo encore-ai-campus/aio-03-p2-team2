@@ -3,6 +3,8 @@ import { Button } from "../../../shared/components/Primitives.jsx";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import { useFestivals } from "../../festivals/hooks/useFestivals.js";
 import LiveAlerts from "../components/LiveAlerts.jsx";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { ApiError } from "../../../shared/components/ApiState.jsx";
 export default function AlertsPage() {
   const demo = useDemo();
   const {
@@ -21,14 +23,18 @@ export default function AlertsPage() {
   // 실제 API 우선 (실패 시 아래 기존 데모 화면)
   const { festivals } = useFestivals(state.festivals);
   const [apiFailed, setApiFailed] = useState(false);
-  const onFail = useCallback(() => setApiFailed(true), []);
+  const [apiError, setApiError] = useState(false);
+  // 데모 모드일 때만 예시 화면으로, 아니면 「서버에 연결할 수 없어요」
+  const onFail = useCallback(() => (DEMO_MODE ? setApiFailed(true) : setApiError(true)), []);
   let w = state.weather,
     ref = festival(w.festivalId) || festival("f22"),
     options = alternativeFestivals(ref);
   return (
     <>
       {/* 실서버 모드: 머리글·진행 단계는 LiveAlerts 안에서 그린다 */}
-      {!apiFailed ? (
+      {apiError ? (
+        <ApiError />
+      ) : !apiFailed ? (
         <LiveAlerts festivals={festivals} onFail={onFail} />
       ) : (
       <>

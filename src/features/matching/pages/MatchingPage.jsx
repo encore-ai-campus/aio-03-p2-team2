@@ -7,6 +7,8 @@ import AgentChatPanel from "../components/AgentChatPanel.jsx";
 import { AI_JOIN } from "../lib/aiParse.js";
 import { recruitmentJoinMode } from "../lib/matchingConditions.js";
 import { SOURCE_LABEL, useFestivals } from "../../festivals/hooks/useFestivals.js";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { ApiError, ApiLoading } from "../../../shared/components/ApiState.jsx";
 import { conditionKey, useMatchingRun } from "../hooks/useMatchingRun.js";
 import CreatePostBox from "../../groups/components/CreatePostBox.jsx";
 
@@ -329,6 +331,9 @@ export default function MatchingPage() {
         </div>
   );
 
+  // 데모 모드가 아니면: 불러오는 중엔 스켈레톤, 연결 실패면 안내 (예전 데모 화면이 먼저 뜨던 문제)
+  if (!DEMO_MODE && source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
+  if (!DEMO_MODE && source === "demo") return <ApiError />;
   return (
     <>
       {/* 실서버 모드: v3 머리글 — 제목·설명 왼쪽, 진행 단계 오른쪽 (실제 진행한 단계까지만 ✓) */}

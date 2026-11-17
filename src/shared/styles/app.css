@@ -2143,3 +2143,33 @@ h3 {
 .al-wx-now{margin-top:10px;align-items:flex-start}
 .al-wx-now>div{flex:1;min-width:0;padding-top:2px}
 .al-wx-risk{position:static;align-self:flex-start;flex:none}
+
+/* ===== AI 알림: 시간별 예보(날씨 앱 형태)·버튼 아래 정렬 (11/17 16:12) ===== */
+.al-weather{display:flex;flex-direction:column}
+.al-wx-btns{margin-top:auto;padding-top:16px}
+.al-hours{display:flex;gap:8px;margin-top:14px;padding:12px 10px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.al-hour{flex:1;max-width:84px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.al-hour small{font-size:12.5px;color:#8a7f79;font-weight:500}
+.al-hour>i{font-size:24px;color:#6f8fb3;line-height:1}
+.al-hour.hi>i{color:#2f6db3}
+.al-hour-bar{width:12px;height:56px;border-radius:6px;background:#eef2f6;display:flex;align-items:flex-end;overflow:hidden}
+.al-hour-bar span{display:block;width:100%;border-radius:6px;background:#a9c8ea}
+.al-hour.hi .al-hour-bar span{background:#2f6db3}
+.al-hour b{font-size:13.5px;font-weight:700;color:#4a413d}
+.al-hour.hi b{color:#2f6db3}
+
+/* ===== 실서버 공통 상태: 불러오는 중 스켈레톤 / 서버 연결 실패 (11/17 16:18) ===== */
+.api-loading{display:flex;flex-direction:column;gap:12px;padding:8px 0}
+.sk{border-radius:12px;background:linear-gradient(90deg,#f3eeeb 25%,#faf6f4 50%,#f3eeeb 75%);background-size:200% 100%;animation:skMove 1.2s ease-in-out infinite}
+.sk-title{height:34px;width:260px}
+.sk-line{height:16px;width:420px;max-width:80%}
+.sk-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin-top:10px}
+.sk-card{height:320px;border-radius:20px}
+@keyframes skMove{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.api-error{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:56px 24px;background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);margin-top:8px}
+.api-error>i{font-size:40px;color:#c9c0bb;margin-bottom:4px}
+.api-error b{font-size:19px}
+.api-error span{font-size:14px;color:var(--sub);line-height:1.7}
+.api-error code{background:#f6f2ef;border-radius:6px;padding:1px 6px;font-size:12.5px}
+.api-error .btn{margin-top:8px;padding:11px 22px;border-radius:12px}
+.api-error small{font-size:12.5px;color:#a39b95;margin-top:4px}

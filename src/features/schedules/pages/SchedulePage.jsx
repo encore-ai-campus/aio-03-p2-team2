@@ -2,6 +2,8 @@ import { Fragment, useCallback, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import { useFestivals } from "../../festivals/hooks/useFestivals.js";
 import LiveSchedule from "../components/LiveSchedule.jsx";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { ApiError } from "../../../shared/components/ApiState.jsx";
 
 // v4.3 · 처리 기록을 사용자가 읽기 쉬운 말로 바꿔 보여준다
 const NODE_KO = {
@@ -34,11 +36,15 @@ export default function SchedulePage() {
   // 실제 API 우선 (실패 시 아래 기존 데모 화면)
   const { festivals } = useFestivals(state.festivals);
   const [apiFailed, setApiFailed] = useState(false);
-  const onFail = useCallback(() => setApiFailed(true), []);
+  const [apiError, setApiError] = useState(false);
+  // 데모 모드일 때만 예시 화면으로, 아니면 「서버에 연결할 수 없어요」
+  const onFail = useCallback(() => (DEMO_MODE ? setApiFailed(true) : setApiError(true)), []);
   return (
     <>
       {/* 실서버 모드: 머리글·진행 단계는 LiveSchedule 안에서 그린다 */}
-      {!apiFailed ? (
+      {apiError ? (
+        <ApiError />
+      ) : !apiFailed ? (
         <LiveSchedule festivals={festivals} onFail={onFail} />
       ) : (
       <>

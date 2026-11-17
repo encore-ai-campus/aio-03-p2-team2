@@ -2,6 +2,8 @@ import { Fragment, useCallback, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import { useFestivals } from "../../festivals/hooks/useFestivals.js";
 import LiveCommunity from "../components/LiveCommunity.jsx";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { ApiError } from "../../../shared/components/ApiState.jsx";
 export default function CommunityPage() {
   const demo = useDemo();
   const { state, btn, pill, group, groupClosed, pageHead, roomCard, roomDetail } =
@@ -9,7 +11,9 @@ export default function CommunityPage() {
   // 실제 모임 API 우선, 실패하면 기존 데모 화면
   const { festivals } = useFestivals(state.festivals);
   const [apiFailed, setApiFailed] = useState(false);
-  const onFail = useCallback(() => setApiFailed(true), []);
+  const [apiError, setApiError] = useState(false);
+  // 데모 모드일 때만 예시 화면으로, 아니면 「서버에 연결할 수 없어요」
+  const onFail = useCallback(() => (DEMO_MODE ? setApiFailed(true) : setApiError(true)), []);
   const groups = [...state.groups]
     .filter(
       (g) =>
@@ -63,7 +67,9 @@ export default function CommunityPage() {
           </div>
         </>
       )}
-      {!apiFailed ? (
+      {apiError ? (
+        <ApiError />
+      ) : !apiFailed ? (
         <LiveCommunity festivals={festivals} onFail={onFail} />
       ) : (
       <>

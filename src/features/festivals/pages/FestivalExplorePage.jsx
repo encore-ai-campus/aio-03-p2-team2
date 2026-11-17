@@ -2,6 +2,8 @@ import { Fragment } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import CalendarView, { ViewToggle } from "../components/CalendarView.jsx";
 import { SOURCE_LABEL, useFestivals } from "../hooks/useFestivals.js";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { ApiError, ApiLoading } from "../../../shared/components/ApiState.jsx";
 export default function FestivalExplorePage() {
   const demo = useDemo();
   const { state, btn, fieldProps, today, active, groupClosed, fCard, calMonth } = demo;
@@ -52,6 +54,9 @@ export default function FestivalExplorePage() {
     )
     .sort((a, b) => a.start.localeCompare(b.start));
   const activeMonth = calendar ? calMonth() : state.month;
+  // 데모 모드가 아니면: 불러오는 중엔 스켈레톤, 연결 실패면 안내 (예시 축제로 바꾸지 않음)
+  if (!DEMO_MODE && source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
+  if (!DEMO_MODE && source === "demo") return <ApiError />;
   return (
     <>
       <section className="hero">
