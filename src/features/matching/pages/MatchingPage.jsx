@@ -363,7 +363,7 @@ export default function MatchingPage() {
       {useApi && chosen && (
         <div className="fest-ctx">
           <div className="fest-ctx-thumb">
-            {chosen.imageUrl ? <img src={chosen.imageUrl} alt="" /> : <span className="fest-ctx-emoji">{chosen.emoji || "🎪"}</span>}
+            {chosen.imageUrl || chosen.thumbnailUrl ? <img src={chosen.imageUrl || chosen.thumbnailUrl} alt="" /> : <span className="fest-ctx-emoji">{chosen.emoji || "🎪"}</span>}
           </div>
           <div className="fest-ctx-name">
             <h3>{chosen.name}</h3>

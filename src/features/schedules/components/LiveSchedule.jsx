@@ -166,7 +166,7 @@ export default function LiveSchedule({ festivals, onFail }) {
         <i className="ti ti-calendar-off" aria-hidden="true" />
         <b>아직 참여한 모임이 없어요</b>
         <span>동행 커뮤니티에서 모임에 참여하면 공동 일정을 볼 수 있어요.</span>
-        <button type="button" className="btn primary" onClick={() => navigate("/community")}>
+        <button type="button" className="btn primary" onClick={() => navigate("/groups")}>
           동행 커뮤니티로 가기 →
         </button>
       </div>
@@ -247,7 +247,7 @@ export default function LiveSchedule({ festivals, onFail }) {
           <i className="ti ti-lock" aria-hidden="true" />
           <b>참여가 확정된 사람만 볼 수 있어요</b>
           <span>동행 커뮤니티에서 참여를 신청하고, 모임장 승인을 받으면 공동 일정이 열려요.</span>
-          <button type="button" className="btn primary" onClick={() => navigate(`/community?groupId=${encodeURIComponent(group.id)}`)}>
+          <button type="button" className="btn primary" onClick={() => navigate(`/groups?groupId=${encodeURIComponent(group.id)}`)}>
             커뮤니티에서 참여 신청하기 →
           </button>
         </div>

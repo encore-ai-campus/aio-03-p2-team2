@@ -17,6 +17,8 @@ export function toCardModel(f) {
     description: f.description || "",
     tags: f.tags || [],
     emoji: CATEGORY_EMOJI[f.category] || "🎪",
+    imageUrl: f.imageUrl || null,
+    thumbnailUrl: f.thumbnailUrl || null,
     riskStatus: f.riskStatus, // normal | weather_risk | changed | cancelled
     venue: f.venue, // { name, address, latitude, longitude }
     operatingHours: f.operatingHours || [], // [{ date, open, close, note }]
