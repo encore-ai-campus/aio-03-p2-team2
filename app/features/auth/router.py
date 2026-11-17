@@ -49,9 +49,23 @@ async def current_user(request: Request) -> dict:
 
 @users_router.get("/me", operation_id="getCurrentUser")
 async def get_current_user(request: Request):
-    """Frontend-friendly alias that does not require the user id in the URL."""
+    """Frontend-friendly alias that does not require the user id in the URL.
 
-    return success(await current_user(request), request)
+    `onboardingCompleted` is true/false, or null before db/002_onboarding.sql is applied.
+    """
+
+    user = await current_user(request)
+    completed = await get_repository(request).onboarding_completed(user["id"])
+    return success({**user, "onboardingCompleted": completed}, request)
+
+
+@users_router.post("/me/onboarding/complete", operation_id="completeCurrentUserOnboarding")
+async def complete_current_user_onboarding(request: Request):
+    """Mark onboarding as finished (saved or skipped) so it is not shown again."""
+
+    user = await current_user(request)
+    await get_repository(request).complete_onboarding(user["id"])
+    return success({"onboardingCompleted": True}, request)
 
 
 @users_router.patch("/me/profile", operation_id="updateCurrentUserProfile")
