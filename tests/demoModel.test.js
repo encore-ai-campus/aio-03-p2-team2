@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaults } from "../src/shared/data/demoData.js";
+import { INIT_GROUPS, clone, defaults } from "../src/shared/data/demoData.js";
 import { createDemoModel } from "../src/shared/lib/demoModel.js";
 
 function setup() {
-  const state = defaults();
+  // 화면 기본값은 모임 없이 시작하므로, 모임 규칙 시험에는 예시 모임을 직접 넣는다
+  const state = { ...defaults(), groups: clone(INIT_GROUPS), selectedGroup: "g2" };
   const notices = [];
   const pages = [];
   const model = createDemoModel(state, {
