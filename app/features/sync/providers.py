@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import unquote
 
@@ -8,6 +8,8 @@ import httpx
 
 
 TOUR_API_URL = "https://apis.data.go.kr/B551011/KorService2/searchFestival2"
+TOUR_COMMON_URL = "https://apis.data.go.kr/B551011/KorService2/detailCommon2"
+TOUR_INTRO_URL = "https://apis.data.go.kr/B551011/KorService2/detailIntro2"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
 
@@ -49,6 +51,26 @@ def _float_or_none(value: Any) -> float | None:
         return None
 
 
+def _tour_source_updated_at(value: Any) -> str:
+    """Convert TourAPI's local modifiedtime to an ISO-8601 timestamp."""
+    text = str(value or "").strip()
+    if len(text) == 14 and text.isdigit():
+        try:
+            local = datetime.strptime(text, "%Y%m%d%H%M%S").replace(tzinfo=timezone(timedelta(hours=9)))
+            return local.astimezone(timezone.utc).isoformat()
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _tour_region_city(item: dict[str, Any]) -> tuple[str, str | None]:
+    """Derive display region/city from the address, not addr2's detail address."""
+    address_parts = str(item.get("addr1") or "").strip().split()
+    region = address_parts[0] if address_parts else str(item.get("areacode") or "unknown").strip()
+    city = address_parts[1] if len(address_parts) > 1 else str(item.get("sigungucode") or "").strip() or None
+    return region or "unknown", city
+
+
 def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
     content_id = str(item.get("contentid") or "").strip()
     name = str(item.get("title") or "").strip()
@@ -60,9 +82,8 @@ def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
     if end_date < start_date:
         raise SyncProviderError("TOUR_API_RESPONSE_INVALID", "TourAPI event dates are reversed")
 
-    address = " ".join(part for part in (item.get("addr1"), item.get("addr2")) if part)
-    region = str(item.get("addr1") or item.get("areacode") or "unknown").strip()
-    city = str(item.get("addr2") or item.get("sigungucode") or "").strip() or None
+    address = " ".join(str(part).strip() for part in (item.get("addr1"), item.get("addr2")) if part)
+    region, city = _tour_region_city(item)
     return {
         "id": f"fst_tour_{content_id}",
         "name": name,
@@ -82,7 +103,7 @@ def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
         },
         "operatingHours": [],
         "riskStatus": "normal",
-        "sourceUpdatedAt": datetime.now(timezone.utc).isoformat(),
+        "sourceUpdatedAt": _tour_source_updated_at(item.get("modifiedtime") or item.get("modifiedTime")),
     }
 
 
@@ -127,7 +148,7 @@ class TourAPIClient:
         result: list[dict[str, Any]] = []
         for page in range(1, max_pages + 1):
             request_params["pageNo"] = page
-            payload = await self._get(request_params)
+            payload = await self._get(TOUR_API_URL, request_params)
             try:
                 response = payload["response"]
                 header = response["header"]
@@ -139,9 +160,17 @@ class TourAPIClient:
                 rows = items.get("item", []) if isinstance(items, dict) else []
                 if isinstance(rows, dict):
                     rows = [rows]
-                if not isinstance(rows, list):
+                if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
                     raise TypeError("items.item is not a list")
-                result.extend(tour_item_to_festival(row) for row in rows)
+                for row in rows:
+                    enriched = row
+                    if params.get("includeDetails"):
+                        content_id = str(row.get("contentid") or "").strip()
+                        if not content_id:
+                            raise SyncProviderError("TOUR_API_RESPONSE_INVALID", "TourAPI item is missing contentid")
+                        details = await self.fetch_festival_details(content_id)
+                        enriched = {**row, **details}
+                    result.append(tour_item_to_festival(enriched))
                 total_count = int(body.get("totalCount") or 0)
             except SyncProviderError:
                 raise
@@ -151,9 +180,47 @@ class TourAPIClient:
                 break
         return result
 
-    async def _get(self, params: dict[str, Any]) -> dict[str, Any]:
+    async def fetch_festival_details(self, content_id: str, *, content_type_id: int = 15) -> dict[str, Any]:
+        """Fetch common and introduction data for one festival content id."""
+        if not self.service_key:
+            raise SyncProviderError("TOUR_API_KEY_MISSING", "TOUR_API_SERVICE_KEY is not configured")
+        base = {
+            "serviceKey": unquote(self.service_key),
+            "MobileOS": "ETC",
+            "MobileApp": "FestaMate",
+            "_type": "json",
+            "contentId": content_id,
+            "numOfRows": 1,
+            "pageNo": 1,
+        }
+        common = await self._get(TOUR_COMMON_URL, base)
+        intro_params = {**base, "contentTypeId": content_type_id}
+        intro = await self._get(TOUR_INTRO_URL, intro_params)
+        return {**self._detail_item(common), **self._detail_item(intro)}
+
+    @staticmethod
+    def _detail_item(payload: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = await self.http.get(TOUR_API_URL, params=params)
+            response = payload["response"]
+            header = response["header"]
+            if str(header.get("resultCode")) != "0000":
+                raise SyncProviderError("TOUR_API_REJECTED", str(header.get("resultMsg") or header.get("resultCode")))
+            body = response["body"]
+            items = body.get("items") or {}
+            row = items.get("item", []) if isinstance(items, dict) else []
+            if isinstance(row, list):
+                return row[0] if row else {}
+            if isinstance(row, dict):
+                return row
+            raise TypeError("detail item is not an object")
+        except SyncProviderError:
+            raise
+        except (KeyError, TypeError, ValueError) as exc:
+            raise SyncProviderError("TOUR_API_RESPONSE_INVALID", "TourAPI detail response shape is invalid") from exc
+
+    async def _get(self, url: str, params: dict[str, Any]) -> dict[str, Any]:
+        try:
+            response = await self.http.get(url, params=params)
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             raise SyncProviderError("TOUR_API_NETWORK_ERROR", "TourAPI network request failed", retryable=True) from exc
         if response.status_code == 429 or response.status_code >= 500:

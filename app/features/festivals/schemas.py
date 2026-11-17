@@ -27,3 +27,13 @@ class FestivalInput(APIModel):
 
 class FestivalImportRequest(APIModel):
     festivals: list[FestivalInput] = Field(min_length=1)
+
+
+class FestivalSyncRequest(APIModel):
+    start_date: date | None = None
+    end_date: date | None = None
+    page_size: int = Field(default=100, ge=1, le=1000)
+    max_pages: int = Field(default=100, ge=1, le=100)
+    include_details: bool = False
+    area_code: str | None = Field(default=None, min_length=1, max_length=10)
+    sigungu_code: str | None = Field(default=None, min_length=1, max_length=10)

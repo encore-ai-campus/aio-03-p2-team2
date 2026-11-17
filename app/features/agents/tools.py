@@ -10,6 +10,8 @@ from urllib.parse import unquote
 
 import httpx
 
+from app.features.sync.providers import SyncProviderError, TourAPIClient
+
 
 class ToolFailure(Exception):
     def __init__(self, code: str, message: str, retryable: bool = False):
@@ -28,6 +30,8 @@ class AgentTools:
         self.settings = settings
         self.http = http_client or httpx.AsyncClient(timeout=15, follow_redirects=False)
         self.owns_http = http_client is None
+        service_key = settings.tour_api_service_key.get_secret_value() if settings.tour_api_service_key else None
+        self.tour_api = TourAPIClient(service_key, http_client=self.http, timeout=15)
 
     async def close(self):
         if self.owns_http:
@@ -139,6 +143,32 @@ class AgentTools:
 
     async def search_festivals(self, state):
         if not self.settings.tour_api_service_key:
+            rows = await self.repository.festivals(start_date=None, end_date=None)
+            return observed("festival_repository", rows[:30], mode=getattr(self.repository, "mode", "database"))
+
+        day = state["conditions"]["date"]
+        try:
+            rows = await self.tour_api.fetch_festivals({
+                "startDate": day,
+                "endDate": day,
+                "pageSize": 30,
+                "maxPages": 1,
+            })
+        except SyncProviderError as exc:
+            if exc.code in {"TOUR_API_NETWORK_ERROR", "TOUR_API_UNAVAILABLE"}:
+                raise ToolFailure("TOOL_NETWORK_ERROR", exc.message, True) from exc
+            if exc.code in {"TOUR_API_KEY_MISSING", "TOUR_API_REJECTED", "TOUR_API_HTTP_ERROR"}:
+                raise ToolFailure("TOOL_CONFIGURATION_MISSING", exc.message) from exc
+            raise ToolFailure("TOOL_RESPONSE_INVALID", exc.message) from exc
+        return observed(
+            "Korea Tourism Organization TourAPI",
+            rows,
+            mode="live",
+            url="https://apis.data.go.kr/B551011/KorService2/searchFestival2",
+        )
+
+        # Kept unreachable for compatibility with the pre-shared-client implementation below.
+        if False:
             rows = await self.repository.festivals(start_date=None, end_date=None)
             return observed("festival_repository", rows[:30], mode=getattr(self.repository,"mode","database"))
         day = state["conditions"]["date"].replace("-", "")

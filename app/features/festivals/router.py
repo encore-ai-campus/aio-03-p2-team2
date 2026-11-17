@@ -9,7 +9,7 @@ from app.core.auth import current_user_id, require_admin, require_current_user
 from app.core.config import get_settings
 from app.core.repositories import get_repository
 from app.core.service import ServiceError
-from .schemas import FestivalImportRequest
+from .schemas import FestivalImportRequest, FestivalSyncRequest
 from .service import FestivalService, available
 
 router = APIRouter(prefix="/festivals", tags=["festivals"])
@@ -72,9 +72,10 @@ async def alternatives(festival_id: str, request: Request, group_id: str | None 
 
 
 @admin_router.post("/festivals/sync", operation_id="syncFestivals")
-async def sync_festivals(payload: dict, request: Request):
+async def sync_festivals(payload: FestivalSyncRequest, request: Request):
     require_development()
-    job = await get_repository(request).create_sync_job("festival_sync", payload, requested_by=current_user_id(request))
+    params = payload.model_dump(by_alias=True, mode="json", exclude_none=True)
+    job = await get_repository(request).create_sync_job("festival_sync", params, requested_by=current_user_id(request))
     return success({"jobId": job["jobId"], "status": job["status"]}, request, status_code=202)
 
 
