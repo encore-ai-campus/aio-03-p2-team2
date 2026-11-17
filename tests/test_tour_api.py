@@ -71,3 +71,23 @@ async def test_tour_client_can_enrich_rows_with_common_and_intro_details():
         )
 
     assert result[0]["description"] == "Detailed overview"
+    assert result[0]["operatingHours"] == [
+        {"date": "2026-11-20", "open": "10:00", "close": "18:00"},
+        {"date": "2026-11-21", "open": "10:00", "close": "18:00"},
+    ]
+
+
+@pytest.mark.parametrize("playtime", ["", None, "날짜별 상이", "10:00~18:00 (토요일 휴무)",
+    "10:00~12:00 / 14:00~18:00", "22:00~02:00", "25:00~26:00", "10:99~18:00"])
+def test_unknown_or_complex_hours_are_not_invented(playtime):
+    result = tour_item_to_festival({**item(), "playtime": playtime})
+    assert result["operatingHours"] == []
+    assert result["operatingHoursKnown"] is False
+
+
+@pytest.mark.parametrize("playtime", ["10:00~18:00", "매일 10:00 ~ 18:00", "10시~18시"])
+def test_simple_daily_hours_cover_each_festival_day(playtime):
+    result = tour_item_to_festival({**item(), "playtime": playtime})
+    assert result["operatingHoursKnown"] is True
+    assert len(result["operatingHours"]) == 2
+    assert result["operatingHours"][1] == {"date":"2026-11-21", "open":"10:00", "close":"18:00"}

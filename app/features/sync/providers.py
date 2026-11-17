@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import unquote
+import re
 
 import httpx
 
@@ -71,6 +72,28 @@ def _tour_region_city(item: dict[str, Any]) -> tuple[str, str | None]:
     return region or "unknown", city
 
 
+def _tour_operating_hours(value: Any, start_date: str, end_date: str) -> list[dict[str, str]]:
+    """Only expand unambiguous daily hours; never invent hours for a complex schedule."""
+    text = str(value or "").strip()
+    match = re.fullmatch(r"(?:매일\s*)?(\d{1,2}):(\d{2})\s*[~～∼〜–-]\s*(\d{1,2}):(\d{2})", text)
+    if not match:
+        match = re.fullmatch(r"(?:매일\s*)?(\d{1,2})시\s*[~～∼〜–-]\s*(\d{1,2})시", text)
+        if not match:
+            return []
+        opening, closing = (int(match[1]), 0), (int(match[2]), 0)
+    else:
+        opening, closing = (int(match[1]), int(match[2])), (int(match[3]), int(match[4]))
+    if any(not 0 <= hour <= 23 or not 0 <= minute <= 59 for hour, minute in (opening, closing)) or closing <= opening:
+        return []
+    start, end = date.fromisoformat(start_date), date.fromisoformat(end_date)
+    # A broad/annual programme needs explicit per-date hours rather than a guessed calendar.
+    if (end - start).days > 366:
+        return []
+    return [{"date": (start + timedelta(days=offset)).isoformat(),
+             "open": f"{opening[0]:02d}:{opening[1]:02d}", "close": f"{closing[0]:02d}:{closing[1]:02d}"}
+            for offset in range((end - start).days + 1)]
+
+
 def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
     content_id = str(item.get("contentid") or "").strip()
     name = str(item.get("title") or "").strip()
@@ -84,6 +107,7 @@ def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
 
     address = " ".join(str(part).strip() for part in (item.get("addr1"), item.get("addr2")) if part)
     region, city = _tour_region_city(item)
+    hours = _tour_operating_hours(item.get("playtime"), start_date, end_date)
     return {
         "id": f"fst_tour_{content_id}",
         "name": name,
@@ -101,7 +125,8 @@ def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
             "latitude": _float_or_none(item.get("mapy")),
             "longitude": _float_or_none(item.get("mapx")),
         },
-        "operatingHours": [],
+        "operatingHours": hours,
+        "operatingHoursKnown": bool(hours),
         "riskStatus": "normal",
         "sourceUpdatedAt": _tour_source_updated_at(item.get("modifiedtime") or item.get("modifiedTime")),
     }
