@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from datetime import date as Date
 
 from pydantic import Field
 
@@ -12,6 +13,7 @@ class MatchingParseRequest(APIModel):
 
 
 class MatchingConditions(APIModel):
+    date: Date | None = None
     start_time: str | None = None
     budget_manwon: int | None = Field(default=None, ge=1, le=1000)
     interests: list[str] = []

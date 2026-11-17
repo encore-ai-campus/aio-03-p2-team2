@@ -240,7 +240,10 @@ class MatchingService:
         if not festival or festival["riskStatus"] == "cancelled":
             raise ServiceError(422, "FESTIVAL_NOT_AVAILABLE", "매칭할 수 없는 축제입니다.")
 
-        conditions = payload.conditions.model_dump(by_alias=True)
+        conditions = payload.conditions.model_dump(mode="json", by_alias=True)
+        day = conditions.get("date")
+        if day and not festival["startDate"] <= day <= festival["endDate"]:
+            raise ServiceError(422, "MATCHING_DATE_INVALID", "참여 날짜는 축제 운영 기간 안에서 선택해 주세요.")
         requester = await self.repository.user(user_id)
         users = await self.repository.users(exclude_id=user_id)
         candidates = rank_candidates(conditions, users, requester, top_k=payload.top_k)
@@ -257,6 +260,7 @@ class MatchingService:
                     "postBody": payload.group.post_body,
                     "capacity": payload.conditions.party_size or 4,
                     "joinMode": payload.conditions.join_mode or "approval",
+                    "conditions": {"date": day, "start_time": payload.conditions.start_time},
                 },
             )
             group_id = group["id"]
