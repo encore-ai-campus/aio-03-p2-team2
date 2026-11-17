@@ -1,5 +1,8 @@
 import ChatHistory from "../components/ChatHistory.jsx";
-import { Fragment } from "react";
+import { Fragment, useCallback, useState } from "react";
+import LiveChat from "../components/LiveChat.jsx";
+import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { ApiError } from "../../../shared/components/ApiState.jsx";
 import { Button } from "../../../shared/components/Primitives.jsx";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 
@@ -7,7 +10,17 @@ const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const ymd = (d) =>
   [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 
+// 실서버 우선: 연결 실패 시 데모 모드면 예시 화면, 아니면 「서버에 연결할 수 없어요」
 export default function ChatPage() {
+  const [apiFailed, setApiFailed] = useState(false);
+  const [apiError, setApiError] = useState(false);
+  const onFail = useCallback(() => (DEMO_MODE ? setApiFailed(true) : setApiError(true)), []);
+  if (apiError) return <ApiError />;
+  return apiFailed ? <DemoChatPage /> : <LiveChat onFail={onFail} />;
+}
+
+// 데모(예시 데이터) 채팅방
+function DemoChatPage() {
   const demo = useDemo();
   const { state, btn, pill, fieldProps, dispatch, submitChat, group, person, pageHead } = demo;
   const rooms = state.groups
