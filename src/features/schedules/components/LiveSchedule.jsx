@@ -145,7 +145,7 @@ export default function LiveSchedule({ festivals, pill, onFail }) {
                 <Timeline items={run.candidate?.items} />
                 {isLeader && (
                   <div className="btnrow" style={{ marginTop: "10px" }}>
-                    <button type="button" className="btn primary" disabled={busy} onClick={() => act(() => decideSchedule(run, "approve"), () => "일정을 확정했어요! 참여자에게 공유돼요.").then(load)}>
+                    <button type="button" className="btn primary" disabled={busy} onClick={() => act(() => decideSchedule(run, "approve")).then(load)}>
                       이 일정으로 확정하기
                     </button>
                     <button type="button" className="btn" disabled={busy} onClick={() => act(() => decideSchedule(run, "reject"), () => "초안을 거절했어요. 기존 일정은 그대로예요.")}>
@@ -155,7 +155,7 @@ export default function LiveSchedule({ festivals, pill, onFail }) {
                 )}
               </div>
             )}
-            {run && run.status === "completed" && <div className="note good" style={{ marginTop: "12px" }}>✅ 일정이 확정됐어요.</div>}
+            {run && run.status === "completed" && <div className="note good" style={{ marginTop: "12px" }}>✅ 일정을 확정했어요! 참여자에게 공유돼요.</div>}
             {run && ["failed", "waiting_input", "rejected", "cancelled"].includes(run.status) && (
               <div className="note warning" style={{ marginTop: "12px" }}>
                 <strong>초안을 확정하지 못했어요</strong>
@@ -166,9 +166,12 @@ export default function LiveSchedule({ festivals, pill, onFail }) {
 
             <div className="btnrow" style={{ marginTop: "15px" }}>
               {isLeader ? (
+                // 초안 승인 대기 중에는 확정/거절만 보이도록 다시 만들기 버튼을 숨긴다
+                run?.status === "waiting_approval" ? null : (
                 <button type="button" className="btn primary" disabled={busy} onClick={() => act(() => draftSchedule(group.id))}>
                   {busy ? "AI가 일정을 만드는 중…" : run ? "AI 일정 초안 다시 만들기" : "AI 일정 초안 만들기"}
                 </button>
+                )
               ) : (
                 pill("모임장이 일정을 확정해요", "purple")
               )}

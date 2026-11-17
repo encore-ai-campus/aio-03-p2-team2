@@ -19,7 +19,7 @@ export function useMatchingRun() {
     setRun({ status: "loading", key, result: null, error: null });
     try {
       const result = await createMatchingRun({ festivalId, profile });
-      setRun({ status: "done", key, result, error: null });
+      setRun({ status: "done", key, result, conditions: result.conditions, error: null });
     } catch (error) {
       console.warn("[matching] API 실패", error);
       const message = ERROR_TEXT[error.code] || error.message || "매칭 중 오류가 났어요. 잠시 후 다시 시도해 주세요.";

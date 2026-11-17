@@ -76,7 +76,7 @@ const ERROR_TEXT = {
   AUTH_USER_NOT_LINKED: "로그인 계정이 앱 사용자와 연결되지 않았어요. 다시 로그인해 주세요.",
 };
 
-export default function AgentChatPanel({ festivals, festivalId, onPickFestival, onResult, pill }) {
+export default function AgentChatPanel({ festivals, festivalId, selectedDate, onPickFestival, onResult, pill }) {
   const [messages, setMessages] = useState([]);
   const [run, setRun] = useState(null); // 마지막 에이전트 응답
   const [busy, setBusy] = useState(false);
@@ -115,7 +115,17 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
       const items = (res.candidate?.items || res.result?.items || []).map(toCandidateModel);
       push({ role: "bot", type: "result", items, run: res });
       // 오른쪽 「추천 동행 후보」 패널에도 같은 결과 표시
-      onResult?.({ status: "done", key: "agent", runId: res.runId, partySize: res.conditions?.party_size, result: { candidates: items }, error: null });
+      // 챗봇에서 받은 조건(날짜·시작 시간 등)도 함께 넘겨 모집글·조건 요약에 쓴다 (snake_case/camelCase 모두 대응)
+      const c = res.conditions || {};
+      const conditions = {
+        date: c.date,
+        startTime: c.start_time ?? c.startTime,
+        partySize: c.party_size ?? c.partySize,
+        budgetManwon: c.budget_manwon ?? c.budgetManwon,
+        interests: c.interests,
+        travelStyle: c.travel_style ?? c.travelStyle,
+      };
+      onResult?.({ status: "done", key: "agent", runId: res.runId, partySize: conditions.partySize, conditions, result: { candidates: items }, error: null });
     } else if (res.status === "failed" || res.status === "cancelled") {
       const reason = res.errors?.[0]?.message || res.result?.summary || "요청을 완료하지 못했어요.";
       push({ role: "bot", type: "text", text: `😥 ${reason}\n조건을 바꿔서 다시 말해 주세요.`, run: res });
@@ -161,7 +171,8 @@ export default function AgentChatPanel({ festivals, festivalId, onPickFestival, 
       );
     }
     return call(
-      () => startAgentRun({ message: value, festivalId: festivalId || undefined, sessionId: run?.sessionId }),
+      () => startAgentRun({ message: value, festivalId: festivalId || undefined, sessionId: run?.sessionId,
+        conditions: selectedDate ? { date: selectedDate } : {} }),
       value,
     );
   }

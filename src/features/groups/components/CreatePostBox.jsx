@@ -11,7 +11,7 @@ const ERROR_TEXT = {
   MATCHING_EMPTY: "추천 후보가 없어서 모집글을 만들 수 없어요. 조건을 바꿔 주세요.",
 };
 
-export default function CreatePostBox({ festival, partySize, joinMode = "approval", summary, runId }) {
+export default function CreatePostBox({ festival, partySize, joinMode = "approval", summary, runId, date, startTime }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,7 +49,7 @@ export default function CreatePostBox({ festival, partySize, joinMode = "approva
       // 에이전트 매칭이면 매칭 조건을 이어받는 workflow API, 직접 매칭이면 일반 모임 생성
       const group = runId
         ? await createGroupFromRun(runId, body)
-        : await createGroup({ festivalId: festival.id, ...body });
+        : await createGroup({ festivalId: festival.id, ...body, date, startTime });
       navigate(`/groups?groupId=${encodeURIComponent(group.id)}`);
     } catch (err) {
       console.warn("[groups] 생성 실패", err);

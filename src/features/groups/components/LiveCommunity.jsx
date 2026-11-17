@@ -2,7 +2,7 @@
 // 참여 신청(POST join-requests) · 모임장 승인/거절(version 포함) · 공개 댓글
 // 모임장 판단은 GET /me 의 users.id 와 group.leaderId 비교 (JWT sub와 다름)
 // 목록 API가 실패하면 onFail()로 CommunityPage가 기존 데모 화면을 보여준다.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { addComment, approveJoin, getGroup, listGroups, listJoinRequests, rejectJoin, requestJoin } from "../api/groupsApi.js";
@@ -36,10 +36,16 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
   const [requested, setRequested] = useState(() => new Set()); // 내가 이번에 신청한 모임 (상세 응답엔 신청 목록이 없음)
   const festival = (id) => festivals.find((f) => f.id === id);
 
+  // 상세에서 확인한 최신 값(인원·신청 대기) — 목록 API 값이 늦게 반영돼도 카드에 덮어쓴다
+  const patchRef = useRef(null);
+  const applyPatch = (list) => {
+    const p = patchRef.current;
+    return p ? list?.map((x) => (x.id === p.id ? { ...x, ...p } : x)) : list;
+  };
   const loadList = useCallback(
     () =>
       listGroups()
-        .then(setGroups)
+        .then((list) => setGroups(applyPatch(list)))
         .catch((e) => {
           console.warn("[groups] 목록 API 실패 → 데모", e);
           onFail?.();
@@ -55,11 +61,20 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
     () =>
       currentId
         ? getGroup(currentId)
-            .then((group) => {
+            .then(async (group) => {
               setDetail(group);
               // 신청 목록은 상세에 없어서 모임장일 때만 따로 조회
-              if (me && group.leaderId === me.id) return listJoinRequests(group.id).then(setRequests);
-              setRequests([]);
+              const reqs = me && group.leaderId === me.id ? await listJoinRequests(group.id) : [];
+              setRequests(reqs);
+              // 목록 API 값(인원·신청 대기)이 늦게 반영돼서, 선택한 모임 카드는 상세 기준으로 맞춘다
+              patchRef.current = {
+                id: group.id,
+                memberCount: group.memberCount,
+                capacity: group.capacity,
+                status: group.status,
+                ...(me && group.leaderId === me.id ? { pendingRequestCount: reqs.length } : {}),
+              };
+              setGroups(applyPatch);
             })
             .catch((e) => setNotice(msg(e)))
         : null,
@@ -138,7 +153,7 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
                 >
                   <div className="btnrow">
                     {pill(label, tone)}
-                    {pill(item.joinMode === "approval" ? "모임장 승인" : "즉시 참여", item.joinMode === "approval" ? "purple" : "blue")}
+                    {pill(item.joinMode === "approval" ? "모임장 승인제" : "즉시 참여제", item.joinMode === "approval" ? "purple" : "blue")}
                     {me && item.leaderId === me.id ? pill("👑 내가 모임장", "red") : null}
                   </div>
                   <h3>{item.title}</h3>
@@ -213,7 +228,7 @@ export default function LiveCommunity({ festivals, pill, onFail }) {
               <div className="btnrow">
                 {isLeader || isMember ? (
                   <>
-                    {isLeader ? pill("모임장 · 직접 참여 승인", "red") : pill("✅ 참여 확정", "green")}
+                    {isLeader ? null : pill("✅ 참여 확정", "green")}
                     {/* 플로우 다음 단계: 참여 확정 → 공동 일정 */}
                     <button type="button" className="btn" onClick={() => navigate(`/schedules?groupId=${encodeURIComponent(g.id)}`)}>
                       🗓️ 공동 일정 {isLeader ? "만들기" : "보기"} →

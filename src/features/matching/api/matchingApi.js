@@ -14,17 +14,8 @@ export const PART_LABEL = {
 };
 
 // 화면의 조건(state.profile) → 백엔드 conditions(camelCase)
-export function toConditions(profile) {
-  return {
-    startTime: profile.start || null,
-    budgetManwon: profile.budget || null,
-    interests: profile.interests || [],
-    travelStyle: profile.style || null,
-    preferredMbti: profile.mbti || [],
-    partySize: profile.party || null,
-    joinMode: profile.joinMode || "approval",
-  };
-}
+export { toConditions } from "../lib/matchingConditions.js";
+import { toConditions } from "../lib/matchingConditions.js";
 
 // 백엔드 후보 → 화면 카드 모델
 // parts: { schedule: { score, max, excluded? } } → { 일정: "25/25" | "미선택" } (기존 ScoreWhy와 같은 모양)
@@ -45,9 +36,10 @@ export function toCandidateModel(c) {
 
 // POST /matching/runs — 모임 생성 없이 후보만 계산 (모집글 저장은 다음 단계에서 연결)
 export async function createMatchingRun({ festivalId, profile, topK = 5 }) {
+  const conditions = toConditions(profile);
   const data = await apiFetch("/matching/runs", {
     method: "POST",
-    body: { festivalId, conditions: toConditions(profile), createGroup: false, topK },
+    body: { festivalId, conditions, createGroup: false, topK },
   });
-  return { runId: data.runId, festivalId: data.festivalId, candidates: (data.candidates || []).map(toCandidateModel) };
+  return { runId: data.runId, festivalId: data.festivalId, conditions, candidates: (data.candidates || []).map(toCandidateModel) };
 }
