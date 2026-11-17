@@ -129,7 +129,20 @@ def tour_item_to_festival(item: dict[str, Any]) -> dict[str, Any]:
         "operatingHoursKnown": bool(hours),
         "riskStatus": "normal",
         "sourceUpdatedAt": _tour_source_updated_at(item.get("modifiedtime") or item.get("modifiedTime")),
+        # TourAPI 대표 이미지(firstimage)·썸네일(firstimage2) URL. 파일이 아니라 주소만 저장한다.
+        "imageUrl": _tour_image_url(item.get("firstimage")),
+        "thumbnailUrl": _tour_image_url(item.get("firstimage2")),
     }
+
+
+def _tour_image_url(value: Any) -> str | None:
+    url = str(value or "").strip()
+    if not url.startswith(("http://", "https://")):
+        return None
+    # 배포 화면(https)에서 혼합 콘텐츠로 막히지 않도록 관광공사 이미지 서버는 https 로 통일
+    if url.startswith("http://tong.visitkorea.or.kr/"):
+        url = "https://" + url[len("http://"):]
+    return url
 
 
 class TourAPIClient:

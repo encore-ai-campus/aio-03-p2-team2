@@ -59,13 +59,25 @@ class FestivalRepositoryMixin(RepositoryBase):
             f"select * from festivals_with_status where {' and '.join(clauses)} order by start_date asc, id asc",
             *args,
         )
-        return [await self._festival_view(row) for row in rows]
-
-    async def _festival_view(self, row: asyncpg.Record) -> dict:
-        hours = await self._pool().fetch(
-            "select date, open_time, close_time, note from festival_operating_hours where festival_id = $1 order by date",
-            row["id"],
+        if not rows:
+            return []
+        # 운영시간을 축제마다 따로 조회하면(N+1) 축제 수만큼 왕복이 생겨 목록이 느려진다 → 한 번에 조회
+        hour_rows = await self._pool().fetch(
+            "select festival_id, date, open_time, close_time, note from festival_operating_hours "
+            "where festival_id = any($1::text[]) order by festival_id, date",
+            [row["id"] for row in rows],
         )
+        hours_by_festival: dict[str, list] = {}
+        for item in hour_rows:
+            hours_by_festival.setdefault(item["festival_id"], []).append(item)
+        return [await self._festival_view(row, hours_by_festival.get(row["id"], [])) for row in rows]
+
+    async def _festival_view(self, row: asyncpg.Record, hours: list | None = None) -> dict:
+        if hours is None:
+            hours = await self._pool().fetch(
+                "select date, open_time, close_time, note from festival_operating_hours where festival_id = $1 order by date",
+                row["id"],
+            )
         return {
             "id": row["id"], "name": row["name"], "region": row["region"], "city": row["city"],
             "startDate": _iso(row["start_date"]), "endDate": _iso(row["end_date"]), "category": row["category"],
@@ -75,6 +87,9 @@ class FestivalRepositoryMixin(RepositoryBase):
             "venue": {"name": row["venue_name"], "address": row["venue_address"], "latitude": row["latitude"], "longitude": row["longitude"]},
             "operatingHours": [{"date": _iso(item["date"]), "open": _hhmm(item["open_time"]), "close": _hhmm(item["close_time"]), "note": item["note"]} for item in hours],
             "riskStatus": row["risk_status"],
+            # 이미지 컬럼은 db: festivals.image_url/thumbnail_url (없는 환경에서도 깨지지 않게 get 사용)
+            "imageUrl": row.get("image_url"),
+            "thumbnailUrl": row.get("thumbnail_url"),
         }
 
     async def upsert_festival(self, data: dict[str, Any]) -> dict:
@@ -89,17 +104,22 @@ class FestivalRepositoryMixin(RepositoryBase):
                 await connection.execute(
                     """
                     insert into festivals (id, name, region, city, start_date, end_date, category, description,
-                        tags, venue_name, venue_address, latitude, longitude, risk_status, source_updated_at)
-                    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                        tags, venue_name, venue_address, latitude, longitude, risk_status, source_updated_at,
+                        image_url, thumbnail_url)
+                    values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
                     on conflict (id) do update set name=excluded.name, region=excluded.region,
                         city=excluded.city, start_date=excluded.start_date, end_date=excluded.end_date,
                         category=excluded.category, description=excluded.description, tags=excluded.tags,
                         venue_name=excluded.venue_name, venue_address=excluded.venue_address,
                         latitude=excluded.latitude, longitude=excluded.longitude,
-                        risk_status=excluded.risk_status, source_updated_at=now(), updated_at=now()
+                        risk_status=excluded.risk_status, source_updated_at=now(), updated_at=now(),
+                        -- 이미지 정보가 없는 가져오기(import)는 기존 이미지를 지우지 않는다
+                        image_url=coalesce(excluded.image_url, festivals.image_url),
+                        thumbnail_url=coalesce(excluded.thumbnail_url, festivals.thumbnail_url)
                     """,
                     festival_id, data["name"], data["region"], data.get("city"), date.fromisoformat(data["startDate"]), date.fromisoformat(data["endDate"]),
                     data["category"], data.get("description", ""), data.get("tags", []), venue.get("name"), venue.get("address"), venue.get("latitude"), venue.get("longitude"), data.get("riskStatus", "normal"), source_updated_at,
+                    data.get("imageUrl"), data.get("thumbnailUrl"),
                 )
                 # Missing/complex TourAPI hours must not erase previously confirmed hours.
                 # Legacy imports retain their explicit replacement behaviour.
