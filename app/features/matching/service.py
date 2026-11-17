@@ -72,7 +72,8 @@ MATCH_WEIGHTS = {
     "ageBand": 10, "partySize": 10, "gender": 5, "mbti": 5,
 }
 # 이 점수(%) 이상인 후보만 추천한다.
-MATCH_THRESHOLD = 80
+# 80 → 60 (11/18): 시연 데이터 진단 결과 선택 조건(관심사 등)이 하나라도 안 맞으면 80%를 넘는 후보가 0명 → 60으로 완화
+MATCH_THRESHOLD = 60
 # 요청한 조건 가중치 중 후보 정보가 있는 비율의 최소값
 MIN_PROFILE_COVERAGE = 0.5
 AGE_BANDS = ("10대", "20대", "30대", "40대", "50대")
@@ -90,6 +91,16 @@ def _missing(weight: int) -> dict[str, Any]:
 
 def _part(score: float, maximum: int) -> dict[str, Any]:
     return {"score": max(0, min(maximum, round(score))), "max": maximum}
+
+
+def candidate_profile(profile: dict) -> dict[str, Any]:
+    """추천 카드용 공개 프로필 요약: 연령대·관심사·여행 스타일·합류 가능 시각."""
+    return {
+        "ageBand": profile.get("ageBand"),
+        "interests": list(profile.get("interests") or [])[:4],
+        "travelStyle": profile.get("travelStyle"),
+        "availableFrom": profile.get("availableFrom"),
+    }
 
 
 def profile_coverage(parts: dict) -> float:
@@ -197,6 +208,8 @@ def score_candidate(conditions: dict, user: dict, requester: dict | None = None)
     coverage = profile_coverage(parts)
     return {
         "user": {"id": user["id"], "displayName": user["displayName"], "avatarUrl": user.get("avatarUrl")},
+        # 화면에 보여 줄 후보 프로필 요약 (성별·MBTI 등 민감할 수 있는 값은 제외)
+        "profile": candidate_profile(profile),
         "score": score,
         "parts": parts,
         "reasons": reasons,
