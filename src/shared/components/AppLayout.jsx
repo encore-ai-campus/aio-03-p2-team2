@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useDemo, paths } from "../../app/DemoProvider.jsx";
 import { useAuth } from "../../features/auth/AuthProvider.jsx";
 import { Button } from "./Primitives.jsx";
@@ -30,9 +30,12 @@ export default function AppLayout() {
   const { user, signOut } = useAuth();
   const me = useMe();
   const location = useLocation();
+  const navigate = useNavigate(); // 로그아웃 후 메인(축제 탐색)으로
   // 🔔 숫자: 실서버면 아직 답하지 않은 내 알림 수, 서버 연결 실패 시 기존 데모 숫자
   const [liveBell, setLiveBell] = useState(null);
   useEffect(() => {
+    // 비로그인(메인 둘러보기)일 때는 내 알림을 조회하지 않는다
+    if (!user) return setLiveBell(null);
     let alive = true;
     listAlerts()
       .then((items) => alive && setLiveBell(items.filter((a) => !a.choice).length))
@@ -40,7 +43,7 @@ export default function AppLayout() {
     return () => {
       alive = false;
     };
-  }, [location.pathname]);
+  }, [location.pathname, user]);
   const demoBell = countPending() + (state.weather?.type && !state.weather?.choice ? 1 : 0);
   const bell = liveBell ?? demoBell;
   const pageName = NAV.find((row) => row[0] === state.page)?.[2] || "축제 탐색";
@@ -64,7 +67,7 @@ export default function AppLayout() {
               >
                 <span className="ico">{NAV_ICON[id] ? <i className={`ti ${NAV_ICON[id]}`} aria-hidden="true" /> : emoji}</span>
                 {label}
-                {liveBell === null && id === "community" && countPending() > 0 && (
+                {user && liveBell === null && id === "community" && countPending() > 0 && (
                   <span className="pill red" style={{ marginLeft: "auto", padding: "3px 7px" }}>
                     {countPending()}
                   </span>
@@ -87,26 +90,35 @@ export default function AppLayout() {
             <b>{pageName}</b>
           </div>
           <div className="top-right">
-            <span className="auth-user" title={user?.email}>
-              {me?.displayName || user?.user_metadata?.display_name || user?.email}
-            </span>
-            <NavLink to="/profile" className="btn small">
-              내 프로필
-            </NavLink>
-            <Button className="btn small" onClick={signOut}>
-              로그아웃
-            </Button>
-            <Button
-              className="toplink bell"
-              title="AI 알림"
-              aria-label="AI 알림"
-              onClick={() => dispatch("nav:alerts")}
-            >
-              <i className="ti ti-bell" aria-hidden="true" />
-              <span className="bell-badge" hidden={!bell}>
-                {bell}
-              </span>
-            </Button>
+            {user ? (
+              <>
+                <span className="auth-user" title={user?.email}>
+                  {me?.displayName || user?.user_metadata?.display_name || user?.email}
+                </span>
+                <NavLink to="/profile" className="btn small">
+                  내 프로필
+                </NavLink>
+                <Button className="btn small" onClick={() => signOut().then(() => navigate("/festivals"))}>
+                  로그아웃
+                </Button>
+                <Button
+                  className="toplink bell"
+                  title="AI 알림"
+                  aria-label="AI 알림"
+                  onClick={() => dispatch("nav:alerts")}
+                >
+                  <i className="ti ti-bell" aria-hidden="true" />
+                  <span className="bell-badge" hidden={!bell}>
+                    {bell}
+                  </span>
+                </Button>
+              </>
+            ) : (
+              // 비로그인: 로그인 버튼 → 로그인 후 지금 보던 화면으로 돌아옴
+              <Link to="/login" state={{ from: location.pathname }} className="btn small primary">
+                로그인
+              </Link>
+            )}
           </div>
         </header>
         <main className="main">

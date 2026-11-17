@@ -21,22 +21,26 @@ export default function App() {
     <AuthProvider>
       <DemoProvider>
         <Routes>
-          {/* 로그인 없이 볼 수 있는 화면 */}
           <Route path="login" element={<LoginPage />} />
-          {/* 로그인해야 볼 수 있는 화면 */}
           <Route element={<RequireAuth />}>
             <Route path="onboarding" element={<OnboardingPage />} />
-            <Route element={<AppLayout />}>
+          </Route>
+          <Route element={<AppLayout />}>
+            {/* 메인: 로그인 없이 볼 수 있는 화면 (로그인했는데 온보딩 전이면 온보딩으로) */}
+            <Route element={<RequireAuth optional />}>
               <Route index element={<HomeRedirect />} />
               <Route path="festivals" element={<FestivalExplorePage />} />
+            </Route>
+            {/* 로그인해야 볼 수 있는 화면 → 비로그인 시 로그인 화면으로, 로그인 후 원래 화면으로 */}
+            <Route element={<RequireAuth />}>
               <Route path="matching" element={<MatchingPage />} />
               <Route path="groups" element={<CommunityPage />} />
               <Route path="chat" element={<ChatPage />} />
               <Route path="schedules" element={<SchedulePage />} />
               <Route path="alerts" element={<AlertsPage />} />
               <Route path="profile" element={<ProfilePage />} />
-              <Route path="*" element={<Navigate to="/festivals" replace />} />
             </Route>
+            <Route path="*" element={<Navigate to="/festivals" replace />} />
           </Route>
         </Routes>
       </DemoProvider>

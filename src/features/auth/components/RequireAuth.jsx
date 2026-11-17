@@ -7,7 +7,9 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 import { useAuth } from "../AuthProvider.jsx";
 
-export default function RequireAuth() {
+// optional=true: 로그인 없이도 볼 수 있는 화면(메인 축제 탐색)용.
+//  - 비로그인 → 그대로 보여 줌 / 로그인했는데 온보딩 전 → 온보딩으로 (기존 규칙 유지)
+export default function RequireAuth({ optional = false }) {
   const { session, loading } = useAuth();
   const location = useLocation();
   const userId = session?.user?.id;
@@ -26,6 +28,7 @@ export default function RequireAuth() {
   }, [userId, metaDone]);
 
   if (loading) return <div className="auth-loading">로그인 상태를 확인하고 있어요…</div>;
+  if (!session && optional) return <Outlet />;
   if (!session) {
     // 원래 가려던 주소를 기억해 두었다가 로그인 후 그곳으로 보낸다
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
