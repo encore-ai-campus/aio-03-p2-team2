@@ -128,7 +128,7 @@ export default function LiveAlerts({ festivals, onFail }) {
     let alive = true;
     setDetail(null);
     setSched(null);
-    Promise.all([getGroup(selectedGroupId).catch(() => null), getSchedule(selectedGroupId).catch(() => null)]).then(([d, sc]) => {
+    Promise.all([getGroup(selectedGroupId).catch(() => null), getSchedule(selectedGroupId).catch((e) => ({ loadError: msg(e) }))]).then(([d, sc]) => {
       if (!alive) return;
       setDetail(d);
       setSched(sc);
@@ -595,6 +595,16 @@ export default function LiveAlerts({ festivals, onFail }) {
           </ol>
         ) : sched === null && !detail ? (
           <p className="sc-empty-line">일정 불러오는 중…</p>
+        ) : sched?.loadError ? (
+          <div className="sc-fail">
+            <b>
+              <i className="ti ti-plug-connected-x" aria-hidden="true" /> 일정을 불러오지 못했어요
+            </b>
+            <span>{sched.loadError} 서버 연결을 확인한 뒤 다시 시도해 주세요.</span>
+            <button type="button" className="btn small al-go" onClick={() => setReloadKey((k) => k + 1)}>
+              다시 불러오기
+            </button>
+          </div>
         ) : (
           <div className="sc-fail">
             <b>

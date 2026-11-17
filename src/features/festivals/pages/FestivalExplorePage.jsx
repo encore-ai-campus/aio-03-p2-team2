@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import CalendarView, { ViewToggle } from "../components/CalendarView.jsx";
 import { SOURCE_LABEL, useFestivals } from "../hooks/useFestivals.js";
@@ -10,7 +10,14 @@ export default function FestivalExplorePage() {
   const calendar = state.discoverView === "calendar";
   // 실제 API 축제 목록 (실패하면 데모 데이터 그대로)
   const { festivals, source } = useFestivals(state.festivals);
-  const [sourceText, sourceClass] = SOURCE_LABEL[source];
+  let [sourceText, sourceClass] = SOURCE_LABEL[source];
+  // 실제 데이터면 출처·갱신 시각 표시 (공지 요구: 데이터 출처·조회 시점)
+  if (source === "api") {
+    const official = festivals.some((f) => f.source === "official_api");
+    const latest = festivals.map((f) => f.sourceUpdatedAt).filter(Boolean).sort().slice(-1)[0];
+    const when = latest ? new Date(latest).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    sourceText = `${official ? "출처: 한국관광공사 TourAPI" : "출처: 페스타메이트 DB"}${when ? ` · ${when} 갱신` : ""}`;
+  }
   const all = festivals.filter(
     (f) => f.start <= "2026-12-31" && f.end >= "2026-01-01",
   );
@@ -54,6 +61,14 @@ export default function FestivalExplorePage() {
     )
     .sort((a, b) => a.start.localeCompare(b.start));
   const activeMonth = calendar ? calMonth() : state.month;
+  // 상시·장기(120일 이상) 운영은 어느 달에나 걸리므로 아래 묶음으로 분리 → 월별 차이가 보이게
+  const [showLong, setShowLong] = useState(true); // 기본은 펼친 상태
+  const curMonth = +today().slice(5, 7); // 이번 달 (지난 달 버튼 흐리게·안내용)
+  const pastMonth = activeMonth && activeMonth < curMonth && state.status === "available";
+  const days = (f) => (new Date(f.end + "T00:00:00") - new Date(f.start + "T00:00:00")) / 864e5;
+  const isLong = (f) => days(f) >= 120;
+  const limited = filtered.filter((f) => !isLong(f));
+  const longRun = filtered.filter(isLong);
   // 데모 모드가 아니면: 불러오는 중엔 스켈레톤, 연결 실패면 안내 (예시 축제로 바꾸지 않음)
   if (!DEMO_MODE && source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
   if (!DEMO_MODE && source === "demo") return <ApiError />;
@@ -146,7 +161,7 @@ export default function FestivalExplorePage() {
             {btn(
               m ? m + "월" : "전체",
               `month:${m}`,
-              `month-button ${m === activeMonth ? "active" : ""}`,
+              `month-button ${m === activeMonth ? "active" : ""} ${m && m < curMonth ? "is-past" : ""}`,
             )}
           </Fragment>
         ))}
@@ -172,7 +187,7 @@ export default function FestivalExplorePage() {
           aria-label="기간 상태"
           {...fieldProps("filter-status")}
         >
-          <option value="all">전체 상태</option>
+          <option value="all">전체 (지난 축제 포함)</option>
           <option value="available">참여 가능</option>
           <option value="past">기간 종료</option>
         </select>
@@ -212,11 +227,48 @@ export default function FestivalExplorePage() {
         <CalendarView demo={demo} list={calList} />
       ) : filtered.length ? (
         <>
-          <div className="festival-grid">
-            {filtered.map((item, index) => (
-              <Fragment key={index}>{fCard(item)}</Fragment>
-            ))}
-          </div>
+          {limited.length ? (
+            <>
+              <div className="fx-sec">
+                <b>{activeMonth ? `${activeMonth}월에 열리는 축제` : "기간 한정 축제"}</b>
+                <span>{limited.length}건</span>
+              </div>
+              <div className="festival-grid">
+                {limited.map((item) => (
+                  <Fragment key={item.id}>{fCard(item)}</Fragment>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="fx-none">
+              {pastMonth ? (
+                <>
+                  <span>{activeMonth}월 축제는 모두 끝났어요. 지금 참여할 수 있는 행사는 아래 상시 운영을 확인해 보세요.</span>
+                  {btn("지난 축제 보기", "status:all", "btn small")}
+                </>
+              ) : (
+                <span>{activeMonth ? `${activeMonth}월에 열리는 기간 한정 축제가 없어요.` : "기간 한정 축제가 없어요."} 아래 상시 운영 행사를 확인해 보세요.</span>
+              )}
+            </div>
+          )}
+          {longRun.length > 0 && (
+            <>
+              <div className="fx-sec long">
+                <b>상시·장기 운영</b>
+                <span>{longRun.length}건 · 언제 가도 열려 있어요</span>
+                {longRun.length > 4 && (
+                  <button type="button" className="fx-more" onClick={() => setShowLong((v) => !v)}>
+                    {showLong ? "접기" : `전체 보기 (${longRun.length})`}
+                  </button>
+                )}
+              </div>
+              <div className="festival-grid">
+                {(showLong ? longRun : longRun.slice(0, 4)).map((item) => (
+                  <Fragment key={item.id}>{fCard(item)}</Fragment>
+                ))}
+              </div>
+            </>
+          )}
         </>
       ) : (
         <>

@@ -46,6 +46,7 @@ function restore() {
       return {
         ...base,
         ...saved,
+        status: saved.status === "past" ? "past" : "available", // 기본은 지난 축제 숨김
         modal: false,
         aiChat,
       };
@@ -306,7 +307,7 @@ export function DemoProvider({ children }) {
         },
         matchingDone: false,
         month: 0,
-        status: "all",
+        status: "available", // 기본: 지난 축제 숨김
         region: "all",
         category: "all",
         keyword: "",

@@ -3,6 +3,9 @@
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 
 const CATEGORY_EMOJI = { 미식: "🍜", 음악: "🎵", 문화: "🎨", 전통: "🏮", 자연: "🌿" };
+// TourAPI 수집 데이터는 분류가 영문(festival 등)으로 와서 화면용 한글로 바꾼다
+const CATEGORY_KO = { festival: "축제", event: "행사", performance: "공연", exhibition: "전시", culture: "문화", tradition: "전통", food: "미식", music: "음악", nature: "자연" };
+export const categoryKo = (c) => (c ? CATEGORY_KO[String(c).toLowerCase()] || c : "축제");
 
 // 백엔드 Festival → 화면 카드 모델 (기존 데모 데이터와 같은 필드명: start, end …)
 export function toCardModel(f) {
@@ -13,7 +16,7 @@ export function toCardModel(f) {
     city: f.city || "",
     start: f.startDate,
     end: f.endDate,
-    category: f.category,
+    category: categoryKo(f.category),
     description: f.description || "",
     tags: f.tags || [],
     emoji: CATEGORY_EMOJI[f.category] || "🎪",
@@ -21,6 +24,10 @@ export function toCardModel(f) {
     venue: f.venue, // { name, address, latitude, longitude }
     operatingHours: f.operatingHours || [], // [{ date, open, close, note }]
     apiStatus: f.status, // past | live | upcoming (서버가 오늘 날짜로 계산)
+    imageUrl: f.imageUrl || null, // TourAPI 대표 이미지 (없으면 null → 화면은 이모지)
+    thumbnailUrl: f.thumbnailUrl || null,
+    source: f.source, // official_api(한국관광공사 TourAPI) | manual
+    sourceUpdatedAt: f.sourceUpdatedAt || null,
   };
 }
 
