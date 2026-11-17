@@ -13,10 +13,10 @@ export const startAgentRun = ({ message, festivalId, sessionId, conditions = {} 
 
 export const getAgentRun = (runId) => apiFetch(`/agents/runs/${encodeURIComponent(runId)}`);
 
-// 추가 질문에 답하기(answers) 또는 승인 처리(decision: approve | reject | cancel)
+// 추가 질문에 답하기(answers · festivalId · groupId) 또는 승인 처리(decision: approve | reject | cancel)
 // checkpointId는 직전 응답의 값을 그대로 보내야 한다 (다르면 409 CHECKPOINT_STALE)
-export const resumeAgentRun = (runId, { checkpointId, message, answers, decision }) =>
+export const resumeAgentRun = (runId, { checkpointId, message, answers, decision, festivalId, groupId }) =>
   apiFetch(`/agents/runs/${encodeURIComponent(runId)}/resume`, {
     method: "POST",
-    body: { checkpointId, message, answers, decision },
+    body: { checkpointId, message, answers, decision, festivalId, groupId },
   });

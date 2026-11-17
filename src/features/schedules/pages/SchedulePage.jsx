@@ -1,5 +1,7 @@
-import { Fragment } from "react";
+import { Fragment, useCallback, useState } from "react";
 import { useDemo } from "../../../app/DemoProvider.jsx";
+import { useFestivals } from "../../festivals/hooks/useFestivals.js";
+import LiveSchedule from "../components/LiveSchedule.jsx";
 
 // v4.3 · 처리 기록을 사용자가 읽기 쉬운 말로 바꿔 보여준다
 const NODE_KO = {
@@ -29,6 +31,10 @@ export default function SchedulePage() {
     member = g?.members.includes(state.actor),
     leader = g && g.leader === state.actor;
   const logs = g?.logs || [];
+  // 실제 API 우선 (실패 시 아래 기존 데모 화면)
+  const { festivals } = useFestivals(state.festivals);
+  const [apiFailed, setApiFailed] = useState(false);
+  const onFail = useCallback(() => setApiFailed(true), []);
   return (
     <>
       {pageHead(
@@ -36,6 +42,9 @@ export default function SchedulePage() {
         "🗓️ 공동 일정 확인·조정",
         "새 멤버가 들어오면 모두가 가능한 시간인지 자동으로 확인해요. 충돌이 있으면 AI가 조정안을 제안하고, 확정은 모임장이 해요.",
       )}
+      {!apiFailed ? (
+        <LiveSchedule festivals={festivals} pill={pill} onFail={onFail} />
+      ) : (
       <div className="columns schedule-columns">
         <section className="box pad">
           <div className="section-head" style={{ marginTop: "0" }}>
@@ -149,6 +158,7 @@ export default function SchedulePage() {
           </details>
         </section>
       </div>
+      )}
     </>
   );
 }
