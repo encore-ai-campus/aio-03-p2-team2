@@ -38,6 +38,16 @@ class GroupService:
 
     async def create(self, user_id: str, payload: dict) -> dict:
         await self.validate_create(payload["festivalId"])
+        conditions = dict(payload.get("conditions") or {})
+        if payload.get("date"):
+            conditions["date"] = str(payload["date"])
+        if payload.get("startTime"):
+            conditions["start_time"] = payload["startTime"]
+        if conditions.get("date"):
+            festival = await self.repository.festival(payload["festivalId"])
+            if not festival["startDate"] <= conditions["date"] <= festival["endDate"]:
+                raise ServiceError(422, "MATCHING_DATE_INVALID", "참여 날짜는 축제 운영 기간 안에서 선택해 주세요.")
+        payload = {**payload, "conditions": conditions}
         return await self.repository.create_group(user_id, payload)
 
     async def update(self, group_id: str, user_id: str, values: dict, version: int) -> dict:

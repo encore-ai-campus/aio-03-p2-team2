@@ -58,7 +58,7 @@ async def create_group(payload: GroupCreate, request: Request):
     repository = get_repository(request)
     user_id = current_user_id(request)
     try:
-        group = await GroupService(repository).create(user_id, payload.model_dump(by_alias=True))
+        group = await GroupService(repository).create(user_id, payload.model_dump(mode="json", by_alias=True))
     except ServiceError as error:
         raise APIError(error.status_code, error.code, error.message, error.details) from error
     except RepositoryError as error:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from datetime import date as Date
 
 from pydantic import Field
 
@@ -13,6 +14,8 @@ class GroupCreate(APIModel):
     post_body: str = Field(min_length=1, max_length=2000)
     capacity: int = Field(ge=2, le=8)
     join_mode: Literal["approval", "instant"] = "approval"
+    date: Date | None = None
+    start_time: str | None = Field(default=None, pattern=r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
 class GroupUpdate(APIModel):
