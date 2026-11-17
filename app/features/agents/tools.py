@@ -63,7 +63,15 @@ class AgentTools:
         return observed("member_profiles", rows, mode=getattr(self.repository, "mode", "database"))
 
     async def get_candidates(self, state):
-        return observed("user_profiles", (await self.repository.users(exclude_id=state["user_id"]))[:50], mode=getattr(self.repository,"mode","database"))
+        from app.features.matching.service import rank_candidates
+        from .schemas import Conditions
+        users = await self.repository.users(exclude_id=state["user_id"])
+        conditions = Conditions.model_validate(state["conditions"]).model_dump(mode="json", by_alias=True, exclude_none=True)
+        # Rank the complete candidate pool before bounding model-visible facts. A strong
+        # candidate after row 50 must not disappear only from the agent's results.
+        ranked = rank_candidates(conditions, users, state.get("requester"), top_k=50)
+        by_id = {user["id"]: user for user in users}
+        return observed("user_profiles", [by_id[item["user"]["id"]] for item in ranked], mode=getattr(self.repository,"mode","database"))
 
     async def get_weather(self, state):
         if self.settings.agent_weather_provider == "demo":

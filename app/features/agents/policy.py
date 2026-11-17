@@ -40,6 +40,15 @@ def parse_text(text: str) -> dict:
     party = re.search(r"([2-8])\s*명", text)
     if party:
         values["party_size"] = int(party[1])
+    age = re.search(r"(?<!\d)(10|20|30|40|50)\s*대(?!\d)", text)
+    if age:
+        values["age_band"] = age[1] + "대"
+    if re.search(r"성별\s*(?:상관\s*없|무관|관계\s*없)", text):
+        values["gender_preference"] = "any"
+    elif re.search(r"동성\s*(?:만|끼리)|같은\s*성별\s*만", text):
+        values["gender_preference"] = "only_same"
+    elif re.search(r"동성\s*선호|같은\s*성별\s*선호", text):
+        values["gender_preference"] = "same"
     if "실내" in text:
         values["indoor_only"] = True
     if "야외도" in text or "실내만 아니어도" in text:
@@ -102,7 +111,7 @@ def _validate_plan(candidate: dict | None, conditions: dict, results: dict, inte
                 user = known.get(item.get("user",{}).get("id"))
                 if not user:
                     errors.append(error("UNGROUNDED_CANDIDATE","도구 결과에 없는 사용자입니다."))
-                elif conditions.get("start_time") and (not user.get("profile",{}).get("availableFrom") or user["profile"]["availableFrom"] > conditions["start_time"]):
+                elif conditions.get("start_time") and user.get("profile",{}).get("availableFrom") and user["profile"]["availableFrom"] > conditions["start_time"]:
                     errors.append(error("TIME_CONFLICT","후보자의 시작 가능 시간이 맞지 않습니다."))
         else:
             known = {row["id"] for row in results.get("search_festivals",{}).get("data",[])}

@@ -92,6 +92,13 @@ def _part(score: float, maximum: int) -> dict[str, Any]:
     return {"score": max(0, min(maximum, round(score))), "max": maximum}
 
 
+def profile_coverage(parts: dict) -> float:
+    """Reconstruct coverage from the persisted score parts as well as fresh results."""
+    available = sum(part["max"] for part in parts.values())
+    requested = available + sum(part.get("requested", 0) for part in parts.values())
+    return round(available / requested, 2) if requested else 0.0
+
+
 def score_candidate(conditions: dict, user: dict, requester: dict | None = None) -> dict:
     """Score one active user. `requester` is the user asking for matches (for age band / gender)."""
     profile = user.get("profile") or {}
@@ -187,8 +194,7 @@ def score_candidate(conditions: dict, user: dict, requester: dict | None = None)
     total_max = sum(part["max"] for part in parts.values())
     score = round(sum(part["score"] for part in parts.values()) / total_max * 100) if total_max else 0
     # 요청한 조건 가중치 중 후보 정보가 있는 비율 (MBTI 비공개는 감점·부족으로 보지 않음)
-    requested = total_max + sum(part.get("requested", 0) for part in parts.values())
-    coverage = round(total_max / requested, 2) if requested else 0.0
+    coverage = profile_coverage(parts)
     return {
         "user": {"id": user["id"], "displayName": user["displayName"], "avatarUrl": user.get("avatarUrl")},
         "score": score,
@@ -200,7 +206,13 @@ def score_candidate(conditions: dict, user: dict, requester: dict | None = None)
 
 def rank_candidates(conditions: dict, users: list[dict], requester: dict | None = None, *,
                     top_k: int = 5, threshold: int = MATCH_THRESHOLD) -> list[dict]:
-    """필수 조건(동성만)으로 거른 뒤 점수를 매기고, 기준점 이상만 높은 순으로 돌려준다."""
+    """시작 시각·동성만 조건으로 거른 뒤 기준점 이상 후보를 높은 순으로 돌려준다."""
+    # Known late arrivals cannot satisfy the requested start time. Missing times remain
+    # explicitly unknown and are handled by profile coverage, as in the current PR policy.
+    start_time = conditions.get("startTime")
+    if start_time:
+        users = [user for user in users if not (user.get("profile") or {}).get("availableFrom")
+                 or user["profile"]["availableFrom"] <= start_time]
     if (conditions.get("genderPreference") or "any") == "only_same":
         my_gender = ((requester or {}).get("profile") or {}).get("gender")
         if not my_gender:
