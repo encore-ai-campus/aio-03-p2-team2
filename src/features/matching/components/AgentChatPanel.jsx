@@ -76,7 +76,7 @@ const ERROR_TEXT = {
   AUTH_USER_NOT_LINKED: "로그인 계정이 앱 사용자와 연결되지 않았어요. 다시 로그인해 주세요.",
 };
 
-export default function AgentChatPanel({ festivals, festivalId, selectedDate, onPickFestival, onResult, pill }) {
+export default function AgentChatPanel({ onEditConditions, festivals, festivalId, selectedDate, onPickFestival, onResult, pill }) {
   const [messages, setMessages] = useState([]);
   const [run, setRun] = useState(null); // 마지막 에이전트 응답
   const [busy, setBusy] = useState(false);
@@ -196,7 +196,7 @@ export default function AgentChatPanel({ festivals, festivalId, selectedDate, on
 
   const botRow = (inner, key) => (
     <div className="ai-row bot" key={key}>
-      <span className="ai-ava">🤖</span>
+      <span className="ai-ava"><img src="/brand/festamate_icon.png" alt="" /></span>
       <div className="ai-col">{inner}</div>
     </div>
   );
@@ -206,7 +206,7 @@ export default function AgentChatPanel({ festivals, festivalId, selectedDate, on
     res?.trace?.length ? (
       <details className="ai-dev">
         <summary>
-          🔧 에이전트 실행 과정 · 단계 {res.trace.length}개 · 도구 호출 {res.toolCalls?.length || 0}회 · 수정 {res.iteration}회
+          <i className="ti ti-tool" aria-hidden="true" /> 에이전트 실행 과정 · 단계 {res.trace.length}개 · 도구 호출 {res.toolCalls?.length || 0}회 · 수정 {res.iteration}회
         </summary>
         <pre>
           {res.trace
@@ -308,9 +308,9 @@ export default function AgentChatPanel({ festivals, festivalId, selectedDate, on
           {/* 후보 목록·모집글 만들기는 오른쪽 「추천 동행 후보」 패널 한 곳에서만 보여준다 (중복 방지) */}
           <div className="ai-bubble">
             {m.items.length
-              ? `동행 후보 ${m.items.length}명을 찾았어요! 🎉\n오른쪽 ‘추천 동행 후보’에서 확인하고 모집글을 만들어 보세요.`
+              ? `같은 시간에 함께할 수 있는 동행 ${m.items.length}명을 찾았어요 🎉\n오른쪽에서 확인하고 모집글을 만들어 보세요.`
               : "조건에 맞는 동행 후보가 아직 없어요. 조건을 바꿔 다시 말해 주세요."}
-            {cond.length > 0 && `\n\n📋 ${cond.join(" · ")}`}
+
           </div>
           {traceBox(m.run)}
         </>,
@@ -327,38 +327,60 @@ export default function AgentChatPanel({ festivals, festivalId, selectedDate, on
   }
 
   const hasMessages = messages.length > 0;
+  // 마지막 매칭 결과의 조건 → 「확인한 조건」 한 줄 (대화창 아래 고정)
+  const lastResult = [...messages].reverse().find((m) => m.type === "result");
+  const confirmed = (() => {
+    if (!lastResult) return "";
+    const raw = lastResult.run.conditions || {};
+    const d = raw.date;
+    const t = raw.start_time ?? raw.startTime;
+    const p = raw.party_size ?? raw.partySize;
+    const b = raw.budget_manwon ?? raw.budgetManwon;
+    return [
+      festival(festivalId)?.name,
+      d && dayLabel(d),
+      t && t + " 시작",
+      p && p + "명",
+      b && b + "만원",
+      raw.interests?.length && raw.interests.join("·"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  })();
   return (
     <section className={`ai-inline ${hasMessages ? "active" : ""}`} aria-label="AI 매칭 도우미">
       <header className="ai-head">
-        <span className="ai-ava">🤖</span>
+        <span className="ai-ava"><img src="/brand/festamate_icon.png" alt="" /></span>
         <div>
-          <strong>AI 매칭 도우미</strong>
-          <small>원하는 동행을 말하면 에이전트가 빠진 조건을 되묻고 후보를 찾아요</small>
+          <strong>동행 찾기 챗봇</strong>
+          <small>원하는 조건을 말하면, 빠진 건 다시 물어보고 동행을 찾아 드려요</small>
         </div>
         <div className="ai-tools">
           {pill ? pill("🟢 실제 에이전트", "green") : null}
           {hasMessages && (
             <button type="button" title="대화 초기화" onClick={reset}>
-              ↺ 새 대화
+              <i className="ti ti-refresh" aria-hidden="true" /> 새 대화
             </button>
           )}
         </div>
       </header>
       <div className="ai-msgs" ref={msgsRef} aria-live="polite">
-        {!hasMessages && (
-          <div className="ai-welcome">
-            <div className="ai-welcome-ex">
-              <span className="ai-quick-label">
-                💡 {festival(festivalId) ? `‘${festival(festivalId).name}’ 기준으로 찾아요 · ` : ""}예시를 누르면 바로 보내져요
-              </span>
-              {examplesFor(festival(festivalId)).map((x) => (
-                <Button key={x} className="ai-chip" onClick={() => send(x)}>
-                  {x}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
+        {!hasMessages &&
+          botRow(
+            <>
+              <div className="ai-bubble">
+                {`안녕하세요! 👋 ${festival(festivalId) ? `‘${festival(festivalId).name}’에 함께 갈 동행을 찾아 드릴게요.` : "어떤 축제에 함께 갈 동행을 찾고 계세요?"}\n원하는 조건을 편하게 말하거나, 아래 예시를 눌러 보세요.`}
+              </div>
+              <div className="ai-quick ai-examples">
+                {examplesFor(festival(festivalId)).map((x) => (
+                  <Button key={x} className="ai-chip" onClick={() => send(x)}>
+                    {x}
+                  </Button>
+                ))}
+              </div>
+            </>,
+            "welcome",
+          )}
         {messages.map(message)}
         {busy &&
           botRow(
@@ -371,6 +393,19 @@ export default function AgentChatPanel({ festivals, festivalId, selectedDate, on
             "typing",
           )}
       </div>
+      {confirmed && (
+        <div className="ai-confirm">
+          <div>
+            <b>확인한 조건</b>
+            <span>{confirmed}</span>
+          </div>
+          {onEditConditions && (
+            <button type="button" onClick={onEditConditions}>
+              수정 <i className="ti ti-chevron-right" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
       <form
         className="ai-compose"
         onSubmit={(e) => {
@@ -396,11 +431,11 @@ export default function AgentChatPanel({ festivals, festivalId, selectedDate, on
             }}
           />
           <button className="ai-send" type="submit" aria-label="보내기" disabled={!text.trim() || busy}>
-            ➤
+            <i className="ti ti-send" aria-hidden="true" />
           </button>
         </div>
         <div className="ai-foot">
-          <span>축제·날짜·시작 시간·인원·예산·관심사를 자유롭게 · Shift+Enter 줄바꿈</span>
+          <span>Enter 보내기 · Shift+Enter 줄바꿈</span>
           <span>{text.length}/300</span>
         </div>
       </form>

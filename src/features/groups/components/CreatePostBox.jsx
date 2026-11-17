@@ -11,7 +11,7 @@ const ERROR_TEXT = {
   MATCHING_EMPTY: "추천 후보가 없어서 모집글을 만들 수 없어요. 조건을 바꿔 주세요.",
 };
 
-export default function CreatePostBox({ festival, partySize, joinMode = "approval", summary, runId, date, startTime }) {
+export default function CreatePostBox({ cta = false, festival, partySize, joinMode = "approval", summary, runId, date, startTime }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -34,8 +34,14 @@ export default function CreatePostBox({ festival, partySize, joinMode = "approva
   if (!festival) return null;
   if (!open)
     return (
-      <button type="button" className="btn small primary" onClick={() => setOpen(true)}>
-        ✍️ 이 조건으로 모집글 만들기
+      <button type="button" className={cta ? "btn primary block cta-btn" : "btn small primary"} onClick={() => setOpen(true)}>
+        {cta ? (
+          <>
+            모집글 만들기 <i className="ti ti-arrow-right" aria-hidden="true" />
+          </>
+        ) : (
+          "✍️ 이 조건으로 모집글 만들기"
+        )}
       </button>
     );
 

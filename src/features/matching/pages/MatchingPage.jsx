@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { useDemo } from "../../../app/DemoProvider.jsx";
 import AiChatPanel from "../components/AiChatPanel.jsx";
@@ -10,6 +11,13 @@ import { conditionKey, useMatchingRun } from "../hooks/useMatchingRun.js";
 import CreatePostBox from "../../groups/components/CreatePostBox.jsx";
 
 const INTERESTS = ["미식", "사진", "산책", "음악", "문화", "전통", "자연", "카페", "액티비티"];
+// 온보딩과 같은 이모지로 통일
+const INTEREST_EMOJI = { 미식: "🍜", 사진: "📸", 산책: "🚶", 음악: "🎵", 문화: "🎨", 전통: "🏮", 자연: "🌳", 카페: "☕", 액티비티: "🎢" };
+const STYLE_EMOJI = { 여유롭게: "🌿", 활동적으로: "⚡", 계획적으로: "📋" };
+const JOIN_OPTIONS = [
+  ["approval", "✋ 승인 후 참여"],
+  ["instant", "🚀 바로 참여"],
+];
 const MBTIS = [
   "ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP",
   "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ",
@@ -38,6 +46,8 @@ export default function MatchingPage() {
   const [formMsg, setFormMsg] = useState("");
   // 오른쪽 패널 결과: 챗봇(에이전트) 결과가 있으면 우선, 없으면 직접 조건 매칭 결과
   const [agentRun, setAgentRun] = useState(null);
+  // 실서버 모드: 왼쪽 카드 탭 (챗봇으로 찾기 / 직접 설정하기)
+  const [tab, setTab] = useState("chat");
   const directResult = useApi && run.key === conditionKey(state.festivalId, pr) ? run : null;
   const apiResult = useApi ? agentRun || directResult : null;
   const showDemoResult = !useApi && state.matchingDone;
@@ -129,28 +139,254 @@ export default function MatchingPage() {
       s.formOpen = open;
     });
 
+  // 직접 조건 설정 폼 (실서버: 「직접 설정하기」 탭 / 데모: 접는 상자)
+  const formBody = (
+        <div className="form-body form-v3">
+          <div className="form-group-title">필수 조건</div>
+          <div className="form-req">
+            <div className="field">
+              <label htmlFor="match-festival">참여할 축제</label>
+              <select id="match-festival" {...fieldProps("match-festival")}>
+                <option value="">축제 선택</option>
+                {all.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} · {dateShort(x.start)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="match-date">참여 날짜</label>
+              <input
+                id="match-date"
+                type="date"
+                min={chosen?.start}
+                max={chosen?.end}
+                value={pr.date || ""}
+                onChange={(e) =>
+                  mutate((s) => {
+                    s.profile.date = e.target.value;
+                  })
+                }
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="match-start">합류 가능 시각</label>
+              <input id="match-start" type="time" {...fieldProps("match-start")} />
+            </div>
+            <div className="field">
+              <label htmlFor="match-cap">모임 정원</label>
+              <select id="match-cap" {...fieldProps("match-cap")}>
+                <option value="">선택</option>
+                {[2, 3, 4, 5, 6, 7, 8].map((x) => (
+                  <option key={x} value={x}>
+                    {x}명
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* 매칭 실행: 필수 조건 바로 아래 (선택 조건을 펼치지 않아도 바로 실행) */}
+          <div className="form-run">
+            <details className="fold score-info">
+              <summary>
+                <i className="ti ti-info-circle" aria-hidden="true" /> 점수 계산 방식
+              </summary>
+              <div className="score-grid">
+                <span>일정 25%</span>
+                <span>관심사 20%</span>
+                <span>예산 20%</span>
+                <span>여행 스타일 15%</span>
+                <span>MBTI 10%</span>
+                <span>희망 인원 10%</span>
+              </div>
+              <p>선택 조건을 비워 두면 그 항목은 빼고, 나머지로 100점 기준을 다시 계산해요.</p>
+            </details>
+            {useApi ? (
+              <button type="button" className="btn primary" disabled={run.status === "loading"} onClick={runApiMatch}>
+                {run.status === "loading" ? "매칭 중…" : "이 조건으로 매칭하기"}
+              </button>
+            ) : (
+              btn("이 조건으로 매칭하기", "runMatch", "btn primary")
+            )}
+            {!useApi && <span className={sourceClass}>{sourceText}</span>}
+            {formMsg && <p className="run-hint" role="alert"><strong>{formMsg}</strong></p>}
+            {!useApi && (
+              <p className="run-hint">
+                챗봇에서 말한 조건도 여기에 반영돼요. 실행하면 공개 모집글과 모임방이 자동으로 만들어지고, 추천된 사람이 자동으로 참여하지는 않아요.
+              </p>
+            )}
+          </div>
+
+          {/* 선택 조건: 기본 접힘 · 한 줄에 한 항목(왼쪽 소제목 / 오른쪽 선택) */}
+          <details className="opt-fold">
+            <summary>
+              <span className="opt-title">
+                <i className="ti ti-help-circle" aria-hidden="true" /> 더 잘 맞는 동행을 찾으려면 <em>(선택)</em>
+              </span>
+              <span className="opt-sum">
+                {[pr.style, pr.budget && `${pr.budget}만원`, pr.interests.length && pr.interests.join(", "), pr.mbti.length && pr.mbti.join("/")]
+                  .filter(Boolean)
+                  .join(" · ") || "비워 두면 점수에서 빠져요"}
+              </span>
+              <i className="ti ti-chevron-down chev" aria-hidden="true" />
+            </summary>
+            <div className="opt-rows">
+              <div className="opt-row">
+                <span className="opt-label">여행 스타일</span>
+                <div className="seg seg-3" role="group" aria-label="여행 스타일">
+                  {["여유롭게", "활동적으로", "계획적으로"].map((x) => (
+                    <button
+                      key={x}
+                      type="button"
+                      className={pr.style === x ? "on" : ""}
+                      aria-pressed={pr.style === x}
+                      onClick={() =>
+                        mutate((s) => {
+                          s.profile.style = s.profile.style === x ? "" : x;
+                        })
+                      }
+                    >
+                      {STYLE_EMOJI[x]} {x}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="opt-row">
+                <label className="opt-label" htmlFor="match-budget">여행 예산</label>
+                {/* 직접 입력 — 온보딩·챗봇에서 정한 값이 있으면 미리 채워진다(위 채우기 로직) */}
+                <div className="budget-field">
+                  <div className="budget-input">
+                    <input
+                      id="match-budget"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={100}
+                      step={1}
+                      placeholder="예) 8"
+                      value={pr.budget || ""}
+                      onChange={(e) => {
+                        const n = e.target.value.replace(/[^0-9]/g, "");
+                        const v = n === "" ? "" : String(Math.min(100, Math.max(1, Number(n))));
+                        mutate((s) => {
+                          s.profile.budget = v;
+                        });
+                      }}
+                    />
+                    <span>만 원</span>
+                  </div>
+                  <small>1인 기준 · 예) 5, 10, 15 · 비워 두면 예산은 보지 않아요</small>
+                </div>
+              </div>
+              <div className="opt-row">
+                <span className="opt-label">
+                  관심사 <small>여러 개</small>
+                </span>
+                <div className="grid-chips g5">
+                  {INTERESTS.map((x) => (
+                    <Fragment key={x}>
+                      {btn(`${INTEREST_EMOJI[x]} ${x}`, `interest:${x}`, `chip ${pr.interests.includes(x) ? "active" : ""}`)}
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+              <div className="opt-row">
+                <span className="opt-label">
+                  선호 MBTI <small>여러 개</small>
+                </span>
+                <div className="grid-chips g8">
+                  {MBTIS.map((x) => (
+                    <Fragment key={x}>
+                      {btn(x, `mbti:${x}`, `chip ${pr.mbti.includes(x) ? "active" : ""}`)}
+                    </Fragment>
+                  ))}
+                </div>
+              </div>
+              <div className="opt-row">
+                <span className="opt-label">참여 방식</span>
+                <div className="seg seg-2" role="group" aria-label="참여 방식">
+                  {JOIN_OPTIONS.map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      className={(pr.joinMode || "approval") === v ? "on" : ""}
+                      aria-pressed={(pr.joinMode || "approval") === v}
+                      onClick={() =>
+                        mutate((s) => {
+                          s.profile.joinMode = v;
+                        })
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+  );
+
   return (
     <>
-      {pageHead(
-        "AI TRAVEL MATCHING",
-        "💞 AI 동행 매칭",
-        "가고 싶은 축제와 원하는 동행을 말로 적으면 AI가 조건을 정리해 추천하고, 공개 모집글과 모임방을 만들어요.",
+      {/* 실서버 모드: v3 머리글 — 제목·설명 왼쪽, 진행 단계 오른쪽 (실제 진행한 단계까지만 ✓) */}
+      {useApi ? (
+        <div className="mp-head">
+          <div>
+            <h1>AI 동행 매칭</h1>
+            <p>방문 시간과 취향을 바탕으로 잘 맞는 동행을 추천해 드려요 🙌</p>
+          </div>
+          <ol className="mp-steps" aria-label="매칭 진행 단계">
+            {["조건 확인", "동행 추천", "모집글 작성", "신청·승인"].map((x, i) => {
+              const doneCount = apiResult?.status === "done" ? 2 : agentRun ? 1 : 0;
+              const cls = i < doneCount ? "done" : i === doneCount ? "cur" : "";
+              return (
+                <li key={x} className={cls}>
+                  {i < doneCount ? <i className="ti ti-circle-check" aria-hidden="true" /> : <span>{String(i + 1).padStart(2, "0")}</span>}
+                  {x}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ) : (
+        pageHead(
+          "AI TRAVEL MATCHING",
+          "💞 AI 동행 매칭",
+          "가고 싶은 축제와 원하는 동행을 말로 적으면 AI가 조건을 정리해 추천하고, 공개 모집글과 모임방을 만들어요.",
+        )
       )}
 
-      {/* 실서버 모드: 실제 진행한 단계까지만 ✓ (후보 추천까지 = 2단계, 모집글·신청은 다음 화면) */}
-      {useApi ? (
-        <ol className="workflow" aria-label="매칭 진행 단계">
-          {["조건 말하기", "AI 후보 추천", "모집글 만들기", "참여 신청·승인"].map((x, i) => {
-            const done = apiResult?.status === "done" && i < 2;
-            return (
-              <li className="step" key={x}>
-                <b style={done ? { background: "var(--coral)", color: "#fff" } : undefined}>{done ? "✓" : i + 1}</b>
-                {x}
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
+      {/* 실서버 모드: 지금 고른 축제 카드 */}
+      {useApi && chosen && (
+        <div className="fest-ctx">
+          <div className="fest-ctx-thumb">
+            {chosen.imageUrl ? <img src={chosen.imageUrl} alt="" /> : <span className="fest-ctx-emoji">{chosen.emoji || "🎪"}</span>}
+          </div>
+          <div className="fest-ctx-name">
+            <h3>{chosen.name}</h3>
+            <span>
+              {[chosen.region, chosen.city].filter(Boolean).join(" ")}
+              {chosen.start ? ` · ${chosen.start.slice(5).replace("-", ".")} – ${(chosen.end || chosen.start).slice(5).replace("-", ".")}` : ""}
+            </span>
+            <small className="fest-ctx-src">
+              <i className="ti ti-circle-check" aria-hidden="true" /> 축제 정보 · 실시간 조회
+            </small>
+          </div>
+          <div className="fest-ctx-visit">
+            <small>방문 예정</small>
+            <b>{pr.date ? `${dayLabel(pr.date)}${pr.start ? ` · ${pr.start}` : ""}` : "아직 정하지 않았어요"}</b>
+          </div>
+          <Link to="/festivals" className="fest-ctx-change">
+            축제 변경 <i className="ti ti-chevron-right" aria-hidden="true" />
+          </Link>
+        </div>
+      )}
+
+      {/* 데모 모드 진행 단계 (기존) */}
+      {useApi ? null : (
       <ol className={`workflow ${showDemoResult ? "done" : ""}`} aria-label="매칭 진행 단계">
         {["조건 말하기", "AI 점수 계산", "모임방 생성", "모집글 등록"].map((x, i) => (
           <li className="step" key={x}>
@@ -161,15 +397,27 @@ export default function MatchingPage() {
       </ol>
       )}
 
-      <div className="match-layout">
+      <div className={`match-layout${useApi ? " live" : ""}`}>
       <div className="match-main">
       {useApi ? (
+        <div className="mtabs-card">
+          <div className="mtabs" role="tablist" aria-label="동행 찾는 방법">
+            <button type="button" role="tab" aria-selected={tab === "chat"} className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>
+              <i className="ti ti-message-chatbot" aria-hidden="true" /> 챗봇으로 찾기
+            </button>
+            <button type="button" role="tab" aria-selected={tab === "form"} className={tab === "form" ? "on" : ""} onClick={() => setTab("form")}>
+              <i className="ti ti-adjustments-horizontal" aria-hidden="true" /> 직접 설정하기
+            </button>
+          </div>
+          {/* 탭을 바꿔도 대화가 사라지지 않도록 챗봇은 숨기기만 한다 */}
+          <div hidden={tab !== "chat"}>
         <AgentChatPanel
           festivals={all}
           festivalId={state.festivalId}
           selectedDate={chosen && pr.date >= chosen.start && pr.date <= chosen.end ? pr.date : undefined}
           pill={pill}
           onResult={setAgentRun}
+          onEditConditions={() => setTab("form")}
           onPickFestival={(id) =>
             mutate((s) => {
               s.festivalId = id;
@@ -177,10 +425,16 @@ export default function MatchingPage() {
             })
           }
         />
+          </div>
+          <div className="tab-form" hidden={tab !== "form"}>
+            {formBody}
+          </div>
+        </div>
       ) : (
         <AiChatPanel />
       )}
 
+      {!useApi && (
       <details
         className="box match-form form-fold"
         open={!!state.formOpen}
@@ -191,146 +445,23 @@ export default function MatchingPage() {
       >
         <summary>
           <span className="form-fold-title">직접 조건 설정</span>
-          <span className="form-fold-sum">{foldSummary}</span>
-          <span className="form-fold-cta">{state.formOpen ? "접기" : "수정"}</span>
+          <span className="form-fold-sum">
+            {useApi
+              ? [pr.date && dayLabel(pr.date), pr.start && pr.start + " 시작", pr.party && pr.party + "명"].filter(Boolean).join(" · ") || "아직 설정한 조건이 없어요"
+              : foldSummary}
+          </span>
+          <span className="form-fold-cta">
+            {state.formOpen ? "접기" : "수정"} <i className="ti ti-chevron-down chev" aria-hidden="true" />
+          </span>
         </summary>
-        <div className="form-body">
-          <div className="field">
-            <label htmlFor="match-festival">참여할 축제 *</label>
-            <select id="match-festival" {...fieldProps("match-festival")}>
-              <option value="">축제 선택</option>
-              {all.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name} · {dateShort(x.start)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="match-date">참여 날짜</label>
-            <input
-              id="match-date"
-              type="date"
-              min={chosen?.start}
-              max={chosen?.end}
-              value={pr.date || ""}
-              onChange={(e) =>
-                mutate((s) => {
-                  s.profile.date = e.target.value;
-                })
-              }
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="match-style">여행 스타일</label>
-            <select id="match-style" {...fieldProps("match-style")}>
-              <option value="">상관없음</option>
-              {["여유롭게", "활동적으로", "계획적으로"].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="match-start">참여 가능 시작 *</label>
-            <input id="match-start" type="time" {...fieldProps("match-start")} />
-          </div>
-          <div className="field">
-            <label htmlFor="match-budget">여행 예산 (만원)</label>
-            <select id="match-budget" {...fieldProps("match-budget")}>
-              <option value="">상관없음</option>
-              {[3, 5, 7, 8, 10, 12, 15, 20].map((v) => (
-                <option key={v} value={v}>
-                  {v}만원
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="match-cap">희망 모임 정원 *</label>
-            <select id="match-cap" {...fieldProps("match-cap")}>
-              <option value="">선택</option>
-              {[2, 3, 4, 5, 6, 7, 8].map((x) => (
-                <option key={x} value={x}>
-                  {x}명
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="match-joinmode">채팅방 입장 방식</label>
-            <select id="match-joinmode" {...fieldProps("match-joinmode")}>
-              <option value="approval">모임장 승인제</option>
-              <option value="instant">즉시 참여제</option>
-            </select>
-          </div>
-          <div className="field span-2">
-            <label>관심사 · 복수 선택</label>
-            <div className="chips">
-              {INTERESTS.map((x) => (
-                <Fragment key={x}>
-                  {btn(x, `interest:${x}`, `chip ${pr.interests.includes(x) ? "active" : ""}`)}
-                </Fragment>
-              ))}
-            </div>
-          </div>
-          <details
-            className="field fold span-2"
-            open={!!state.mbtiOpen}
-            onToggle={(e) => {
-              const open = e.currentTarget.open;
-              if (open !== !!state.mbtiOpen)
-                mutate((s) => {
-                  s.mbtiOpen = open;
-                });
-            }}
-          >
-            <summary>
-              선호 MBTI{" "}
-              <span className="muted" style={{ fontWeight: 650 }}>
-                (선택) · {pr.mbti.length ? pr.mbti.join(", ") : "상관없음"}
-              </span>
-            </summary>
-            <div className="chips" style={{ marginTop: "10px" }}>
-              {MBTIS.map((x) => (
-                <Fragment key={x}>
-                  {btn(x, `mbti:${x}`, `chip ${pr.mbti.includes(x) ? "active" : ""}`)}
-                </Fragment>
-              ))}
-            </div>
-            <div className="hint">
-              선택하지 않아도 돼요. 미선택 시 MBTI 10%를 제외한 90% 가중치를 100점 기준으로 환산해요.
-            </div>
-          </details>
-          <div className="note span-2">
-            <strong>* 필수</strong> · 축제·시작 시간·희망 인원이 있어야 매칭해요. 선택 조건(예산·관심사·여행
-            스타일·MBTI)을 비워 두면 그 항목은 점수에서 빼고 100점 기준으로 환산해요.
-            <br />
-            <strong>매칭 가중치</strong> · 일정 25% · 관심사 20% · 예산 20% · 여행 스타일 15% · MBTI 10% ·
-            희망 동행 인원 10%
-          </div>
-          <div className="span-2 form-run">
-            {useApi ? (
-              <button type="button" className="btn primary" disabled={run.status === "loading"} onClick={runApiMatch}>
-                {run.status === "loading" ? "매칭 중…" : "이 조건으로 매칭하기"}
-              </button>
-            ) : (
-              btn("이 조건으로 매칭하기", "runMatch", "btn primary")
-            )}
-            <span className={sourceClass} style={{ marginLeft: "8px" }}>{sourceText}</span>
-            {formMsg && <p className="run-hint" role="alert"><strong>{formMsg}</strong></p>}
-            <p className="run-hint">
-              {useApi
-                ? "실제 서버에서 추천 점수를 계산해요. 모집글·모임방 생성은 다음 단계에서 연결돼요."
-                : "챗봇에서 말한 조건도 여기에 반영돼요. 실행하면 공개 모집글과 모임방이 자동으로 만들어지고, 추천된 사람이 자동으로 참여하지는 않아요."}
-            </p>
-          </div>
-        </div>
+        {formBody}
       </details>
+      )}
       </div>
 
       <section className="box pad match-results">
         {apiResult ? (
-          <ApiResults run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} pill={pill} />
+          <ApiResults run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} pill={pill} joinLabel={AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]} />
         ) : showDemoResult ? (
           <>
           {matchingGroup && (
@@ -389,17 +520,31 @@ export default function MatchingPage() {
           </div>
           </>
         ) : (
-          <>
-            <div className="section-head" style={{ marginTop: 0 }}>
-              <h2>추천 동행 후보</h2>
-              {pill("매칭 대기", "blue")}
+          <div className="match-idle">
+            <div className="cand-head">
+              <h2>추천 동행</h2>
             </div>
-            <div className="empty match-empty">
-              <div className="big">💖</div>
-              <h3>나와 잘 맞는 여행 동행을 찾아보세요</h3>
-              <p>왼쪽 AI 매칭 도우미에 가고 싶은 축제와 원하는 동행을 말해 주세요. 매칭하면 추천 후보가 여기에 표시돼요.</p>
-            </div>
-          </>
+            <p className="cand-sub">챗봇 대화나 설정이 끝나면 잘 맞는 동행이 여기에 나타나요.</p>
+            <ol className="how-steps path">
+              {[
+                ["ti-message-circle", "조건 말하기", "가고 싶은 축제와 원하는 동행을 편하게 말해요"],
+                ["ti-help-circle", "빠진 조건 되묻기", "날짜·시간처럼 꼭 필요한 것만 AI가 다시 물어봐요"],
+                ["ti-users", "동행 추천", "합류 시간과 취향이 잘 맞는 순서로 보여 드려요"],
+              ].map(([icon, title, desc], i) => (
+                <li key={title} className={i === 0 ? "now" : ""}>
+                  <i className={`ti ${icon}`} aria-hidden="true" />
+                  <div>
+                    <small>
+                      STEP {i + 1}
+                      {i === 0 ? " · 지금" : ""}
+                    </small>
+                    <b>{title}</b>
+                    <span>{desc}</span>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
       </section>
       </div>
@@ -431,29 +576,30 @@ function ScoreWhy({ parts }) {
   );
 }
 
-// 실제 API 매칭 결과 (POST /matching/runs) — 데모 결과와 같은 카드 모양
-function ApiResults({ run, festival, profile, summary, pill }) {
-  const festivalName = festival?.name;
-  const head = (label, tone) => (
-    <div className="section-head" style={{ marginTop: 0 }}>
-      <h2>추천 동행 후보</h2>
-      {pill(label, tone)}
+// 실제 API 매칭 결과 — v3: 후보 목록(합류 시각·공통점) + 「이 조건으로 모집할까요?」 박스
+const REASON_ICON = (r) => (/합류|시/.test(r) ? "ti-clock" : /나이/.test(r) ? "ti-user" : /관심|취향/.test(r) ? "ti-heart" : /예산/.test(r) ? "ti-wallet" : /스타일/.test(r) ? "ti-walk" : "ti-check");
+function ApiResults({ run, festival, profile, summary, pill, joinLabel }) {
+  const head = (right) => (
+    <div className="cand-head">
+      <h2>
+        추천 동행 {right != null && <span>{right}</span>}
+      </h2>
     </div>
   );
   if (run.status === "loading")
     return (
       <>
-        {head("계산 중", "blue")}
+        {head()}
         <div className="empty match-empty">
           <div className="big">⏳</div>
-          <h3>추천 점수를 계산하고 있어요</h3>
+          <h3>잘 맞는 동행을 찾고 있어요</h3>
         </div>
       </>
     );
   if (run.status === "error")
     return (
       <>
-        {head("오류", "blue")}
+        {head()}
         <div className="note">
           <strong>매칭하지 못했어요</strong>
           <br />
@@ -462,23 +608,34 @@ function ApiResults({ run, festival, profile, summary, pill }) {
       </>
     );
   const candidates = run.result?.candidates || [];
+  const date = run.conditions?.date || profile.date;
+  const start = run.conditions?.startTime || profile.start;
+  const party = run.partySize || profile.party;
+  const dl = (iso) => {
+    const d = new Date(iso + "T00:00:00");
+    return `${d.getMonth() + 1}.${d.getDate()} ${"일월화수목금토"[d.getDay()]}`;
+  };
   return (
     <>
-      {head("가중치 적용 점수", "green")}
-      <p className="sm muted">
-        {festivalName || "선택한 축제"} 참가를 기준으로 계산한 <b>추천 점수</b>예요.
-      </p>
+      {head(`${candidates.length}명`)}
+      <p className="cand-sub">합류 시간과 관심사가 비슷한 순서예요.</p>
       {candidates.length ? (
-        <div className="result-grid">
+        <div className="cand-list">
           {candidates.map((o) => (
-            <div className="match-result" key={o.id}>
-              <span className="avatar">
-                {o.avatarUrl ? <img src={o.avatarUrl} alt="" width="100%" height="100%" style={{ borderRadius: "50%", objectFit: "cover" }} /> : (o.name || "?").slice(0, 1)}
+            <div className="cand" key={o.id}>
+              <span className="cand-ava">
+                {o.avatarUrl ? <img src={o.avatarUrl} alt="" /> : (o.name || "?").slice(0, 1)}
               </span>
-              <div>
-                <strong>{o.name}</strong>
-                {o.reasons.length > 0 && <div className="sm muted">{o.reasons.join(" · ")}</div>}
-                <ScoreWhy parts={o.parts} />
+              <div className="cand-body">
+                <div className="cand-top">
+                  <b>{o.name}</b>
+                  <span className="cand-pct">매칭 {o.score}%</span>
+                </div>
+                {o.reasons.map((r) => (
+                  <div className="cand-meta" key={r}>
+                    <i className={`ti ${REASON_ICON(r)}`} aria-hidden="true" /> {r}
+                  </div>
+                ))}
                 <details className="ratio-detail">
                   <summary>점수 상세 보기</summary>
                   <div className="ratio">
@@ -489,34 +646,39 @@ function ApiResults({ run, festival, profile, summary, pill }) {
                     ))}
                   </div>
                 </details>
-                <div className="score-bar">
-                  <div style={{ width: o.score + "%" }} />
-                </div>
-              </div>
-              <div className="score">
-                {o.score}
-                <small>%</small>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div className="empty">조건에 맞는 추천 후보가 아직 없어요.</div>
+        <div className="empty">조건에 맞는 동행이 아직 없어요. 조건을 바꿔 다시 찾아보세요.</div>
       )}
-      <div style={{ marginTop: "12px" }}>
-        <CreatePostBox
-          festival={festival}
-          runId={run.runId}
-          partySize={run.partySize || profile.party}
-          joinMode={recruitmentJoinMode(run.runId, profile.joinMode)}
-          summary={summary}
-          date={run.conditions?.date || profile.date}
-          startTime={run.conditions?.startTime || profile.start}
-        />
-      </div>
-      <div className="note" style={{ marginTop: "15px" }}>
-        추천 점수는 입력한 조건이 얼마나 겹치는지를 나타내요. 실제 만족도를 보장하지는 않아요.
-      </div>
+      {candidates.length > 0 && (
+        <div className="cta-box">
+          <h3>이 조건으로 동행을 모집할까요? ✍️</h3>
+          <p>확인한 조건을 바탕으로 모집글 초안을 만들어요.</p>
+          <dl>
+            <dt>방문 일정</dt>
+            <dd>{date ? `${dl(date)}${start ? ` · ${start}` : ""}` : "미정"}</dd>
+            <dt>모집 인원</dt>
+            <dd>
+              {party ? `나 포함 ${party}명` : "정원은 다음 단계에서 정해요"}
+              {joinLabel ? ` · ${joinLabel}` : ""}
+            </dd>
+          </dl>
+          <CreatePostBox
+            cta
+            festival={festival}
+            runId={run.runId}
+            partySize={party}
+            joinMode={recruitmentJoinMode(run.runId, profile.joinMode)}
+            summary={summary}
+            date={date}
+            startTime={start}
+          />
+          <div className="cta-foot">게시 전에 내용을 확인하고 수정할 수 있어요.</div>
+        </div>
+      )}
     </>
   );
 }

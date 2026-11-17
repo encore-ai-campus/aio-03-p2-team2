@@ -22,20 +22,49 @@ export default function CommunityPage() {
   if (!g) g = groups[0];
   return (
     <>
-      {pageHead(
-        "TRAVEL COMMUNITY",
-        "👥 동행 커뮤니티",
-        "AI 매칭 이후 생성된 공개 모집글을 최신순으로 확인하고 댓글·참여 신청을 진행하세요.",
-        btn("＋ 직접 모임 만들기", "newGroup", "btn primary"),
-      )}
-      <div className="note coral">
-        <b>안전한 참여 규칙</b>
-        {
-          " · 최초 게시글 작성자가 모임장이 돼요. 공개 댓글은 누구나, 채팅은 승인된 참여자만 이용해요. 정원 초과 시 자동 마감되지만 게시글은 삭제되지 않아요."
-        }
-      </div>
       {!apiFailed ? (
-        <LiveCommunity festivals={festivals} pill={pill} onFail={onFail} />
+        /* 실서버 모드: v3 머리글 + 안전 규칙 한 줄 */
+        <>
+          <div className="mp-head cm-head">
+            <div>
+              <h1>동행 커뮤니티</h1>
+              <p>AI 매칭으로 만들어진 모집글을 보고, 댓글을 남기거나 참여를 신청해요</p>
+            </div>
+            {btn("＋ 직접 모임 만들기", "newGroup", "btn cm-new")}
+          </div>
+          <ul className="cm-rules" aria-label="이용 규칙">
+            <li>
+              <i className="ti ti-crown" aria-hidden="true" /> 글쓴이가 모임장
+            </li>
+            <li>
+              <i className="ti ti-message-circle" aria-hidden="true" /> 댓글은 누구나
+            </li>
+            <li>
+              <i className="ti ti-lock" aria-hidden="true" /> 채팅은 승인된 참여자만
+            </li>
+            <li>
+              <i className="ti ti-users" aria-hidden="true" /> 정원이 차면 자동 마감
+            </li>
+          </ul>
+        </>
+      ) : (
+        <>
+          {pageHead(
+            "TRAVEL COMMUNITY",
+            "👥 동행 커뮤니티",
+            "AI 매칭 이후 생성된 공개 모집글을 최신순으로 확인하고 댓글·참여 신청을 진행하세요.",
+            btn("＋ 직접 모임 만들기", "newGroup", "btn primary"),
+          )}
+          <div className="note coral">
+            <b>안전한 참여 규칙</b>
+            {
+              " · 최초 게시글 작성자가 모임장이 돼요. 공개 댓글은 누구나, 채팅은 승인된 참여자만 이용해요. 정원 초과 시 자동 마감되지만 게시글은 삭제되지 않아요."
+            }
+          </div>
+        </>
+      )}
+      {!apiFailed ? (
+        <LiveCommunity festivals={festivals} onFail={onFail} />
       ) : (
       <>
       <div className="section-head">
