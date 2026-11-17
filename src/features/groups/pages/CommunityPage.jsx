@@ -12,6 +12,8 @@ export default function CommunityPage() {
   const { festivals } = useFestivals(state.festivals);
   const [apiFailed, setApiFailed] = useState(false);
   const [apiError, setApiError] = useState(false);
+  const [newOpen, setNewOpen] = useState(false); // 실서버 「＋ 직접 모임 만들기」 창
+  const closeNew = useCallback(() => setNewOpen(false), []);
   // 데모 모드일 때만 예시 화면으로, 아니면 「서버에 연결할 수 없어요」
   const onFail = useCallback(() => (DEMO_MODE ? setApiFailed(true) : setApiError(true)), []);
   const groups = [...state.groups]
@@ -34,7 +36,9 @@ export default function CommunityPage() {
               <h1>동행 커뮤니티</h1>
               <p>AI 매칭으로 만들어진 모집글을 보고, 댓글을 남기거나 참여를 신청해요</p>
             </div>
-            {btn("＋ 직접 모임 만들기", "newGroup", "btn cm-new")}
+            <button type="button" className="btn cm-new" onClick={() => setNewOpen(true)}>
+              ＋ 직접 모임 만들기
+            </button>
           </div>
           <ul className="cm-rules" aria-label="이용 규칙">
             <li>
@@ -70,7 +74,7 @@ export default function CommunityPage() {
       {apiError ? (
         <ApiError />
       ) : !apiFailed ? (
-        <LiveCommunity festivals={festivals} onFail={onFail} />
+        <LiveCommunity festivals={festivals} onFail={onFail} newOpen={newOpen} onCloseNew={closeNew} />
       ) : (
       <>
       <div className="section-head">
