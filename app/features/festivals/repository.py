@@ -101,12 +101,15 @@ class FestivalRepositoryMixin(RepositoryBase):
                     festival_id, data["name"], data["region"], data.get("city"), date.fromisoformat(data["startDate"]), date.fromisoformat(data["endDate"]),
                     data["category"], data.get("description", ""), data.get("tags", []), venue.get("name"), venue.get("address"), venue.get("latitude"), venue.get("longitude"), data.get("riskStatus", "normal"), source_updated_at,
                 )
-                await connection.execute("delete from festival_operating_hours where festival_id = $1", festival_id)
-                for item in data.get("operatingHours", []):
-                    await connection.execute(
-                        "insert into festival_operating_hours (festival_id, date, open_time, close_time, note) values ($1,$2,$3,$4,$5)",
-                        festival_id, date.fromisoformat(item["date"]), _time(item["open"]), _time(item["close"]), item.get("note"),
-                    )
+                # Missing/complex TourAPI hours must not erase previously confirmed hours.
+                # Legacy imports retain their explicit replacement behaviour.
+                if data.get("operatingHoursKnown", True):
+                    await connection.execute("delete from festival_operating_hours where festival_id = $1", festival_id)
+                    for item in data.get("operatingHours", []):
+                        await connection.execute(
+                            "insert into festival_operating_hours (festival_id, date, open_time, close_time, note) values ($1,$2,$3,$4,$5)",
+                            festival_id, date.fromisoformat(item["date"]), _time(item["open"]), _time(item["close"]), item.get("note"),
+                        )
         return await self.festival(festival_id)  # type: ignore[return-value]
 
     async def upsert_weather_forecast(self, festival_id: str, forecast: dict[str, Any]) -> None:
