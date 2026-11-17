@@ -40,12 +40,14 @@ class ExternalSyncWorker:
         if self.owns_http:
             await self.http.aclose()
 
-    async def run_once(self) -> bool:
-        await self.repository.requeue_stale_sync_jobs(self.settings.external_sync_lease_seconds)
+    async def run_once(self, *, job_id: str | None = None) -> bool:
+        if job_id is None:
+            await self.repository.requeue_stale_sync_jobs(self.settings.external_sync_lease_seconds)
         job = await self.repository.claim_next_sync_job(
             self.worker_id,
             lease_seconds=self.settings.external_sync_lease_seconds,
             max_attempts=self.settings.external_sync_max_attempts,
+            **({"job_id": job_id} if job_id is not None else {}),
         )
         if not job:
             return False
@@ -84,7 +86,9 @@ class ExternalSyncWorker:
 
     async def _run_job(self, job: dict[str, Any]) -> dict[str, Any]:
         kind = job.get("kind")
-        params = job.get("params") or {}
+        params = job.get("params")
+        if params is None:
+            params = {}
         if isinstance(params, (str, bytes, bytearray)):
             try:
                 params = json.loads(params)

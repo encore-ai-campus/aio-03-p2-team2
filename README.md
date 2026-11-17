@@ -202,3 +202,15 @@ TourAPI 수집에서 `includeDetails=true`이면 상세 `playtime`의 명확한 
 일별 상이·휴무 조건·여러 시간대·야간 등 복잡한 표현은 추정하지 않으며, 재수집 시 기존에
 확인된 운영시간은 유지합니다. 새 축제에 확정 운영시간이 없으면 기존 검증대로 추가 확인이 필요합니다.
 TourAPI 키를 설정하지 않은 환경에서도 기존 날씨 도구·가상 축제 테스트는 계속 사용할 수 있습니다.
+
+축제 수집 API의 `202`는 작업 등록만 의미합니다. 별도 터미널에서
+`uv run python -m app.sync_worker`를 실행해야 대기 작업이 처리됩니다.
+등록된 특정 작업만 한 번 처리하려면 아래 명령을 사용하세요.
+
+```powershell
+uv run python -m app.sync_worker --once --job-id job_등록된작업ID
+```
+
+전국 축제 수집 예시: `{"startDate":"2026-11-17","endDate":"2026-12-31","pageSize":10,"maxPages":1,"includeDetails":true}`.
+전국 조회에서는 `areaCode`, `sigunguCode`를 생략합니다. 지역 필터를 지정할 때에는 실제 숫자 코드 문자열을 사용하며,
+Swagger 예시값 `"string"`은 허용하지 않습니다. 작업 결과의 `status=succeeded`, `accepted`, `rejected`를 확인하세요.

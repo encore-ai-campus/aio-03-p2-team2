@@ -35,5 +35,5 @@ class FestivalSyncRequest(APIModel):
     page_size: int = Field(default=100, ge=1, le=1000)
     max_pages: int = Field(default=100, ge=1, le=100)
     include_details: bool = False
-    area_code: str | None = Field(default=None, min_length=1, max_length=10)
-    sigungu_code: str | None = Field(default=None, min_length=1, max_length=10)
+    area_code: str | None = Field(default=None, pattern=r"^\d{1,10}$", examples=["1"])
+    sigungu_code: str | None = Field(default=None, pattern=r"^\d{1,10}$", examples=["1"])
