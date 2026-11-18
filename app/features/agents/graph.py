@@ -240,7 +240,10 @@ class AgentNodes:
             "iteration": state["iteration"], "candidate": deepcopy(candidate),
             "errors": deepcopy(errors), "repair": deepcopy(state.get("repair", {})),
         }]
-        if intent == "scheduling" and any(item["code"] in {"WEATHER_TIME_CONFLICT", "TIME_CONFLICT"} for item in errors):
+        # 기본 일정 대체는 마지막 수단: 먼저 자가 성찰(reflect_and_repair)로 AI가 한 번 고쳐 보게 하고,
+        # 그래도 허용 시간대를 벗어날 때만(iteration >= 1) 검증된 기본 일정으로 대체한다.
+        if (intent == "scheduling" and state["iteration"] >= 1
+                and any(item["code"] in {"WEATHER_TIME_CONFLICT", "TIME_CONFLICT"} for item in errors)):
             window, _ = schedule_window(conditions, results)
             if window:
                 basic = rules_plan(conditions, results, window)

@@ -5,7 +5,24 @@ import math
 
 import httpx
 
-from .weather import meeting_window, SEVERE_CODES
+from .weather import DEFAULT_MEETING_MINUTES, meeting_window, SEVERE_CODES
+
+
+def _overlaps_meeting(festival: dict, day: str, conditions: dict) -> bool:
+    """대체 축제는 그 날 운영시간이 모임 시간과 겹칠 때만 추천한다.
+
+    겹치지 않으면(예: 모임 12:00~13:30, 축제 14:00 개장) 고른 뒤 새 일정을 만들 수 없다.
+    모임 시작 시각을 모르면 운영시간이 있는 축제는 모두 허용한다.
+    """
+    hours = next((row for row in festival.get("operatingHours") or [] if row.get("date") == day), None)
+    if not hours or not hours.get("open") or not hours.get("close"):
+        return False
+    start = conditions.get("start_time")
+    if not start:
+        return True
+    end = conditions.get("end_time") or (
+        datetime.fromisoformat(f"{day}T{start}") + timedelta(minutes=DEFAULT_MEETING_MINUTES)).strftime("%H:%M")
+    return hours["open"] < end and hours["close"] > start
 
 
 class ToolFailure(Exception):
@@ -138,7 +155,8 @@ class AgentTools:
         day = date.fromisoformat(state["conditions"]["date"])
         rows = await self.repository.festivals(start_date=day, end_date=day, status="available")
         current_id = state.get("festival_id")
-        alternatives = [festival for festival in rows if festival["id"] != current_id]
+        alternatives = [festival for festival in rows if festival["id"] != current_id
+                        and _overlaps_meeting(festival, day.isoformat(), state["conditions"])]
         return observed(
             "festival_repository",
             alternatives[:30],
