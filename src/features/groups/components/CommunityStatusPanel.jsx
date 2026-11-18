@@ -110,7 +110,8 @@ export default function CommunityStatusPanel({ g, me, isLeader, isMember, myPend
             pending.map((r) => (
               <div className="cm-request" key={r.id}>
                 <div>
-                  <strong>신청자 #{shortId(r.userId)}</strong>
+                  {/* 백엔드가 신청자 닉네임(user.displayName)을 함께 보낸다. 없을 때만 ID 일부로 표시 */}
+                  <strong>{r.user?.displayName || `신청자 #${shortId(r.userId)}`}</strong>
                   <small>
                     {r.message ? `“${r.message}” · ` : ""}
                     {fmt(r.createdAt)}
