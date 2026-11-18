@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, AsyncIterator
@@ -73,8 +74,11 @@ class JWTVerifier:
                 algorithms=[algorithm],
                 audience=self.settings.supabase_jwt_audience,
                 issuer=issuer,
-                options={"require": ["sub", "exp", "iat"]},
+                # 발급 시각(iat)은 아래에서 시계 차이를 허용해 직접 검사한다. 만료(exp)는 그대로 엄격하게.
+                options={"require": ["sub", "exp", "iat"], "verify_iat": False},
             )
+            if decoded["iat"] > time.time() + self.settings.supabase_jwt_leeway_seconds:
+                raise APIError(401, "AUTH_TOKEN_INVALID", "아직 유효하지 않은 Supabase Auth 토큰입니다.")
         except APIError:
             raise
         except (jwt.PyJWTError, ValueError, TypeError) as exc:

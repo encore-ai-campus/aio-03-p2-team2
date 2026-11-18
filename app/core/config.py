@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str | None = None
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_issuer: str | None = None
+    # 발급 시각(iat) 시계 차이 허용(초, 만료 exp 에는 적용 안 함). 0이면 방금 발급된 토큰이 시계가 조금만 느려도
+    # "아직 유효하지 않음(iat)"으로 거절돼 로그인 직후 401 → 자동 로그아웃이 생긴다.
+    supabase_jwt_leeway_seconds: int = 60
 
 
 @lru_cache
