@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { listAlerts } from "../api/alertsApi.js";
+import { isVisibleAlert, needsWeatherResponse } from "../lib/alertStatus.js";
 import "../notificationDropdown.css";
 
 const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
@@ -20,14 +21,14 @@ export default function NotificationDropdown({ userId, hidden = false }) {
   const [open, setOpen] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [result, setResult] = useState({ status: "loading", items: [] });
-  const pending = result.items.filter((item) => !item.choice).length;
+  const pending = result.items.filter(needsWeatherResponse).length;
 
   // 기존 벨과 동일하게 화면 이동 시 갱신하고, 미리보기를 열 때도 최신 상태를 확인한다.
   useEffect(() => {
     let alive = true;
     setResult((previous) => ({ ...previous, status: "loading" }));
     listAlerts()
-      .then((items) => { if (alive) setResult({ status: "ready", items }); })
+      .then((items) => { if (alive) setResult({ status: "ready", items: items.filter(isVisibleAlert) }); })
       .catch(() => { if (alive) setResult({ status: "error", items: [] }); });
     return () => { alive = false; };
   }, [location.pathname, userId, refresh]);
@@ -98,7 +99,7 @@ export default function NotificationDropdown({ userId, hidden = false }) {
                 {result.items.slice(0, 5).map((item) => (
                   <li key={item.id} className="al-preview-item">
                     <div className="al-preview-meta">
-                      <span>{item.choice ? "응답 완료" : "응답 대기"}</span>
+                      <span>{needsWeatherResponse(item) ? "응답 대기" : item.type === "rain" ? "응답 완료" : "안내"}</span>
                       {alertTime(item.createdAt) && <time dateTime={item.createdAt}>{alertTime(item.createdAt)}</time>}
                     </div>
                     <h3>{item.title || "모임 알림"}</h3>
