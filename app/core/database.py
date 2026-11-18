@@ -54,6 +54,16 @@ async def _init_connection(connection: asyncpg.Connection) -> None:
         )
 
 
+class _RlsConnection(asyncpg.Connection):
+    """풀에 돌려줄 때 RLS 역할·JWT 클레임 초기화를 기본 리셋 쿼리와 한 번에 보낸다 (왕복 1회).
+
+    RESET ALL 은 SET ROLE 을 되돌리지 않으므로 reset role 을 명시한다.
+    """
+
+    def get_reset_query(self) -> str:
+        return "select set_config('request.jwt.claims', '{}', false);\nreset role;\n" + super().get_reset_query()
+
+
 class _ScopedAcquire:
     def __init__(self, database: "Database") -> None:
         self.database = database
@@ -73,10 +83,8 @@ class _ScopedAcquire:
 
     async def __aexit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
         if self.connection is not None and self.database.pool is not None:
-            try:
-                await self.database._clear_connection_claims(self.connection)
-            finally:
-                await self.database.pool.release(self.connection)
+            # 역할·클레임 초기화는 release 시 _RlsConnection 리셋 쿼리에서 함께 처리
+            await self.database.pool.release(self.connection)
 
 
 class Database:
@@ -111,15 +119,12 @@ class Database:
         role = self.settings.database_authenticated_role if claims else self.settings.database_anon_role
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", role):
             raise RuntimeError("Invalid PostgreSQL RLS role configuration")
-        await connection.execute(f"set role {role}")
+        # 역할과 클레임을 한 번의 왕복으로 설정 (set_config('role', …) 은 SET ROLE 과 같다)
         await connection.execute(
-            "select set_config('request.jwt.claims', $1, false)",
+            "select set_config('role', $1, false), set_config('request.jwt.claims', $2, false)",
+            role,
             json.dumps(claims or {}, separators=(",", ":")),
         )
-
-    async def _clear_connection_claims(self, connection: asyncpg.Connection) -> None:
-        await connection.execute("select set_config('request.jwt.claims', '{}', false)")
-        await connection.execute("reset role")
 
     def acquire(self) -> _ScopedAcquire:
         return _ScopedAcquire(self)
@@ -135,6 +140,7 @@ class Database:
                 max_size=self.settings.database_pool_max_size,
                 command_timeout=10,
                 init=_init_connection,
+                connection_class=_RlsConnection,
             )
             check_result = await self.check()
             self.status = check_result["status"]
