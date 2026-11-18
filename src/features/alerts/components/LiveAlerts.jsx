@@ -103,7 +103,7 @@ export default function LiveAlerts({ festivals, onFail }) {
         setAlerts(a);
       })
       .catch((e) => {
-        console.warn("[alerts] API 실패 → 데모", e);
+        console.warn("[alerts] API 조회 실패", e);
         onFail?.();
       });
   }, [onFail]);

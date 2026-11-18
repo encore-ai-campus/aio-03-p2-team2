@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { INIT_GROUPS, clone, defaults } from "../src/shared/data/demoData.js";
-import { createDemoModel } from "../src/shared/lib/demoModel.js";
+import { INIT_GROUPS, clone, defaults } from "./fixtures/demoData.js";
+import { createDemoModel } from "./fixtures/demoModel.js";
 
 function setup() {
   // 화면 기본값은 모임 없이 시작하므로, 모임 규칙 시험에는 예시 모임을 직접 넣는다

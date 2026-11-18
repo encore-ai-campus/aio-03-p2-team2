@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useDemo, paths } from "../../app/DemoProvider.jsx";
+import { useAppState, paths } from "../../app/AppStateProvider.jsx";
 import { useAuth } from "../../features/auth/AuthProvider.jsx";
 import { Button } from "./Primitives.jsx";
 import { useMe } from "../../features/auth/hooks/useMe.js";
@@ -26,12 +26,12 @@ const TABS = [
 ];
 
 export default function AppLayout() {
-  const { state, NAV, countPending, dispatch } = useDemo();
+  const { state, NAV, dispatch } = useAppState();
   const { user, signOut } = useAuth();
   const me = useMe();
   const location = useLocation();
   const navigate = useNavigate(); // 로그아웃 후 메인(축제 탐색)으로
-  // 🔔 숫자: 실서버면 아직 답하지 않은 내 알림 수, 서버 연결 실패 시 기존 데모 숫자
+  // 아직 답하지 않은 실제 알림 수를 표시한다.
   const [liveBell, setLiveBell] = useState(null);
   useEffect(() => {
     // 비로그인(메인 둘러보기)일 때는 내 알림을 조회하지 않는다
@@ -44,8 +44,7 @@ export default function AppLayout() {
       alive = false;
     };
   }, [location.pathname, user]);
-  const demoBell = countPending() + (state.weather?.type && !state.weather?.choice ? 1 : 0);
-  const bell = liveBell ?? demoBell;
+  const bell = liveBell ?? 0;
   const pageName = NAV.find((row) => row[0] === state.page)?.[2] || "축제 탐색";
 
   return (
@@ -67,11 +66,6 @@ export default function AppLayout() {
               >
                 <span className="ico">{NAV_ICON[id] ? <i className={`ti ${NAV_ICON[id]}`} aria-hidden="true" /> : emoji}</span>
                 {label}
-                {user && liveBell === null && id === "community" && countPending() > 0 && (
-                  <span className="pill red" style={{ marginLeft: "auto", padding: "3px 7px" }}>
-                    {countPending()}
-                  </span>
-                )}
               </NavLink>,
               ]
             ))}

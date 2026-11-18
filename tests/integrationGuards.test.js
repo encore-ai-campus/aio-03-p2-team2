@@ -1,21 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEMO_MODE } from "../src/shared/lib/demoMode.js";
+import { initialState } from "../src/app/appState.js";
 import { matchingAgentRequest, matchingView } from "../src/features/matching/lib/agentFestival.js";
 
 const festivals = [{ id: "fst_tour_3360113", start: "2026-11-19", end: "2026-11-22" }];
 
-test("demo flag is safe without Vite or browser globals", () => {
-  assert.equal(DEMO_MODE, false);
+test("production state contains only UI settings and no demo entities", () => {
+  const state = initialState();
+  for (const key of ["festivals", "groups", "actor", "aiChat", "weather", "matchScores"]) assert.equal(Object.hasOwn(state, key), false);
 });
 
-test("empty DB and failed API never open the demo chatbot unless explicitly enabled", () => {
+test("empty DB and failed API never open a demo chatbot", () => {
   assert.equal(matchingView("empty", false), "empty");
   assert.equal(matchingView("demo", false), "error");
   assert.equal(matchingView("loading", false), "loading");
   assert.equal(matchingView("api", false), "api");
-  assert.equal(matchingView("empty", true), "demo");
-  assert.equal(matchingView("demo", true), "demo");
+  assert.equal(matchingView("empty", true), "empty");
+  assert.equal(matchingView("demo", true), "error");
   assert.equal(matchingView("api", true), "api");
 });
 

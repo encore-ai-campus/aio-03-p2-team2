@@ -3,7 +3,7 @@
 //   → status "waiting_input": 빠진 조건(interrupt.missing)을 되묻고 → 답변을 POST /resume 로 전송 (반복)
 //   → status "completed": result.items(추천 후보) 표시
 //   → status "failed": 오류·수정 전략(repair) 사유 표시
-// 서버 연결이 안 되면 MatchingPage가 기존 데모 챗봇(AiChatPanel)을 대신 보여준다.
+// 서버 연결 실패 시 오류를 안내하고 실제 입력을 유지한다.
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../../shared/components/Primitives.jsx";

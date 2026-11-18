@@ -1,3 +1,5 @@
+export const AI_JOIN = { approval: "모임장 승인제", instant: "즉시 참여제" };
+
 export function toConditions(profile) {
   return {
     date: profile.date || null,

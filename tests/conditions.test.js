@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaults } from "../src/shared/data/demoData.js";
-import { createDemoModel } from "../src/shared/lib/demoModel.js";
-import { aiParse } from "../src/features/matching/lib/aiParse.js";
-import { aiReply, missingOptional } from "../src/features/matching/lib/aiChat.js";
+import { defaults } from "./fixtures/demoData.js";
+import { createDemoModel } from "./fixtures/demoModel.js";
+import { aiParse } from "./fixtures/aiParse.js";
+import { aiReply, missingOptional } from "./fixtures/aiChat.js";
 
 function setup() {
   const state = defaults();

@@ -4,7 +4,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
-import { useDemo } from "../../../app/DemoProvider.jsx";
 import { useFestivals } from "../../festivals/hooks/useFestivals.js";
 import { getGroup, listGroups } from "../../groups/api/groupsApi.js";
 import { listMessages, openChatSocket, sendMessage } from "../api/chatApi.js";
@@ -48,8 +47,7 @@ export default function LiveChat({ onFail }) {
   const [reload, setReload] = useState(0);
   const [showAll, setShowAll] = useState(false);
   const inputRef = useRef(null);
-  const { state: demoState } = useDemo();
-  const { festivals } = useFestivals(demoState.festivals);
+  const { festivals } = useFestivals();
   const festivalName = (id) => festivals.find((f) => f.id === id)?.name || "";
 
   // 1) 내 모임방 찾기 — GET /groups 에는 참여자 정보가 없어 상세를 3개씩 조회 (DB 연결 풀 2 고려)

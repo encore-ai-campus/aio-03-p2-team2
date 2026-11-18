@@ -1,14 +1,12 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
-import { useDemo } from "../../../app/DemoProvider.jsx";
-import AiChatPanel from "../components/AiChatPanel.jsx";
+import { useAppState } from "../../../app/AppStateProvider.jsx";
 import AgentChatPanel from "../components/AgentChatPanel.jsx";
-import { AI_JOIN } from "../lib/aiParse.js";
+import { AI_JOIN } from "../lib/matchingConditions.js";
 import { recruitmentJoinMode } from "../lib/matchingConditions.js";
 import { matchingView, selectedApiFestival } from "../lib/agentFestival.js";
-import { SOURCE_LABEL, useFestivals } from "../../festivals/hooks/useFestivals.js";
-import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
+import { useFestivals } from "../../festivals/hooks/useFestivals.js";
 import { ApiError, ApiLoading } from "../../../shared/components/ApiState.jsx";
 import { conditionKey, useMatchingRun } from "../hooks/useMatchingRun.js";
 import CreatePostBox from "../../groups/components/CreatePostBox.jsx";
@@ -34,22 +32,20 @@ const dayLabel = (iso) => {
 
 // v4.4 · 왼쪽: 챗봇(메인) + 접힌 직접 조건 설정 / 오른쪽: 추천 동행 후보
 export default function MatchingPage() {
-  const demo = useDemo();
-  const { state, btn, pill, fieldProps, festival, person, active, dateShort, pageHead, mutate } = demo;
+  const ui = useAppState();
+  const { state, btn, pill, fieldProps, active, dateShort, mutate } = ui;
   const pr = state.profile;
-  // 축제 목록: 실제 API 우선, 실패 시 데모 데이터 (축제 탐색 화면과 같은 규칙)
-  const { festivals: liveFestivals, source } = useFestivals(state.festivals);
+  // 축제 탐색과 동일한 실제 API 목록만 사용한다.
+  const { festivals: liveFestivals, source } = useFestivals();
   const useApi = source === "api";
-  const findFestival = (id) => selectedApiFestival(liveFestivals, id) || (!useApi && DEMO_MODE ? festival(id) : undefined);
+  const findFestival = (id) => selectedApiFestival(liveFestivals, id);
   const isOpen = (x) => (x.apiStatus ? x.apiStatus !== "past" && x.riskStatus !== "cancelled" : active(x));
-  const f = findFestival(state.festivalId) || liveFestivals.find(isOpen) || liveFestivals[0];
   const all = liveFestivals.filter(isOpen);
   const apiFestival = useApi ? selectedApiFestival(all, state.festivalId) : undefined;
   useEffect(() => {
     if (!useApi || !state.festivalId || apiFestival) return;
     mutate((s) => {
       s.festivalId = null;
-      s.matchingDone = false;
     });
   }, [useApi, state.festivalId, apiFestival, mutate]);
   // 직접 조건 매칭(실제 API) — 조건이 바뀌면 이전 결과는 숨긴다
@@ -71,7 +67,6 @@ export default function MatchingPage() {
   const [chatStage, setChatStage] = useState(0); // 챗봇 진행 단계 → 오른쪽 STEP 안내 (0 조건 말하기 · 1 되묻기 · 2 추천)
   const directResult = useApi && run.key === conditionKey(state.festivalId, pr) ? run : null;
   const apiResult = useApi ? agentRun || directResult : null;
-  const showDemoResult = !useApi && state.matchingDone;
   const runApiMatch = () => {
     const missing = [
       !all.some((x) => x.id === state.festivalId) && "축제",
@@ -86,13 +81,6 @@ export default function MatchingPage() {
     setAgentRun(null);
     execute(state.festivalId, pr);
   };
-  const [sourceText, sourceClass] = SOURCE_LABEL[source];
-  const candidates = state.matchingDone
-    ? (state.matchScores || []).map((x) => ({ ...x, p: person(x.id) }))
-    : [];
-  const matchingGroup = state.groups.find(
-    (g) => g.leader === state.actor && g.id === state.matchGroupId,
-  );
   const chosen = state.festivalId ? findFestival(state.festivalId) : null;
   const summaryItems = [
     chosen?.name,
@@ -117,7 +105,6 @@ export default function MatchingPage() {
         ac.partySize && ac.partySize + "명",
       ].filter(Boolean)
     : [];
-  const foldSummary = agentBits.length ? [chosen?.name, ...agentBits, AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]].filter(Boolean).join(" · ") : summary;
   // 모집글 본문은 바로 위 줄에 축제명이 있으므로 축제명 없이
   const postSummary = agentBits.length ? [...agentBits, AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]].filter(Boolean).join(" · ") : summary;
 
@@ -155,12 +142,7 @@ export default function MatchingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentCond]);
 
-  const setFormOpen = (open) =>
-    mutate((s) => {
-      s.formOpen = open;
-    });
-
-  // 직접 조건 설정 폼 (실서버: 「직접 설정하기」 탭 / 데모: 접는 상자)
+  // 직접 조건 설정 폼
   const formBody = (
         <div className="form-body form-v3">
           <div className="form-group-title">필수 조건</div>
@@ -226,20 +208,10 @@ export default function MatchingPage() {
               </div>
               <p>선택 조건을 비워 두면 그 항목은 빼고 나머지로 100점 기준을 다시 계산해요. 60% 이상인 동행을 추천해요.</p>
             </details>
-            {useApi ? (
-              <button type="button" className="btn primary" disabled={run.status === "loading"} onClick={runApiMatch}>
-                {run.status === "loading" ? "매칭 중…" : "이 조건으로 매칭하기"}
-              </button>
-            ) : (
-              btn("이 조건으로 매칭하기", "runMatch", "btn primary")
-            )}
-            {!useApi && <span className={sourceClass}>{sourceText}</span>}
+            <button type="button" className="btn primary" disabled={run.status === "loading"} onClick={runApiMatch}>
+              {run.status === "loading" ? "매칭 중…" : "이 조건으로 매칭하기"}
+            </button>
             {formMsg && <p className="run-hint" role="alert"><strong>{formMsg}</strong></p>}
-            {!useApi && (
-              <p className="run-hint">
-                챗봇에서 말한 조건도 여기에 반영돼요. 실행하면 공개 모집글과 모임방이 자동으로 만들어지고, 추천된 사람이 자동으로 참여하지는 않아요.
-              </p>
-            )}
           </div>
 
           {/* 선택 조건: 기본 접힘 · 한 줄에 한 항목(왼쪽 소제목 / 오른쪽 선택) */}
@@ -359,8 +331,8 @@ export default function MatchingPage() {
         </div>
   );
 
-  // 데모 모드가 아니면: 불러오는 중엔 스켈레톤, 연결 실패면 안내 (예전 데모 화면이 먼저 뜨던 문제)
-  const view = matchingView(source, DEMO_MODE);
+  // 불러오는 중·조회 실패·빈 목록을 구분해 안내한다.
+  const view = matchingView(source);
   if (view === "loading") return <ApiLoading text="축제 불러오는 중…" />;
   if (view === "error") return <ApiError />;
   if (view === "empty") return (
@@ -371,10 +343,7 @@ export default function MatchingPage() {
     </section>
   );
   return (
-    <div className={useApi ? "mp-v3" : undefined}>
-      {/* 실서버 모드: v3 머리글 — 제목·설명 왼쪽, 진행 단계 오른쪽 (실제 진행한 단계까지만 ✓) */}
-      {/* 실서버 모드: 머리글 한 줄 — 제목 왼쪽, 지금 고른 축제 오른쪽 (진행 상황은 오른쪽 패널이 보여 줌) */}
-      {useApi ? (
+    <div className="mp-v3">
         <div className="mp-top">
           <div className="mp-top-title">
             <h1>AI 동행 매칭</h1>
@@ -397,29 +366,8 @@ export default function MatchingPage() {
             </div>
           )}
         </div>
-      ) : (
-        pageHead(
-          "AI TRAVEL MATCHING",
-          "💞 AI 동행 매칭",
-          "가고 싶은 축제와 원하는 동행을 말로 적으면 AI가 조건을 정리해 추천하고, 공개 모집글과 모임방을 만들어요.",
-        )
-      )}
-
-      {/* 데모 모드 진행 단계 (기존) */}
-      {useApi ? null : (
-      <ol className={`workflow ${showDemoResult ? "done" : ""}`} aria-label="매칭 진행 단계">
-        {["조건 말하기", "AI 점수 계산", "모임방 생성", "모집글 등록"].map((x, i) => (
-          <li className="step" key={x}>
-            <b>{showDemoResult ? "✓" : i + 1}</b>
-            {x}
-          </li>
-        ))}
-      </ol>
-      )}
-
-      <div className={`match-layout${useApi ? " live" : ""}`}>
-      <div className="match-main">
-      {useApi ? (
+      <div className="match-layout live">
+        <div className="match-main">
         <div className="mtabs-card">
           <div className="mtabs" role="tablist" aria-label="동행 찾는 방법">
             <button type="button" role="tab" aria-selected={tab === "chat"} className={tab === "chat" ? "on" : ""} onClick={() => setTab("chat")}>
@@ -442,8 +390,7 @@ export default function MatchingPage() {
           onPickFestival={(id) =>
             mutate((s) => {
               s.festivalId = id;
-              s.matchingDone = false;
-            })
+                    })
           }
         />
           </div>
@@ -451,97 +398,9 @@ export default function MatchingPage() {
             {formBody}
           </div>
         </div>
-      ) : (
-        <AiChatPanel />
-      )}
-
-      {!useApi && (
-      <details
-        className="box match-form form-fold"
-        open={!!state.formOpen}
-        onToggle={(e) => {
-          const open = e.currentTarget.open;
-          if (open !== !!state.formOpen) setFormOpen(open);
-        }}
-      >
-        <summary>
-          <span className="form-fold-title">직접 조건 설정</span>
-          <span className="form-fold-sum">
-            {useApi
-              ? [pr.date && dayLabel(pr.date), pr.start && pr.start + " 시작", pr.party && pr.party + "명"].filter(Boolean).join(" · ") || "아직 설정한 조건이 없어요"
-              : foldSummary}
-          </span>
-          <span className="form-fold-cta">
-            {state.formOpen ? "접기" : "수정"} <i className="ti ti-chevron-down chev" aria-hidden="true" />
-          </span>
-        </summary>
-        {formBody}
-      </details>
-      )}
-      </div>
-
-      <section className={`box pad match-results${apiResult ? " has-result" : ""}`}>
-        {apiResult ? (
-          <ApiResults key={apiResult.runId || apiResult.key} run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} joinLabel={AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]} onEdit={openMore} />
-        ) : showDemoResult ? (
-          <>
-          {matchingGroup && (
-            <div className="note good">
-              <strong>✅ AI 매칭 → 모임방 → 공개 게시글 생성 완료</strong>
-              <br />
-              추천 후보는 자동으로 참여하지 않아요. 댓글·참여 신청 후 입장 방식에 따라 채팅방에 들어와요.
-              <div style={{ height: "10px" }} />
-              {btn("생성된 커뮤니티 게시글 확인 →", `openGroup:${matchingGroup.id}`, "btn small green")}
-            </div>
-          )}
-          <div className="section-head" style={{ marginTop: "10px" }}>
-            <h2>추천 동행 후보</h2>
-            {pill("가중치 적용 점수", "green")}
-          </div>
-          <p className="sm muted">
-            {festival(state.matchFestivalId)?.name || f.name} 참가를 기준으로 계산한 <b>추천 점수</b>예요.
-          </p>
-          {candidates.length ? (
-            <div className="result-grid">
-              {candidates.map((o) => (
-                <div className="match-result" key={o.id}>
-                  <span className="avatar">{o.p.emoji}</span>
-                  <div>
-                    <strong>{o.p.name}</strong>
-                    <div className="sm muted">
-                      {o.p.style} · {o.p.interests.join(" · ")}
-                    </div>
-                    <ScoreWhy parts={o.parts} />
-                    <details className="ratio-detail">
-                      <summary>점수 상세 보기</summary>
-                      <div className="ratio">
-                        {Object.entries(o.parts).map(([k, v]) => (
-                          <span key={k}>
-                            {k} {v}
-                          </span>
-                        ))}
-                      </div>
-                    </details>
-                    <div className="score-bar">
-                      <div style={{ width: o.score + "%" }} />
-                    </div>
-                  </div>
-                  <div className="score">
-                    {o.score}
-                    <small>%</small>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty">추천 결과가 없어요.</div>
-          )}
-          <div className="note" style={{ marginTop: "15px" }}>
-            추천 점수는 입력한 조건이 얼마나 겹치는지를 나타내요. 실제 만족도를 보장하지는 않아요.
-          </div>
-          </>
-        ) : (
-          useApi ? (
+        </div>
+        <section className={`box pad match-results${apiResult ? " has-result" : ""}`}>
+          {apiResult ? (<ApiResults key={apiResult.runId || apiResult.key} run={apiResult} festival={findFestival(state.festivalId)} profile={pr} summary={postSummary} joinLabel={AI_JOIN[recruitmentJoinMode(agentRun, pr.joinMode)]} onEdit={openMore} />) : (
           <div className="ws-empty">
             <span className="ws-empty-ic"><i className="ti ti-users" aria-hidden="true" /></span>
             <h2>추천 동행이 여기에 나타나요</h2>
@@ -561,64 +420,9 @@ export default function MatchingPage() {
               })}
             </div>
           </div>
-          ) : (
-          <div className="match-idle">
-            <div className="cand-head">
-              <h2>추천 동행</h2>
-            </div>
-            <p className="cand-sub">챗봇 대화나 설정이 끝나면 잘 맞는 동행이 여기에 나타나요.</p>
-            <ol className="how-steps path">
-              {[
-                ["ti-message-circle", "조건 말하기", "가고 싶은 축제와 원하는 동행을 편하게 말해요"],
-                ["ti-help-circle", "빠진 조건 되묻기", "날짜·시간처럼 꼭 필요한 것만 AI가 다시 물어봐요"],
-                ["ti-users", "동행 추천", "합류 시간과 취향이 잘 맞는 순서로 보여 드려요"],
-              ].map(([icon, title, desc], i) => {
-                // 직접 설정 탭은 대화 단계와 무관 → STEP 1 표시
-                const now = tab === "chat" ? chatStage : 0;
-                return (
-                <li key={title} className={i === now ? "now" : i < now ? "done" : ""}>
-                  <i className={`ti ${i < now ? "ti-check" : icon}`} aria-hidden="true" />
-                  <div>
-                    <small>
-                      STEP {i + 1}
-                      {i === now ? " · 지금" : i < now ? " · 완료" : ""}
-                    </small>
-                    <b>{title}</b>
-                    <span>{desc}</span>
-                  </div>
-                </li>
-                );
-              })}
-            </ol>
-          </div>
-          )
-        )}
-      </section>
+          )}
+        </section>
       </div>
-    </div>
-  );
-}
-
-// 점수 요약: 잘 맞는 점(80% 이상)·다른 점(50% 미만)
-function ScoreWhy({ parts }) {
-  const r = Object.entries(parts)
-    .filter(([, v]) => v !== "미선택")
-    .map(([k, v]) => {
-      const [a, b] = String(v).split("/").map(Number);
-      return [k, a / b];
-    });
-  const good = r.filter((x) => x[1] >= 0.8).map((x) => x[0]);
-  const weak = r.filter((x) => x[1] < 0.5).map((x) => x[0]);
-  if (!good.length && !weak.length)
-    return (
-      <div className="why">
-        <span className="g">전반적으로 무난하게 맞아요</span>
-      </div>
-    );
-  return (
-    <div className="why">
-      {good.length > 0 && <span className="g">잘 맞는 점 · {good.slice(0, 3).join(", ")}</span>}
-      {weak.length > 0 && <span className="w">다른 점 · {weak.slice(0, 2).join(", ")}</span>}
     </div>
   );
 }
