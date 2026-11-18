@@ -19,8 +19,21 @@ def test_real_dates_are_untouched():
 
 
 def test_travel_style_short_forms_match_profile_values():
-    for raw, expected in [("계획적", "계획적으로"), ("계획적으로", "계획적으로"), ("여유", "여유롭게"), ("활동적인", "활동적으로")]:
+    for raw, expected in [("계획적", "계획적으로"), ("계획적으로", "계획적으로"), ("계획 세워서", "계획적으로"),
+                          ("여유 있게", "여유롭게"), ("여유롭게", "여유롭게"), ("활동적인", "활동적으로")]:
         assert Conditions.model_validate({"travel_style": raw}).travel_style == expected
+
+
+def test_negated_styles_are_not_turned_into_the_opposite():
+    # 팀 리뷰(저라뎃): "계획 없이"가 "계획적으로"로 바뀌면 반대 성향 후보 점수가 잘못 오른다
+    for raw in ["계획 없이", "계획없이", "계획 없는", "여유 없게", "여유없이", "활동 안 하고", "활동적이지 않게"]:
+        assert Conditions.model_validate({"travel_style": raw}).travel_style == raw
+
+
+def test_negated_style_gets_no_style_points():
+    conditions = Conditions.model_validate({"travel_style": "계획 없이"}).model_dump(mode="json", by_alias=True, exclude_none=True)
+    user = {"id": "u", "displayName": "u", "profile": {"travelStyle": "계획적으로"}}
+    assert score_candidate(conditions, user)["parts"]["style"] == {"score": 0, "max": 15}
 
 
 def test_short_style_now_scores_full_style_points():
