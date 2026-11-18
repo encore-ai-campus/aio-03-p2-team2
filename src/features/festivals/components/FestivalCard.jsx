@@ -9,8 +9,8 @@ const shortRegion = (r) =>
     .replace(/도$/, "")
     .trim();
 
-export function FestivalCard({ demo, f }) {
-  const { btn, active, status, dday, period } = demo;
+export function FestivalCard({ ui, f }) {
+  const { btn, active, status, dday, period } = ui;
   let past = !active(f);
   // TourAPI 사진: 원본 대표 이미지 우선(썸네일은 작아서 깨짐)
   const photo = f.imageUrl || f.thumbnailUrl;

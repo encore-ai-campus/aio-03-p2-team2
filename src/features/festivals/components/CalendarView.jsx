@@ -13,8 +13,8 @@ export const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 export const ymd = (d) =>
   [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 
-export function ViewToggle({ demo }) {
-  const v = demo.state.discoverView || "list";
+export function ViewToggle({ ui }) {
+  const v = ui.state.discoverView || "list";
   return (
     <div className="viewtoggle" role="tablist" aria-label="보기 방식">
       {[
@@ -26,7 +26,7 @@ export function ViewToggle({ demo }) {
           role="tab"
           aria-selected={v === k}
           className={v === k ? "active" : ""}
-          onClick={() => demo.dispatch(`view:${k}`)}
+          onClick={() => ui.dispatch(`view:${k}`)}
         >
           {l}
         </Button>
@@ -35,8 +35,8 @@ export function ViewToggle({ demo }) {
   );
 }
 
-export default function CalendarView({ demo, list }) {
-  const { state, dispatch, calMonth, today, active, period, fCard } = demo;
+export default function CalendarView({ ui, list }) {
+  const { state, dispatch, calMonth, today, active, period, fCard } = ui;
   const m = calMonth();
   const first = new Date(2026, m - 1, 1);
   const last = new Date(2026, m, 0);
@@ -53,7 +53,7 @@ export default function CalendarView({ demo, list }) {
     (f) => f.start.slice(0, 7) <= monthKey && f.end.slice(0, 7) >= monthKey,
   ).length;
   const sel = state.calDay && state.calDay.startsWith(monthKey) ? state.calDay : null;
-  const cats = [...new Set(state.festivals.map((f) => f.category))];
+  const cats = [...new Set(list.map((f) => f.category))];
   const selList = sel ? on(sel) : [];
 
   function selectDay(ds) {

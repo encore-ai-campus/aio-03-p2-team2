@@ -1,4 +1,4 @@
-import { clone } from "../../../shared/data/demoData.js";
+import { clone } from "./demoData.js";
 import { AI_LABEL } from "./aiParse.js";
 
 // 챗봇 대화 상태 변경 규칙. DemoProvider.mutate()가 복제한 state를 넘겨준다.

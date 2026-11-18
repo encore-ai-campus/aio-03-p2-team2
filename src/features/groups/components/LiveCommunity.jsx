@@ -84,7 +84,7 @@ export default function LiveCommunity({ festivals, onFail, newOpen, onCloseNew }
       listGroups()
         .then((list) => setGroups(applyPatch(list)))
         .catch((e) => {
-          console.warn("[groups] 목록 API 실패 → 데모", e);
+          console.warn("[groups] 목록 API 조회 실패", e);
           onFail?.();
         }),
     [onFail],

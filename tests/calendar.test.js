@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaults } from "../src/shared/data/demoData.js";
-import { createDemoModel } from "../src/shared/lib/demoModel.js";
+import { defaults } from "./fixtures/demoData.js";
+import { createDemoModel } from "./fixtures/demoModel.js";
 
 function setup() {
   const state = defaults();

@@ -13,9 +13,8 @@ export function matchingAgentRequest({ festivals, festivalId, selectedDate, mess
   };
 }
 
-export function matchingView(source, demoMode) {
+export function matchingView(source) {
   if (source === "api") return "api";
-  if (demoMode) return "demo";
   if (source === "loading") return "loading";
   return source === "empty" ? "empty" : "error";
 }

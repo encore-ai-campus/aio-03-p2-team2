@@ -1,10 +1,10 @@
-import { DEMO_MODE } from "./demoMode.js";
+const DEMO_MODE = false;
 import {
   BASE_PROFILES,
   INIT_GROUPS,
   clone,
   defaults,
-} from "../data/demoData.js";
+} from "./demoData.js";
 
 // These are browser-only simulation rules. Each action receives a cloned state
 // from DemoProvider; no network request or external service is invoked here.

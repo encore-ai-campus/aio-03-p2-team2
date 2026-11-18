@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { DemoProvider, paths, useDemo } from "./DemoProvider.jsx";
+import { AppStateProvider, paths, useAppState } from "./AppStateProvider.jsx";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider.jsx";
 import RequireAuth from "../features/auth/components/RequireAuth.jsx";
 import LoginPage from "../features/auth/pages/LoginPage.jsx";
@@ -13,14 +13,14 @@ import ChatPage from "../features/chat/pages/ChatPage.jsx";
 import SchedulePage from "../features/schedules/pages/SchedulePage.jsx";
 import AlertsPage from "../features/alerts/pages/AlertsPage.jsx";
 function HomeRedirect() {
-  const { state } = useDemo();
+  const { state } = useAppState();
   const { session } = useAuth();
   return <Navigate to={session ? paths[state.page] || paths.discover : paths.discover} replace />;
 }
 export default function App() {
   return (
     <AuthProvider>
-      <DemoProvider>
+      <AppStateProvider>
         <Routes>
           <Route path="login" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
@@ -44,7 +44,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/festivals" replace />} />
           </Route>
         </Routes>
-      </DemoProvider>
+      </AppStateProvider>
     </AuthProvider>
   );
 }

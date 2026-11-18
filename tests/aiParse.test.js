@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaults } from "../src/shared/data/demoData.js";
-import { aiParse, aiArgs } from "../src/features/matching/lib/aiParse.js";
+import { defaults } from "./fixtures/demoData.js";
+import { aiParse, aiArgs } from "./fixtures/aiParse.js";
 
 const state = defaults();
 const ctx = {

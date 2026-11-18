@@ -1,15 +1,14 @@
 import { Fragment, useState } from "react";
-import { useDemo } from "../../../app/DemoProvider.jsx";
+import { useAppState } from "../../../app/AppStateProvider.jsx";
 import CalendarView, { ViewToggle } from "../components/CalendarView.jsx";
 import { SOURCE_LABEL, useFestivals } from "../hooks/useFestivals.js";
-import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
 import { ApiError, ApiLoading } from "../../../shared/components/ApiState.jsx";
 export default function FestivalExplorePage() {
-  const demo = useDemo();
-  const { state, btn, fieldProps, today, active, groupClosed, fCard, calMonth } = demo;
+  const ui = useAppState();
+  const { state, btn, fieldProps, today, active, fCard, calMonth } = ui;
   const calendar = state.discoverView === "calendar";
-  // 실제 API 축제 목록 (실패하면 데모 데이터 그대로)
-  const { festivals, source } = useFestivals(state.festivals);
+  // 실제 API 축제 목록
+  const { festivals, source } = useFestivals();
   let [sourceText, sourceClass] = SOURCE_LABEL[source];
   // 실제 데이터면 출처·갱신 시각 표시 (공지 요구: 데이터 출처·조회 시점)
   if (source === "api") {
@@ -69,9 +68,9 @@ export default function FestivalExplorePage() {
   const isLong = (f) => days(f) >= 120;
   const limited = filtered.filter((f) => !isLong(f));
   const longRun = filtered.filter(isLong);
-  // 데모 모드가 아니면: 불러오는 중엔 스켈레톤, 연결 실패면 안내 (예시 축제로 바꾸지 않음)
-  if (!DEMO_MODE && source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
-  if (!DEMO_MODE && source === "demo") return <ApiError />;
+  // 실제 조회 상태에 따라 로딩·오류를 안내한다.
+  if (source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
+  if (source === "error") return <ApiError />;
   return (
     <>
       <section className="hero">
@@ -116,15 +115,6 @@ export default function FestivalExplorePage() {
             <span>지난 축제</span>
           </div>
         </div>
-        <div className="stat">
-          <div className="icon">👥</div>
-          <div>
-            <strong>
-              {state.groups.filter((g) => !groupClosed(g)).length}
-            </strong>
-            <span>모집 중인 동행 모임</span>
-          </div>
-        </div>
       </div>
 
       <div className="section-head">
@@ -143,7 +133,7 @@ export default function FestivalExplorePage() {
               {filtered.length}건
             </span>
           )}
-          <ViewToggle demo={demo} />
+          <ViewToggle ui={ui} />
         </div>
       </div>
 
@@ -217,14 +207,14 @@ export default function FestivalExplorePage() {
         </select>
       </div>
 
-      <FilterSummary demo={demo} />
+      <FilterSummary ui={ui} />
       <div
         style={{
           height: "15px",
         }}
       />
       {calendar ? (
-        <CalendarView demo={demo} list={calList} />
+        <CalendarView ui={ui} list={calList} />
       ) : filtered.length ? (
         <>
           {limited.length ? (
@@ -310,8 +300,8 @@ export default function FestivalExplorePage() {
 }
 
 // v4.3 · 적용 중인 필터 요약과 개별·전체 초기화
-function FilterSummary({ demo }) {
-  const { state, dispatch } = demo;
+function FilterSummary({ ui }) {
+  const { state, dispatch } = ui;
   const items = [];
   if (state.discoverView !== "calendar" && state.month) items.push(["month", state.month + "월"]);
   if (state.status !== "all")
