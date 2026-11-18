@@ -29,6 +29,7 @@ await build({
     export { default as AgentChatPanel } from './src/features/matching/components/AgentChatPanel.jsx';
     export { default as CreatePostBox } from './src/features/groups/components/CreatePostBox.jsx';`, resolveDir: root },
   bundle: true, platform: "node", format: "esm", packages: "external", jsx: "automatic",
+  define: { "import.meta.env.VITE_API_BASE_URL": JSON.stringify("http://test/api/v1") },
   outfile: join(temporary, "components.mjs"),
   plugins: [{ name: "test-boundaries", setup(b) {
     b.onResolve({ filter: /^actual-app-state$/ }, () => ({ path: join(root, 'src/app/AppStateProvider.jsx') }));
@@ -59,6 +60,11 @@ async function mount(element, path = "/matching") {
 const change = (renderer, label, value) => renderer.root.findByProps({ "aria-label": label }).props.onChange({ target: { value } });
 const textOf = (value) => typeof value === "string" ? value : Array.isArray(value) ? value.map(textOf).join("") : textOf(value?.props?.children || "");
 const button = (renderer, text) => renderer.root.findAllByType("button").find((b) => textOf(b.props.children).includes(text));
+function mockChatSocket(t, Socket = class { close() {} }) {
+  const original = globalThis.WebSocket;
+  globalThis.WebSocket = Socket;
+  t.after(() => { globalThis.WebSocket = original; });
+}
 
 const inboxAlerts = [
   { id: "approval", type: "festival_changed", status: "unread", title: "참여 신청이 승인되었습니다", message: "모임 채팅에 참여할 수 있습니다." },
@@ -126,9 +132,7 @@ test("a delayed chat send never changes the room opened after sending", async (t
   const histories = { a: [originalA], b: [originalB] };
   let finishA;
   globalThis.testAuth = { user: { id: "chat_auth" } };
-  t.mock.method(globalThis, "WebSocket", class {
-    close() {}
-  });
+  mockChatSocket(t);
   globalThis.testApi = async (path, options) => {
     if (path === "/me") return { id: "chat_member" };
     if (path.startsWith("/festivals?")) return { items: [], total: 0 };
@@ -169,6 +173,109 @@ test("a delayed chat send never changes the room opened after sending", async (t
   assert.deepEqual(messages(renderer), ["B방 기존 메시지", "B방 새 메시지"]);
   await act(async () => chooseRoom(renderer, "채팅방 A"));
   assert.deepEqual(messages(renderer), ["A방 기존 메시지", "A방 새 메시지"]);
+});
+
+test("chat loads the page before the earliest visible message", async (t) => {
+  globalThis.testAuth = { user: { id: "older_chat_auth" } };
+  mockChatSocket(t);
+  const group = { id: "older_room", title: "채팅방", members: [{ userId: "older_member" }] };
+  const message = (id, second, text) => ({
+    id, text, type: "user", sender: { id: "older_member" }, createdAt: `2026-11-18T12:00:0${second}Z`,
+  });
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "older_member" };
+    if (path.startsWith("/festivals?")) return { items: [], total: 0 };
+    if (path.startsWith("/groups?")) return { items: [group], total: 1 };
+    if (path === "/groups/older_room") return group;
+    if (path === "/groups/older_room/messages?limit=50") {
+      return { items: [message("a", 2, "최근 메시지")], nextCursor: "a" };
+    }
+    if (path === "/groups/older_room/messages?limit=50&before=a") {
+      return { items: [message("z", 1, "이전 메시지")], nextCursor: null };
+    }
+    throw new Error(`Unexpected request: ${path}`);
+  };
+
+  const renderer = await mount(h(LiveChat), "/chat?groupId=older_room");
+  t.after(() => act(async () => renderer.unmount()));
+  const load = button(renderer, "이전 메시지 불러오기");
+  assert.ok(load);
+  await act(async () => load.props.onClick());
+  const messages = renderer.root.findAllByProps({ className: "chat-bubble" });
+  assert.deepEqual(messages.map((node) => node.props.children), ["이전 메시지", "최근 메시지"]);
+  assert.equal(button(renderer, "이전 메시지 불러오기"), undefined);
+});
+
+test("chat catches up across workers even when the socket stays connected", async (t) => {
+  globalThis.testAuth = { user: { id: "catchup_chat_auth" } };
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  let socket;
+  mockChatSocket(t, class {
+    constructor() { socket = this; }
+    close() {}
+  });
+  const group = { id: "catchup_room", title: "채팅방", members: [{ userId: "catchup_member" }] };
+  const message = (id, second, text) => ({
+    id, text, type: "user", sender: { id: "catchup_member" }, createdAt: `2026-11-18T12:00:0${second}Z`,
+  });
+  const first = message("a", 1, "기존 메시지");
+  const remote = message("b", 2, "다른 서버 메시지");
+  const local = message("c", 3, "연결된 서버 메시지");
+  let available = [];
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "catchup_member" };
+    if (path.startsWith("/festivals?")) return { items: [], total: 0 };
+    if (path.startsWith("/groups?")) return { items: [group], total: 1 };
+    if (path === "/groups/catchup_room") return group;
+    if (path === "/groups/catchup_room/messages?limit=50") {
+      return available.length ? { items: [local], nextCursor: local.id } : { items: [first], nextCursor: null };
+    }
+    if (path === "/groups/catchup_room/messages?limit=50&after=a") return { items: available, nextCursor: null };
+    throw new Error(`Unexpected request: ${path}`);
+  };
+
+  const renderer = await mount(h(LiveChat), "/chat?groupId=catchup_room");
+  t.after(() => act(async () => renderer.unmount()));
+  const push = (event, data) => socket.onmessage({ data: JSON.stringify({ event, data }) });
+  await act(async () => push("chat.connected"));
+  available = [remote, local];
+  await act(async () => push("chat.message.created", local));
+  await act(async () => t.mock.timers.tick(5000));
+  const messages = renderer.root.findAllByProps({ className: "chat-bubble" });
+  assert.deepEqual(messages.map((node) => node.props.children), ["기존 메시지", "다른 서버 메시지", "연결된 서버 메시지"]);
+});
+
+test("chat reconciles a later commit with an earlier creation time", async (t) => {
+  globalThis.testAuth = { user: { id: "overlap_chat_auth" } };
+  t.mock.timers.enable({ apis: ["setInterval"] });
+  mockChatSocket(t);
+  const group = { id: "overlap_room", title: "채팅방", members: [{ userId: "overlap_member" }] };
+  const message = (id, second, text) => ({
+    id, text, type: "user", sender: { id: "overlap_member" }, createdAt: `2026-11-18T12:00:0${second}Z`,
+  });
+  const first = message("a", 1, "기존 메시지");
+  const late = message("b", 2, "늦게 저장된 메시지");
+  const newest = message("c", 3, "최근 메시지");
+  let messages = [first];
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "overlap_member" };
+    if (path.startsWith("/festivals?")) return { items: [], total: 0 };
+    if (path.startsWith("/groups?")) return { items: [group], total: 1 };
+    if (path === "/groups/overlap_room") return group;
+    if (path === "/groups/overlap_room/messages?limit=50") return { items: messages, nextCursor: null };
+    if (path === "/groups/overlap_room/messages?limit=50&after=a") return { items: [newest], nextCursor: null };
+    if (path === "/groups/overlap_room/messages?limit=50&after=c") return { items: [], nextCursor: null };
+    throw new Error(`Unexpected request: ${path}`);
+  };
+  const renderer = await mount(h(LiveChat), "/chat?groupId=overlap_room");
+  t.after(() => act(async () => renderer.unmount()));
+  const bubbles = () => renderer.root.findAllByProps({ className: "chat-bubble" }).map((node) => node.props.children);
+  messages = [first, newest];
+  await act(async () => t.mock.timers.tick(5000));
+  assert.deepEqual(bubbles(), ["기존 메시지", "최근 메시지"]);
+  messages = [first, late, newest];
+  await act(async () => t.mock.timers.tick(5000));
+  assert.deepEqual(bubbles(), ["기존 메시지", "늦게 저장된 메시지", "최근 메시지"]);
 });
 
 test("late group and schedule responses cannot replace the selected group's schedule", async (t) => {
@@ -213,7 +320,7 @@ test("late group and schedule responses cannot replace the selected group's sche
 
 test("chat can open a member's group from the second page of a 101-group list", async (t) => {
   globalThis.testAuth = { user: { id: "paged_chat_auth" } };
-  t.mock.method(globalThis, "WebSocket", class { close() {} });
+  mockChatSocket(t);
   const groups = Array.from({ length: 101 }, (_, i) => ({
     id: `grp_${i + 1}`, title: `모임 ${i + 1}`, memberCount: 1, capacity: 4,
   }));
@@ -289,6 +396,128 @@ test("anonymous root ignores the persisted private page while signed-in navigati
   const renderer = await mount(h(App), "/matching");
   assert.equal(renderer.root.findByType("output").props["data-location"], "/login");
   await act(async () => renderer.unmount());
+});
+
+test("a persisted schedule draft can be approved after reopening the page", async (t) => {
+  globalThis.testAuth = { user: { id: "reopen_schedule_auth" } };
+  const group = { id: "reopen", title: "모임", leaderId: "reopen_leader", status: "open", capacity: 4,
+    members: [{ userId: "reopen_leader", role: "leader", user: { displayName: "모임장" } }] };
+  const draft = { runId: "run_reopen", status: "waiting_approval", checkpointId: "saved_checkpoint", proposalId: "prp_reopen_1",
+    candidate: { items: [{ date: "2099-11-20", time: "15:00", label: "관람" }] } };
+  let saved = false;
+  let approved;
+  globalThis.testApi = async (path, options) => {
+    if (path === "/me") return { id: group.leaderId };
+    if (path.startsWith("/groups?")) return { items: [group], total: 1 };
+    if (path === "/groups/reopen") return group;
+    if (path === "/groups/reopen/schedule") return { items: [], proposals: saved ? [{ id: draft.proposalId, status: "draft" }] : [] };
+    if (path === "/groups/reopen/schedule/draft") return draft;
+    if (path === "/workflow/groups/reopen/schedule") { saved = true; return draft; }
+    if (path === "/agents/runs/run_reopen/resume") {
+      approved = JSON.parse(JSON.stringify(options.body));
+      saved = false;
+      return { ...draft, status: "completed" };
+    }
+    throw new Error(path);
+  };
+  const render = () => mount(h(LiveSchedule, { festivals: [] }), "/schedules?groupId=reopen");
+  const first = await render();
+  await act(async () => button(first, "AI 일정 초안 만들기").props.onClick());
+  await act(async () => first.unmount());
+  const reopened = await render();
+  t.after(() => act(async () => reopened.unmount()));
+  const approve = button(reopened, "이 일정으로 확정하기");
+  assert.ok(approve, "the saved draft should have an approval action");
+  await act(async () => approve.props.onClick());
+  assert.deepEqual(approved, { checkpointId: "saved_checkpoint", decision: "approve" });
+});
+
+test("a late weather review does not display its prompt in a different group", async (t) => {
+  globalThis.testAuth = { user: { id: "weather_switch_auth" } };
+  const groups = ["a", "b"].map((id) => ({ id, leaderId: "weather_switch_leader",
+    festivalId: festival.id, title: "모임 " + id, members: [], capacity: 4 }));
+  let finishReview;
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: groups[0].leaderId };
+    if (path.startsWith("/groups?")) return { items: groups, total: 2 };
+    if (path.startsWith("/alerts?")) return { items: [], total: 0 };
+    if (path.endsWith("/schedule")) return { items: [{ date: "2099-11-20", time: "15:00", label: "관람" }] };
+    if (path.endsWith("/weather-check")) return { weather: { data: {} }, risk: false };
+    if (path === "/workflow/groups/a/weather-review") return new Promise((resolve) => { finishReview = resolve; });
+    const group = groups.find((g) => path === "/groups/" + g.id);
+    if (group) return group;
+    throw new Error(path);
+  };
+  const renderer = await mount(h(LiveAlerts, { festivals: [festival] }), "/alerts");
+  t.after(() => act(async () => renderer.unmount()));
+  await act(async () => { button(renderer, "비 예보 만들기").props.onClick(); });
+  await act(async () => renderer.root.findByType("select").props.onChange({ target: { value: "b" } }));
+  await act(async () => finishReview({ weatherCheck: { weather: { data: {} }, risk: true },
+    run: { runId: "a_weather_run", checkpointId: "cp_a", status: "waiting_input", interrupt: { type: "weather_confirmation" } } }));
+  assert.equal(renderer.root.findByType("select").props.value, "b");
+  assert.ok(!button(renderer, "아니요, 대체 축제 추천"), "A's delayed prompt should never appear under B");
+});
+
+test("the alerts page reopens a saved replacement draft for the selected group", async (t) => {
+  globalThis.testAuth = { user: { id: "restore_alternative_auth" } };
+  const group = { id: "replacement", title: "모임", leaderId: "replacement_leader",
+    festivalId: festival.id, members: [], capacity: 4 };
+  const draft = {
+    runId: "run_restored_replacement", status: "waiting_approval", checkpointId: "restored_checkpoint",
+    targetFestivalId: "fst_restore_target", conditions: { date: "2099-11-20" },
+  };
+  let decision;
+  globalThis.testApi = async (path, options) => {
+    if (path === "/me") return { id: group.leaderId };
+    if (path.startsWith("/groups?")) return { items: [group], total: 1 };
+    if (path.startsWith("/alerts?")) return { items: [], total: 0 };
+    if (path === "/groups/replacement") return group;
+    if (path === "/groups/replacement/schedule") return {
+      items: [{ date: "2099-11-20", time: "15:00", label: "관람" }],
+      proposals: [{ id: "prp_replacement_1", status: "draft" }],
+    };
+    if (path === "/groups/replacement/schedule/draft") return draft;
+    if (path === "/festivals/fst_restore_target") return { id: "fst_restore_target", name: "복구할 축제", startDate: festival.start, endDate: festival.end };
+    if (path.endsWith("/weather-check")) return { weather: { data: {} }, risk: false };
+    if (path === "/agents/runs/run_restored_replacement/resume") {
+      decision = JSON.parse(JSON.stringify(options.body));
+      return { ...draft, status: "rejected" };
+    }
+    throw new Error(path);
+  };
+  const renderer = await mount(h(LiveAlerts, { festivals: [festival] }), "/alerts");
+  t.after(() => act(async () => renderer.unmount()));
+  assert.ok(renderer.root.findAllByType("h2").some((heading) => textOf(heading.props.children) === "복구할 축제로 바꾸면"));
+  await act(async () => button(renderer, "기존 유지").props.onClick());
+  assert.deepEqual(decision, { checkpointId: "restored_checkpoint", decision: "reject" });
+});
+
+test("alerts beyond the first page contribute to both the inbox and pending badge", async (t) => {
+  globalThis.testAuth = { user: { id: "alerts_pagination_auth" } };
+  const firstPage = Array.from({ length: 50 }, (_, index) => ({
+    id: "notice_" + index, type: "festival_changed", status: "unread", title: "모임 안내",
+  }));
+  const older = { id: "older_rain", type: "rain", status: "unread", title: "오래된 비 예보" };
+  let answered = false;
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "alerts_pagination_user" };
+    if (path.startsWith("/groups?")) return { items: [], total: 0 };
+    if (path === "/alerts/older_rain/answer") { answered = true; return null; }
+    if (path.startsWith("/alerts?")) {
+      const page = Number(new URL(path, "http://test").searchParams.get("page") || "1");
+      const olderAlert = answered ? { ...older, status: "answered", choice: "continue" } : older;
+      return { items: page === 1 ? firstPage : [olderAlert], page, pageSize: 50, total: 51 };
+    }
+    throw new Error(path);
+  };
+  const renderer = await mount(h(React.Fragment, null,
+    h(NotificationDropdown, { userId: "alerts_pagination_user" }), h(LiveAlerts, { festivals: [] }),
+  ), "/alerts");
+  t.after(() => act(async () => renderer.unmount()));
+  assert.equal(renderer.root.findByProps({ className: "gnb-badge" }).props.children, 1);
+  assert.match(JSON.stringify(renderer.toJSON()), /오래된 비 예보/);
+  await act(async () => button(renderer, "네, 예정대로 참여할게요").props.onClick());
+  assert.equal(renderer.root.findByProps({ className: "gnb-badge" }).props.children, 0);
 });
 
 test("changing selected companions preserves the draft and saving sends exactly one request", async () => {
@@ -471,7 +700,9 @@ test("weather simulation confirms a replacement festival without changing the me
       conditions: { date: options.body.conditions?.date ?? "2099-11-20" },
       comparison: { before: { items: [{ time: "15:00", label: "기존 관람" }] }, after: { items: [{ time: "16:00", label: "새 축제 관람" }] } },
     };
-    if (path === "/agents/runs/new_schedule/resume") return { runId: "new_schedule", status: "completed" };
+    if (path === "/agents/runs/new_schedule/resume") return {
+      runId: "new_schedule", status: options.body.decision === "reject" ? "rejected" : "completed",
+    };
     throw new Error(`Unexpected request: ${path}`);
   };
   const renderer = await mount(h(LiveAlerts, { festivals: [festival] }));
@@ -483,10 +714,13 @@ test("weather simulation confirms a replacement festival without changing the me
   assert.match(JSON.stringify(renderer.toJSON()), /대체 축제/);
   await act(async () => button(renderer, "일정 보기").props.onClick());
   assert.deepEqual(calls.find((c) => c.path.endsWith("/select")).body, { festivalId: "alternative" });
-  assert.match(JSON.stringify(renderer.toJSON()), /11\/20\([^)]*\) 기준으로 다시 만든 일정/);
+  assert.ok(renderer.root.findAllByType("p").some((paragraph) => /11\/20\([^)]*\) 기준으로 다시 만든 일정/.test(textOf(paragraph.props.children))));
   assert.match(JSON.stringify(renderer.toJSON()), /새 축제 관람/);
+  await act(async () => button(renderer, "다른 축제 고르기").props.onClick());
+  assert.ok(calls.some((c) => c.path === "/agents/runs/new_schedule/resume" && c.body.decision === "reject"));
+  await act(async () => button(renderer, "일정 보기").props.onClick());
   await act(async () => button(renderer, "이 축제·일정으로 변경 확정").props.onClick());
-  const approval = calls.find((c) => c.path === "/agents/runs/new_schedule/resume").body;
+  const approval = calls.find((c) => c.path === "/agents/runs/new_schedule/resume" && c.body.decision === "approve").body;
   assert.equal(approval.checkpointId, "cp_schedule");
   assert.equal(approval.decision, "approve");
   assert.match(JSON.stringify(renderer.toJSON()), /대체 축제와 새 일정으로 확정했어요/);

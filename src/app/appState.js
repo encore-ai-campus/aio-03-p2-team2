@@ -5,9 +5,10 @@ export const NAV = [
   ["discover", "🎪", "축제 탐색"], ["match", "💞", "AI 동행 매칭"], ["community", "👥", "동행 커뮤니티"],
   ["room", "💬", "모임 채팅방"], ["schedule", "🗓️", "일정 확인·조정"], ["alerts", "🔔", "AI 알림·대안"],
 ];
+const validYear = (year) => Number.isInteger(year) && year >= 1000 && year <= 9999;
 
 export const initialState = () => ({
-  page: "discover", month: 0, status: "available", region: "all", category: "all", keyword: "",
+  page: "discover", year: null, month: 0, status: "available", region: "all", category: "all", keyword: "",
   festivalId: null, discoverView: "list", calDay: null,
   profile: { interests: [], budget: null, style: "", mbti: [], party: null, start: "", date: "", joinMode: "approval" },
 });
@@ -21,6 +22,7 @@ export function restoreUiState(saved, legacy = false) {
   if (!paths[state.page]) state.page = "discover";
   if (!["all", "available", "past"].includes(state.status)) state.status = "available";
   if (!["list", "calendar"].includes(state.discoverView)) state.discoverView = "list";
+  if (validYear(saved.year)) state.year = saved.year;
   if (Number.isInteger(saved.month) && saved.month >= 0 && saved.month <= 12) state.month = saved.month;
   if (!legacy && typeof saved.festivalId === "string") state.festivalId = saved.festivalId;
   const profile = saved.profile || {};
@@ -32,15 +34,20 @@ export function restoreUiState(saved, legacy = false) {
   return state;
 }
 
-export const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
-export const calendarMonth = (state) => state.month || (today().startsWith("2026-") ? Number(today().slice(5, 7)) : 1);
+const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
+  year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Seoul",
+});
+export const today = () => dateFormatter.format(new Date());
+export const calendarYear = (state, date = today()) => state.year ?? Number(date.slice(0, 4));
+export const calendarMonth = (state, date = today()) =>
+  state.month || (calendarYear(state, date) === Number(date.slice(0, 4)) ? Number(date.slice(5, 7)) : 1);
 
 export function applyUiAction(state, action) {
   const [kind, id] = action.split(":");
   const next = structuredClone(state);
+  if (kind === "year" && validYear(Number(id)) && Number(id) !== calendarYear(state)) {
+    Object.assign(next, { year: Number(id), month: 0, calDay: null, region: "all", category: "all" });
+  }
   if (kind === "month") { next.month = Number(id); next.calDay = null; }
   if (kind === "view") next.discoverView = id;
   if (kind === "calMove") { next.month = Math.max(1, Math.min(12, calendarMonth(state) + Number(id))); next.calDay = null; }

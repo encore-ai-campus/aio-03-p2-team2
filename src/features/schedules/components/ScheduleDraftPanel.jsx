@@ -1,7 +1,10 @@
 // 한 장 카드 왼쪽: 현재 확정 일정 + AI 초안(승인 전에는 확정되지 않음) + 초안 만들기 버튼
 import { Timeline } from "./ScheduleTimeline.jsx";
 
-export default function ScheduleDraftPanel({ schedule, run, notice, busy, isLeader, beforeKeys, onApprove, onReject, onDraft }) {
+export default function ScheduleDraftPanel({
+  schedule, run, notice, busy, loading, unrecoverableDraft, draftReadFailed, isLeader, beforeKeys,
+  targetFestivalName, onApprove, onReject, onDiscard, onDraft, onRetry,
+}) {
   return (
     <section className="sc-main">
       <h2 className="sc-h">현재 확정 일정</h2>
@@ -17,7 +20,7 @@ export default function ScheduleDraftPanel({ schedule, run, notice, busy, isLead
       {run && run.status === "waiting_approval" && (
         <div className="sc-draft">
           <div className="sc-draft-head">
-            <b>AI 일정 초안</b>
+            <b>{run.targetFestivalId ? `${targetFestivalName || "대체 축제"} 일정 초안` : "AI 일정 초안"}</b>
             <span className="cm-badge open">
               <i className="ti ti-circle-check" aria-hidden="true" /> 검증 통과
             </span>
@@ -26,10 +29,10 @@ export default function ScheduleDraftPanel({ schedule, run, notice, busy, isLead
           <Timeline items={run.candidate?.items} changedKeys={beforeKeys} />
           {isLeader ? (
             <div className="sc-draft-btns">
-              <button type="button" className="btn primary" disabled={busy} onClick={onApprove}>
-                이 일정으로 확정하기
+              <button type="button" className="btn primary" disabled={busy || loading} onClick={onApprove}>
+                {run.targetFestivalId ? "이 축제·일정으로 변경 확정" : "이 일정으로 확정하기"}
               </button>
-              <button type="button" className="btn" disabled={busy} onClick={onReject}>
+              <button type="button" className="btn" disabled={busy || loading} onClick={onReject}>
                 거절
               </button>
             </div>
@@ -53,7 +56,16 @@ export default function ScheduleDraftPanel({ schedule, run, notice, busy, isLead
       )}
 
       {/* 초안 승인 대기 중에는 확정/거절만 보이도록 다시 만들기 버튼을 숨긴다 */}
-      {run?.status === "waiting_approval" ? null : isLeader ? (
+      {loading ? <p className="sc-empty-line">일정을 불러오는 중…</p> : null}
+      {isLeader && unrecoverableDraft && (
+        <button type="button" className="btn sc-make" disabled={busy} onClick={onDiscard}>
+          복구할 수 없는 초안 폐기
+        </button>
+      )}
+      {isLeader && draftReadFailed && (
+        <button type="button" className="btn sc-make" disabled={busy} onClick={onRetry}>다시 불러오기</button>
+      )}
+      {loading || unrecoverableDraft || draftReadFailed || run?.status === "waiting_approval" ? null : isLeader ? (
         <button type="button" className="btn primary sc-make" disabled={busy} onClick={onDraft}>
           <i className="ti ti-sparkles" aria-hidden="true" />
           {busy ? "AI가 일정을 만드는 중…" : run ? "AI 일정 초안 다시 만들기" : "AI 일정 초안 만들기"}

@@ -2,7 +2,7 @@
 
 const ERROR_TEXT = {
   LEADER_ONLY: "모임장만 일정을 만들 수 있어요.",
-  CHECKPOINT_STALE: "일정 상태가 바뀌었어요. 초안을 다시 만들어 주세요.",
+  CHECKPOINT_STALE: "일정 상태가 바뀌었어요. 최신 초안을 확인해 주세요.",
   RUN_NOT_WAITING: "이미 처리된 초안이에요.",
   GROUP_MEMBER_ONLY: "모임 참여자만 일정을 볼 수 있어요.",
 };

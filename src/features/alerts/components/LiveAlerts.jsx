@@ -94,7 +94,7 @@ export default function LiveAlerts({ festivals, onFail }) {
           hasSchedule={items.length > 0}
           selectedFestival={selectedFestival}
           selectedGroupId={selectedGroupId}
-          busy={busy}
+          busy={busy || (scheduleRun?.status === "waiting_approval" ? "draft" : "")}
           reviewWeather={reviewWeather}
         />
         <section className="sc-side al-panel" ref={panelRef}>

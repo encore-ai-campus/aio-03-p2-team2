@@ -59,7 +59,8 @@ export default function AlertWorkflowPanel({
         </button>
         <h2 className="sc-h">{chosen?.name || "대체 축제"}로 바꾸면</h2>
         <p className="sc-sub">
-          {chosen ? `${chosen.region} · ${formatAlertDate(scheduleRun.conditions?.date || meetingDate) || "모임 날짜"} 기준으로 다시 만든 일정이에요.` : ""}
+          {chosen?.region ? `${chosen.region} · ` : ""}
+          {formatAlertDate(scheduleRun.conditions?.date || meetingDate) || "모임 날짜"} 기준으로 다시 만든 일정이에요.
         </p>
         {ok ? (
           <div className="sc-compare-grid al-compare">

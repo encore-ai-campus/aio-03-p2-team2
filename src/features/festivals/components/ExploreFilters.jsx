@@ -5,18 +5,24 @@ import { ViewToggle } from "./CalendarView.jsx";
 const MONTHS = [0, ...Array.from({ length: 12 }, (_, i) => i + 1)];
 
 export default function ExploreFilters({ ui, x }) {
-  const { btn, fieldProps, today } = ui;
+  const { btn, dispatch, fieldProps, today } = ui;
   return (
     <>
       <div className="section-head">
         <div>
-          <h2>2026 축제 둘러보기</h2>
+          <h2>{x.year} 축제 둘러보기</h2>
           <p>
             {"1월~12월 · 참여 가능 여부 자동 표시 · 오늘 "}
             {today()}
           </p>
         </div>
         <div className="section-actions">
+          {x.years.length > 1 && (
+            <select className="fx-year-select" aria-label="축제 연도" value={x.year}
+              onChange={(event) => dispatch(`year:${event.target.value}`)}>
+              {x.years.map((year) => <option key={year} value={year}>{year}년</option>)}
+            </select>
+          )}
           <span className={x.sourceClass} title="축제 데이터 출처">{x.sourceText}</span>
           {!x.calendar && (
             <span className="pill blue">
@@ -34,7 +40,7 @@ export default function ExploreFilters({ ui, x }) {
             {btn(
               m ? m + "월" : "전체",
               `month:${m}`,
-              `month-button ${m === x.activeMonth ? "active" : ""} ${m && m < x.curMonth ? "is-past" : ""}`,
+              `month-button ${m === x.activeMonth ? "active" : ""} ${m && m < x.firstUpcomingMonth ? "is-past" : ""}`,
             )}
           </Fragment>
         ))}

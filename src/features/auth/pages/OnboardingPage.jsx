@@ -2,7 +2,7 @@
 // 저장하거나 "나중에"를 누르면 POST /me/onboarding/complete 로 완료 표시 → 다음 로그인부터 다시 묻지 않음
 // 예산·인원·시작 시각은 매칭할 때마다 바뀌는 조건이라 AI 동행 매칭(챗봇)에서 묻는다 (matching_runs.conditions)
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 import { useAuth } from "../AuthProvider.jsx";
 import { AGE_BANDS, EMPTY_FORM, GENDERS, INTERESTS, MBTIS, STYLES, toProfileBody, toggleInList } from "../lib/profileOptions.js";
@@ -22,6 +22,8 @@ async function markCompleteOnServer() {
 export default function OnboardingPage() {
   const { user, markOnboarded } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = location.state?.from || "/festivals";
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
@@ -38,7 +40,7 @@ export default function OnboardingPage() {
       await apiFetch("/me/profile", { method: "PATCH", body: toProfileBody(form) });
       await markCompleteOnServer();
       await markOnboarded();
-      navigate("/festivals", { replace: true });
+      navigate(destination, { replace: true });
     } catch (err) {
       if (err.status) setError(`저장하지 못했어요 (${err.status} ${err.code || ""})`);
       else setError("서버에 연결할 수 없어요. 백엔드 서버가 실행 중인지 확인해 주세요.");
@@ -50,7 +52,7 @@ export default function OnboardingPage() {
   async function skipAll() {
     await markCompleteOnServer();
     await markOnboarded(); // 건너뛰어도 다음 로그인 때 다시 묻지 않음 ("내 프로필"에서 입력 가능)
-    navigate("/festivals", { replace: true });
+    navigate(destination, { replace: true });
   }
 
   const next = () => (isLast ? finish() : setStep((s) => s + 1));

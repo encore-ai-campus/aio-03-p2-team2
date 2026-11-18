@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { listAlerts } from "../api/alertsApi.js";
+import { listAlerts, subscribeToAlertChanges } from "../api/alertsApi.js";
 import { isVisibleAlert, needsWeatherResponse } from "../lib/alertStatus.js";
 import "../notificationDropdown.css";
 
@@ -22,6 +22,8 @@ export default function NotificationDropdown({ userId, hidden = false }) {
   const [refresh, setRefresh] = useState(0);
   const [result, setResult] = useState({ status: "loading", items: [] });
   const pending = result.items.filter(needsWeatherResponse).length;
+
+  useEffect(() => subscribeToAlertChanges(() => setRefresh((value) => value + 1)), []);
 
   // 기존 벨과 동일하게 화면 이동 시 갱신하고, 미리보기를 열 때도 최신 상태를 확인한다.
   useEffect(() => {
