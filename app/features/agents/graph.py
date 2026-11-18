@@ -11,7 +11,7 @@ from langgraph.types import interrupt
 from app.core.repository import RepositoryError
 from app.features.matching.interests import extracted_interests
 from .memory import proposal_id_for_run
-from .policy import error, infer_intent, required_tools, validate_plan
+from .policy import error, infer_intent, required_tools, rules_plan, schedule_window, validate_plan
 from .schemas import Conditions
 from .state import AgentState
 from .tools import ToolFailure
@@ -223,15 +223,32 @@ class AgentNodes:
 
     async def generate_candidate(self, state):
         try:
+            if state["intent"] == "scheduling":
+                _, window_error = schedule_window(state["conditions"], state["tool_results"])
+                if window_error:
+                    return self.update(state, "generate_candidate", candidate=None, errors=[window_error])
             candidate = await self.model.generate(state)
             return self.update(state,"generate_candidate",candidate=candidate)
         except Exception:
             return self.update(state,"generate_candidate",candidate=None,errors=[error("MODEL_UNAVAILABLE","후보 생성에 실패했습니다. 모델 설정과 응답을 확인해야 합니다.")])
 
     async def validate_candidate(self, state):
-        errors = validate_plan(state.get("candidate"),state["conditions"],state["tool_results"],state["intent"])
-        history = state.get("candidate_history", []) + [{"iteration": state["iteration"], "candidate": deepcopy(state.get("candidate")), "errors": deepcopy(errors), "repair": deepcopy(state.get("repair", {}))}]
-        return self.update(state,"validate_candidate",errors=errors,candidate_history=history)
+        conditions, results, intent = state["conditions"], state["tool_results"], state["intent"]
+        candidate = state.get("candidate")
+        errors = validate_plan(candidate, conditions, results, intent)
+        history = state.get("candidate_history", []) + [{
+            "iteration": state["iteration"], "candidate": deepcopy(candidate),
+            "errors": deepcopy(errors), "repair": deepcopy(state.get("repair", {})),
+        }]
+        if intent == "scheduling" and any(item["code"] in {"WEATHER_TIME_CONFLICT", "TIME_CONFLICT"} for item in errors):
+            window, _ = schedule_window(conditions, results)
+            if window:
+                basic = rules_plan(conditions, results, window)
+                if not validate_plan(basic, conditions, results, intent):
+                    repair = {"action": "regenerate", "reason": "허용 시간대를 벗어난 초안을 검증된 기본 일정으로 대체했습니다."}
+                    history.append({"iteration": state["iteration"], "candidate": deepcopy(basic), "errors": [], "repair": repair})
+                    return self.update(state, "validate_candidate", candidate=basic, errors=[], repair=repair, candidate_history=history)
+        return self.update(state, "validate_candidate", errors=errors, candidate_history=history)
 
     async def reflect_and_repair(self, state):
         if state["iteration"] >= self.settings.agent_max_iterations:

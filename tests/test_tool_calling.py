@@ -109,15 +109,20 @@ async def test_bad_model_call_is_rejected_then_corrected(tmp_path,bad_name,bad_a
 
 
 @pytest.mark.asyncio
-async def test_dependency_error_is_returned_to_model_before_corrected_call(tmp_path):
+@pytest.mark.parametrize("festival_already_read", [False, True])
+async def test_dependency_error_is_returned_to_model_before_corrected_call(tmp_path, festival_already_read):
     repo,day=seed(); g=await group(repo)
     weather=call('get_weather',{'festival_id':g['festivalId'],'date':day},'early_weather')
-    model=ScriptedOpenAI([response(weather),response(*required(g,day)),response()])
+    festival, availability, corrected_weather = required(g, day)
+    before = [response(festival)] if festival_already_read else []
+    corrected = [availability, corrected_weather] if festival_already_read else [festival, availability, corrected_weather]
+    model=ScriptedOpenAI([*before, response(weather), response(*corrected), response()])
     service=await make_service(repo,settings(tmp_path),model=model).open()
     try:
         run=await service.start(USER,RunStart(message='일정 생성',group_id=g['id']))
         assert run['status']=='waiting_approval'
-        assert run['toolCalls'][0]['code']=='TOOL_DEPENDENCY_MISSING'
+        early = next(item for item in run["toolCalls"] if item["callId"] == "early_weather")
+        assert early["code"] == "TOOL_DEPENDENCY_MISSING"
     finally: await service.close()
 
 

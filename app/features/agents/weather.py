@@ -1,6 +1,7 @@
 """Server-owned meeting windows and shared weather risk policy."""
 from datetime import datetime, timedelta
 
+DEFAULT_MEETING_MINUTES = 90
 SEVERE_CODES = {65, 67, 75, 77, 82, 85, 86, 95, 96, 99}
 
 
@@ -10,7 +11,7 @@ def schedule_conditions(items):
     same_day = [item for item in items if item["date"] == day]
     return {"date": day, "start_time": min(item["time"] for item in same_day),
             "end_time": max(item.get("endTime") or
-                            (datetime.fromisoformat(f"{day}T{item['time']}") + timedelta(minutes=90)).strftime("%H:%M")
+                            (datetime.fromisoformat(f"{day}T{item['time']}") + timedelta(minutes=DEFAULT_MEETING_MINUTES)).strftime("%H:%M")
                             for item in same_day)}
 
 
@@ -34,7 +35,7 @@ def meeting_window(state, festival):
         if member.get("availableFrom"):
             start = max(start, datetime.fromisoformat(f"{day}T{member['availableFrom']}"))
     end_time = conditions.get("end_time") or (saved.get("end_time") if not conditions.get("start_time") and not availability else None)
-    end = datetime.fromisoformat(f"{day}T{end_time}") if end_time else start + timedelta(minutes=90)
+    end = datetime.fromisoformat(f"{day}T{end_time}") if end_time else start + timedelta(minutes=DEFAULT_MEETING_MINUTES)
     if end <= start or end.date() != start.date():
         raise ValueError("meeting window must end later on the same day")
     return start, end

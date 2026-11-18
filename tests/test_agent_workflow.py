@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 from tests.ephemeral_storage import EphemeralAgentStorage
 from tests.auth_helpers import install_test_identity, token_headers
@@ -17,7 +18,8 @@ from app.core.repository import RepositoryError
 from app.features.agents.providers import RuleBasedModel,OpenAIModel
 from app.features.agents.service import AgentService
 from app.features.agents.schemas import RunStart,ResumeRun,Conditions
-from app.features.agents.tools import AgentTools,ToolFailure
+from app.features.agents.tools import AgentTools,ToolFailure,observed
+from app.features.agents.weather import meeting_window
 from app.features.agents.workflow import WorkflowService
 from app.main import create_app
 
@@ -73,6 +75,77 @@ async def test_proposal_approval_and_replay(running):
     with pytest.raises(RepositoryError) as exc: await resume(service,run)
     assert exc.value.code == "CHECKPOINT_STALE"
     assert len((await repo.group(g["id"]))["messages"]) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rain_on_draft, rain_on_approval", [(False, False), (True, False), (False, True)])
+async def test_weather_window_overrun_uses_a_validated_basic_draft(running, monkeypatch, rain_on_draft, rain_on_approval):
+    service, repo, group, day = running
+    repo.store.festivals[group["festivalId"]].update(
+        name="축제 이름 " * 22, operatingHours=[{"date": day, "open": "11:00", "close": "17:00"}],
+    )
+    original_schedule = deepcopy(group["schedule"]["items"])
+    checked_windows = []
+
+    async def weather(state):
+        festival = state["tool_results"]["get_festival"]["data"]
+        start, end = meeting_window(state, festival)
+        checked_windows.append((start.strftime("%H:%M"), end.strftime("%H:%M")))
+        rain_risk = rain_on_draft if len(checked_windows) == 1 else rain_on_approval
+        result = {
+            "date": day, "startTime": checked_windows[-1][0], "endTime": checked_windows[-1][1],
+            "precipitationProbability": 90 if rain_risk else 0, "weatherCode": 61 if rain_risk else 0,
+        }
+        return observed("test weather", result, mode="live")
+
+    overrun = {"summary": "long itinerary", "items": [
+        {"date": day, "time": start, "endTime": end, "label": "축제 관람", "description": ""}
+        for start, end in [("13:00", "14:00"), ("14:00", "15:00"), ("15:00", "16:00"), ("16:00", "16:30")]
+    ]}
+    generate = AsyncMock(return_value=overrun)
+    monkeypatch.setattr(service.tools, "get_weather", weather)
+    monkeypatch.setattr(service.model, "generate", generate)
+    run = await start(service, group, conditions=Conditions(date=day, start_time="13:00", avoid_rain=rain_on_draft or rain_on_approval))
+
+    generate.assert_awaited_once()
+    assert checked_windows == [("13:00", "14:30")]
+    assert [item["code"] for item in run["candidateHistory"][0]["errors"]].count("WEATHER_TIME_CONFLICT") == 3
+    assert (await repo.group(group["id"]))["schedule"]["items"] == original_schedule
+    if rain_on_draft:
+        assert run["status"] == "waiting_input"
+        assert "WEATHER_RISK" in {item["code"] for item in run["errors"]}
+        assert not run["proposalId"]
+    else:
+        assert run["status"] == "waiting_approval"
+        assert run["errors"] == []
+        assert run["candidate"]["items"][0]["time"] == "13:00"
+        assert run["candidate"]["items"][-1]["endTime"] == "14:30"
+        assert len(run["candidateHistory"]) == 2
+        result = await resume(service, run)
+        if rain_on_approval:
+            assert result["status"] == "waiting_input"
+            assert "WEATHER_RISK" in {item["code"] for item in result["errors"]}
+            assert (await repo.group(group["id"]))["schedule"]["items"] == original_schedule
+        else:
+            assert result["status"] == "completed"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hours, code", [([], "OPERATING_HOURS_MISSING"), (["11:00", "12:30"], "SCHEDULE_WINDOW_EMPTY")])
+async def test_unavailable_schedule_window_does_not_call_generation(running, monkeypatch, hours, code):
+    service, repo, group, day = running
+    repo.store.festivals[group["festivalId"]]["operatingHours"] = [
+        {"date": day, "open": hours[0], "close": hours[1]}
+    ] if hours else []
+    generate = AsyncMock(return_value={"summary": "fixture", "items": [
+        {"date": day, "time": "13:00", "endTime": "14:30", "label": "관람", "description": ""},
+    ]})
+    monkeypatch.setattr(service.model, "generate", generate)
+    run = await start(service, group, conditions=Conditions(date=day, start_time="13:00"))
+    assert run["status"] == "waiting_input"
+    assert [item["code"] for item in run["errors"]] == [code]
+    assert not run["proposalId"]
+    generate.assert_not_awaited()
 
 @pytest.mark.asyncio
 async def test_missing_input_then_explicit_answer(running):
@@ -160,7 +233,8 @@ async def test_user_does_not_override_member_time(running):
     service,repo,g,_=running
     repo.store.groups[g["id"]]["members"].append({"userId":"usr_demo_01","role":"member"})
     run=await start(service,g,conditions=Conditions(start_time="10:00",end_time="14:00"))
-    assert run["status"] == "failed"
+    assert run["status"] == "waiting_input"
+    assert [item["code"] for item in run["errors"]] == ["SCHEDULE_WINDOW_EMPTY"]
     assert not (await repo.group(g["id"]))["schedule"]["proposals"]
 
 @pytest.mark.asyncio
@@ -188,7 +262,7 @@ async def test_restart_can_resume_checkpoint(tmp_path):
 class BrokenModel(RuleBasedModel):
     async def generate(self,state):
         candidate = await super().generate(state)
-        candidate["items"][0]["time"] = "00:00"
+        candidate["items"][0]["endTime"] = candidate["items"][0]["time"]
         return candidate
 
 class FirstWrongModel(RuleBasedModel):
@@ -206,8 +280,11 @@ async def test_reasoning_repair_is_bounded(tmp_path,model,expected):
         run = await start(service,g)
         assert run["status"] == expected
         assert run["iteration"] <= 2
-        assert "reflect_and_repair" in [event["node"] for event in run["trace"]]
-        if expected == "failed": assert (await repo.group(g["id"]))["schedule"]["proposals"] == []
+        if expected == "failed":
+            assert "reflect_and_repair" in [event["node"] for event in run["trace"]]
+            assert (await repo.group(g["id"]))["schedule"]["proposals"] == []
+        else:
+            assert run["candidate"]["items"][0]["time"] == "13:00"
     finally: await service.close()
 
 class FailingWeather(AgentTools):
@@ -268,7 +345,12 @@ async def test_risk_response_does_not_apply_unverified_alternative(running):
     assert "다시 확인" in run["candidate"]["message"]
 
 @pytest.mark.asyncio
-async def test_openai_structured_adapter_no_paid_call():
+@pytest.mark.parametrize("forecast, explicit_end, expected_end", [
+    ({"startTime": "13:00", "endTime": "14:30"}, None, "14:30"),
+    ({}, None, "14:45"),
+    ({"startTime": "13:00", "endTime": "16:30"}, "16:30", "16:00"),
+])
+async def test_openai_structured_adapter_no_paid_call(forecast, explicit_end, expected_end):
     from app.features.agents.schemas import SchedulePlan
     model=OpenAIModel("test-key","test-model")
     captured={}
@@ -277,10 +359,18 @@ async def test_openai_structured_adapter_no_paid_call():
         return SimpleNamespace(output_parsed=SchedulePlan(summary="검증",items=[dict(date="2030-01-01",time="13:00",endTime="14:00",label="축제",description="테스트")]))
     model.client.responses.parse=fake_parse
     try:
-        result=await model.generate(dict(intent="scheduling",conditions={},tool_results={},errors=[]))
+        constraints = {"date": "2030-01-01", "start_time": "13:00", "end_time": explicit_end}
+        results = {
+            "get_festival": {"data": {"operatingHours": [{"date": constraints["date"], "open": "11:00", "close": "17:00"}]}},
+            "get_availability": {"data": [{"availableFrom": "13:15", "availableUntil": "16:00"}]},
+            "get_weather": {"data": forecast},
+        }
+        result=await model.generate(dict(intent="scheduling",conditions=constraints,tool_results=results,errors=[]))
         assert result["items"][0]["endTime"] == "14:00"
         assert captured["store"] is False
         assert captured["text_format"] is SchedulePlan
+        assert json.loads(captured["input"][1]["content"])["scheduleWindow"] == {"startTime": "13:15", "endTime": expected_end}
+        assert "scheduleWindow" in captured["input"][0]["content"]
     finally: await model.close()
 
 @pytest.mark.asyncio

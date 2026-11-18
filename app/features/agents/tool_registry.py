@@ -37,7 +37,7 @@ DESCRIPTIONS = {
     "get_festival": "Read the selected festival's dates, operating hours, venue and cancellation status. Needed before weather lookup.",
     "get_availability": "Read every active member's available times in the current group. Required for scheduling.",
     "get_candidates": "Read up to 50 ranked eligible companions for the selected festival using current matching conditions and the authenticated requester's profile. The current user and candidates unavailable at the requested start time are excluded. Required for matching.",
-    "get_weather": "Read hourly weather for the selected festival coordinates and server-owned meeting time window. Call get_festival first. Scheduling should read get_availability first to reflect participant start times. Required for scheduling, risk response and rain-avoidance matching.",
+    "get_weather": "Read hourly weather for the selected festival coordinates and server-owned meeting time window. Call get_festival first. For scheduling, also call get_availability before this tool. Required for scheduling, risk response and rain-avoidance matching.",
     "search_festivals": "Search the festival database for non-cancelled alternatives whose event dates include the request date. Required for risk response; optional when alternatives are relevant. Does not change the group's festival.",
 }
 
@@ -83,6 +83,9 @@ def validate_tool_request(request, state, results):
         raise ToolFailure("TOOL_ARGUMENTS_INVALID", "도구 인자 스키마를 확인하고 누락·잘못된 값을 수정하세요.") from None
     if values != bound_arguments(name, state):
         raise ToolFailure("TOOL_SCOPE_MISMATCH", "현재 요청의 festival_id·group_id·date와 일치하는 인자를 사용하세요.")
-    if name == "get_weather" and "get_festival" not in results:
-        raise ToolFailure("TOOL_DEPENDENCY_MISSING", "get_festival을 먼저 조회한 후 날씨를 요청하세요.")
+    if name == "get_weather":
+        if "get_festival" not in results:
+            raise ToolFailure("TOOL_DEPENDENCY_MISSING", "get_festival을 먼저 조회한 후 날씨를 요청하세요.")
+        if state["intent"] == "scheduling" and "get_availability" not in results:
+            raise ToolFailure("TOOL_DEPENDENCY_MISSING", "일정 생성은 get_availability를 먼저 조회한 후 날씨를 요청하세요.")
     return values

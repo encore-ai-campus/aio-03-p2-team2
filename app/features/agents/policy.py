@@ -3,9 +3,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 import re
+from typing import NamedTuple
 from zoneinfo import ZoneInfo
 
-from .schemas import Conditions, SchedulePlan
+from .schemas import Conditions, SCHEDULE_LABEL_MAX_LENGTH, SchedulePlan
+from .weather import DEFAULT_MEETING_MINUTES
 
 
 def today() -> str:
@@ -85,6 +87,46 @@ def error(code: str, message: str, **details) -> dict:
     return {"code": code, "message": message, "details": details}
 
 
+class ScheduleWindow(NamedTuple):
+    available: tuple[str, str]
+    forecast: tuple[str, str] | None
+
+    @property
+    def allowed(self) -> tuple[str, str]:
+        start, end = self.available
+        if self.forecast:
+            start = max(start, self.forecast[0])
+            end = min(end, self.forecast[1])
+        return start, end
+
+
+def schedule_window(conditions: dict, results: dict) -> tuple[ScheduleWindow | None, dict | None]:
+    festival = results.get("get_festival", {}).get("data") or {}
+    hours = next((row for row in festival.get("operatingHours", []) if row["date"] == conditions.get("date")), None)
+    if not hours or not hours.get("open") or not hours.get("close"):
+        return None, error("OPERATING_HOURS_MISSING", "해당 날짜의 운영시간을 확인해야 합니다.")
+
+    availability = results.get("get_availability", {}).get("data", [])
+    if not availability or any(not row.get("availableFrom") for row in availability):
+        return None, error("AVAILABILITY_MISSING", "모든 참여자의 가능 시간이 필요합니다.")
+
+    earliest = max(hours["open"], conditions.get("start_time") or "00:00", *(row["availableFrom"] for row in availability))
+    latest = min(hours["close"], conditions.get("end_time") or "23:59", *(row.get("availableUntil") or "23:59" for row in availability))
+    weather = results.get("get_weather", {}).get("data") or {}
+    forecast_start, forecast_end = weather.get("startTime"), weather.get("endTime")
+    if bool(forecast_start) != bool(forecast_end):
+        return None, error("TOOL_RESPONSE_INVALID", "조회한 예보의 시작·종료 시간을 확인해야 합니다.")
+    forecast = (forecast_start, forecast_end) if forecast_start and forecast_end else None
+    if forecast is None and not conditions.get("end_time"):
+        latest = hhmm(min(minutes(latest), minutes(earliest) + DEFAULT_MEETING_MINUTES))
+    window = ScheduleWindow((earliest, latest), forecast)
+    start, end = window.allowed
+    if start >= end:
+        return None, error("SCHEDULE_WINDOW_EMPTY", "운영시간, 참여 가능 시간, 예보 시간대가 겹치지 않습니다. 모임 시간을 확인해 주세요.",
+                           earliest=start, latest=end)
+    return window, None
+
+
 def validate_plan(candidate: dict | None, conditions: dict, results: dict, intent: str) -> list[dict]:
     try:
         return _validate_plan(candidate,conditions,results,intent)
@@ -123,18 +165,16 @@ def _validate_plan(candidate: dict | None, conditions: dict, results: dict, inte
     except ValueError:
         return errors + [error("CANDIDATE_INVALID", "일정 항목 형식이 올바르지 않습니다.")]
     target_date = conditions["date"]
-    hours = next((row for row in festival.get("operatingHours", []) if row["date"] == target_date), None)
-    if not hours or not hours.get("open") or not hours.get("close"):
-        return errors + [error("OPERATING_HOURS_MISSING", "해당 날짜의 운영시간을 확인해야 합니다.")]
-    availability = results.get("get_availability", {}).get("data", [])
-    if not availability or any(not row.get("availableFrom") for row in availability):
-        return errors + [error("AVAILABILITY_MISSING", "모든 참여자의 가능 시간이 필요합니다.")]
-    lower = max([hours["open"], conditions.get("start_time") or "00:00"] + [row["availableFrom"] for row in availability])
-    upper = min([hours["close"], conditions.get("end_time") or "23:59"] + [row.get("availableUntil") or "23:59" for row in availability])
+    window, window_error = schedule_window(conditions, results)
+    if window_error:
+        return errors + [window_error]
+    lower, upper = window.available
+    allowed_start, allowed_end = window.allowed
     previous_end = None
     for item in plan.items:
-        if weather and weather.get("startTime") and (item.time < weather["startTime"] or item.end_time > weather["endTime"]):
-            errors.append(error("WEATHER_TIME_CONFLICT", "일정이 확인한 예보 시간대를 벗어났습니다. 모임 시작·종료 시간을 확인해 주세요."))
+        if window.forecast and (item.time < window.forecast[0] or item.end_time > window.forecast[1]):
+            errors.append(error("WEATHER_TIME_CONFLICT", "일정이 확인한 예보 시간대를 벗어났습니다. 모임 시작·종료 시간을 확인해 주세요.",
+                                earliest=allowed_start, latest=allowed_end))
         if item.date.isoformat() != target_date:
             errors.append(error("DATE_MISMATCH", "요청 날짜를 벗어났습니다.", expected=target_date))
         if item.time < lower or item.end_time > upper:
@@ -145,21 +185,21 @@ def _validate_plan(candidate: dict | None, conditions: dict, results: dict, inte
     return errors
 
 
-def rules_plan(conditions: dict, results: dict) -> dict:
+def rules_plan(conditions: dict, results: dict, window: ScheduleWindow | None = None) -> dict:
+    if window is None:
+        window, _ = schedule_window(conditions, results)
+    if window is None:
+        return {"summary": "조건을 만족하는 시간이 없습니다.", "items": []}
     festival = results["get_festival"]["data"]
-    hours = next((row for row in festival.get("operatingHours", []) if row["date"] == conditions["date"]), {})
-    starts = [conditions.get("start_time") or "00:00", hours.get("open") or "00:00"]
-    starts += [row.get("availableFrom") or "00:00" for row in results.get("get_availability", {}).get("data", [])]
-    start = minutes(max(starts))
-    if start + 90 >= 1440:
-        return {"summary": "조건을 만족하는 시간이 없습니다.", "items": []}
-    end = min(start + 90, minutes(conditions.get("end_time") or "23:59"))
-    if end <= start:
-        return {"summary": "조건을 만족하는 시간이 없습니다.", "items": []}
+    name = festival.get("name")
+    label = name[:SCHEDULE_LABEL_MAX_LENGTH] if isinstance(name, str) and name else "축제 관람"
+    allowed_start, allowed_end = window.allowed
+    start = minutes(allowed_start)
+    end = min(start + DEFAULT_MEETING_MINUTES, minutes(allowed_end))
     if end <= start + 30:
         return {"summary": "참여 가능 시간에 맞춘 축제 관람", "items": [
-            {"date": conditions["date"], "time": hhmm(start), "endTime": hhmm(end), "label": festival["name"], "description": "축제를 관람합니다."}]}
+            {"date": conditions["date"], "time": hhmm(start), "endTime": hhmm(end), "label": label, "description": "축제를 관람합니다."}]}
     return {"summary": "참여 가능 시간과 운영시간을 반영한 공동 일정", "items": [
         {"date": conditions["date"], "time": hhmm(start), "endTime": hhmm(start+30), "label": "모임 참석자 확인", "description": "축제 장소에서 참석자를 확인합니다."},
-        {"date": conditions["date"], "time": hhmm(start+30), "endTime": hhmm(end), "label": festival["name"], "description": "확인한 운영시간 안에서 축제를 관람합니다."},
+        {"date": conditions["date"], "time": hhmm(start+30), "endTime": hhmm(end), "label": label, "description": "확인한 운영시간 안에서 축제를 관람합니다."},
     ]}

@@ -87,11 +87,14 @@ class ResumeRun(APIModel):
     weather_decision: Literal["keep", "alternatives"] | None = None
 
 
+SCHEDULE_LABEL_MAX_LENGTH = 120
+
+
 class PlanItem(APIModel):
     date: Date
     time: str
     end_time: str
-    label: str = Field(min_length=1, max_length=120)
+    label: str = Field(min_length=1, max_length=SCHEDULE_LABEL_MAX_LENGTH)
     description: str = Field(max_length=500)
 
     @field_validator("time", "end_time")
