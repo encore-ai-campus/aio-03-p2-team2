@@ -1,11 +1,25 @@
 from __future__ import annotations
 
-from datetime import date as Date, time
+from datetime import date as Date, datetime, time, timedelta, timezone
 from typing import Literal, Annotated
 
 from pydantic import Field, field_validator, model_validator
 
 from app.core.models import APIModel
+
+
+# 프로필 여행 스타일 값(온보딩 선택지)과 맞춘다. AI가 "계획적"처럼 줄여 말해도 점수 계산에서 같은 값으로 본다.
+# 정해진 표현만 바꾼다 — "계획 없이"처럼 반대 뜻이 "계획적으로"가 되면 안 되므로 접두어 일치는 쓰지 않는다.
+_TRAVEL_STYLES = {
+    "계획적으로": ("계획적으로", "계획적", "계획적인", "계획적이게", "계획대로", "계획해서", "계획 세워서"),
+    "여유롭게": ("여유롭게", "여유로운", "여유롭", "여유 있게", "여유있게", "느긋하게", "천천히"),
+    "활동적으로": ("활동적으로", "활동적", "활동적인", "활발하게", "활발한", "부지런히"),
+}
+_STYLE_ALIASES = {alias.replace(" ", ""): canonical for canonical, aliases in _TRAVEL_STYLES.items() for alias in aliases}
+
+
+def _seoul_today() -> Date:
+    return datetime.now(timezone(timedelta(hours=9))).date()
 
 
 class Conditions(APIModel):
@@ -32,6 +46,31 @@ class Conditions(APIModel):
                     raise ValueError()
             except ValueError:
                 raise ValueError("time must use HH:mm") from None
+        return value
+
+    @field_validator("travel_style")
+    @classmethod
+    def canonical_style(cls, value: str | None) -> str | None:
+        # 목록에 있는 표현만 프로필 값으로 바꾸고, 나머지("계획 없이", "활동 안 하고" 등)는 그대로 둔다.
+        # 그대로 둔 값은 어떤 프로필과도 같지 않아 스타일 점수가 0 → 반대 성향 후보가 잘못 올라가지 않는다.
+        if value:
+            return _STYLE_ALIASES.get(value.replace(" ", "").strip(), value)
+        return value
+
+    @field_validator("date")
+    @classmethod
+    def plausible_year(cls, value: Date | None) -> Date | None:
+        # "11월 21일"처럼 연도 없이 말하면 AI가 1111년 등 엉뚱한 연도를 채울 수 있다.
+        # 명백히 잘못된 연도(작년보다 이전)만 다가오는 같은 월·일로 바로잡는다.
+        today = _seoul_today()
+        if value is not None and value.year < today.year - 1:
+            try:
+                fixed = value.replace(year=today.year)
+                if fixed < today:
+                    fixed = fixed.replace(year=today.year + 1)
+            except ValueError:  # 2월 29일
+                return value
+            return fixed
         return value
 
     @model_validator(mode="after")
