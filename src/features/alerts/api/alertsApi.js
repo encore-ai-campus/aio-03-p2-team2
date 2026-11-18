@@ -27,10 +27,9 @@ export const riskResponseForGroup = (groupId) => apiFetch(`/workflow/groups/${en
 
 // POST /workflow/risk-runs/{runId}/select — 추천받은 대체 축제 선택 → 그 축제 기준 일정 재생성 실행
 // 응답 = 에이전트 실행: waiting_approval → comparison.before(기존)·after(새 일정) → 모임장 확정(resume decision)
-// ⚠️ 날짜는 자동으로 바뀌지 않음 — 대체 축제 기간 안의 날짜를 conditions.date로 꼭 보내야 함
-//    (안 보내면 기존 일정 날짜로 검증해서 FESTIVAL_UNAVAILABLE "축제 기간 또는 취소 상태를 확인해야 합니다")
-export const selectAlternative = (runId, festivalId, date) =>
-  apiFetch(`/workflow/risk-runs/${enc(runId)}/select`, { method: "POST", body: { festivalId, conditions: date ? { date } : {} } });
+// 날짜를 생략하면 서버가 추천 실행에 저장된 모임 날짜를 유지한다.
+export const selectAlternative = (runId, festivalId) =>
+  apiFetch(`/workflow/risk-runs/${enc(runId)}/select`, { method: "POST", body: { festivalId } });
 
 // POST /workflow/groups/{id}/weather-review — 날씨 확인 + 「그래도 진행할까요?」 (모임장만)
 // 응답 { weatherCheck: { date, risk, weather, createdAlertCount, isTest }, run: 에이전트 실행 }

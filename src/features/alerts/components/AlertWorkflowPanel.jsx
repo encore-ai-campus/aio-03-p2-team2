@@ -1,5 +1,5 @@
 import AlertGroupInfo from "./AlertGroupInfo.jsx";
-import { alternativeDate, formatAlertDate } from "../lib/alertDates.js";
+import { formatAlertDate } from "../lib/alertDates.js";
 
 const md = (date) => (date ? date.slice(5).replace("-", ".") : "");
 
@@ -23,6 +23,7 @@ export default function AlertWorkflowPanel({
   decideWeather, decideScheduleChange, returnToAlternatives, chooseAlternative, toggleAlternatives, recommendAlternatives,
   detail, schedule, items, riskOn, toggleRisk, reloadSchedule, onOpenSchedule,
 }) {
+  const meetingDate = alternativeRun?.conditions?.date || day;
   if (weatherPrompt) {
     const choices = weatherPrompt.interrupt.choices || [
       { value: "keep", label: "네, 기존 축제 유지" },
@@ -58,7 +59,7 @@ export default function AlertWorkflowPanel({
         </button>
         <h2 className="sc-h">{chosen?.name || "대체 축제"}로 바꾸면</h2>
         <p className="sc-sub">
-          {chosen ? `${chosen.region} · ${formatAlertDate(alternativeDate(chosen))} 기준으로 다시 만든 일정이에요.` : ""}
+          {chosen ? `${chosen.region} · ${formatAlertDate(scheduleRun.conditions?.date || meetingDate) || "모임 날짜"} 기준으로 다시 만든 일정이에요.` : ""}
         </p>
         {ok ? (
           <div className="sc-compare-grid al-compare">
@@ -107,7 +108,7 @@ export default function AlertWorkflowPanel({
     return (
       <div className="al-step">
         <h2 className="sc-h">AI 대체 축제 {alternatives.length ? `${alternatives.length}곳` : ""}</h2>
-        <p className="sc-sub">고르면 {formatAlertDate(day) || "모임 날짜"} 기준으로 일정을 다시 만들어요.</p>
+        <p className="sc-sub">고르면 {formatAlertDate(meetingDate) || "모임 날짜"} 기준으로 일정을 다시 만들어요.</p>
         {alternativeRun.status !== "completed" ? (
           <div className="sc-fail">
             <b>

@@ -5,7 +5,6 @@ import { decideSchedule, getSchedule } from "../../schedules/api/scheduleApi.js"
 import { fetchFestival } from "../../festivals/api/festivalsApi.js";
 import { resumeAgentRun } from "../../matching/api/agentsApi.js";
 import { answerAlert, listAlerts, riskResponseForGroup, selectAlternative, setRiskAlert, weatherCheck, weatherReview } from "../api/alertsApi.js";
-import { alternativeDate } from "../lib/alertDates.js";
 import { isVisibleAlert } from "../lib/alertStatus.js";
 
 const ERROR_TEXT = {
@@ -193,7 +192,7 @@ export function useAlerts({ festivals, onFail }) {
 
   const chooseAlternative = (f) =>
     act(`choose:${f.id}`, async () => {
-      const r = await selectAlternative(alternativeRun.runId, f.id, alternativeDate(f));
+      const r = await selectAlternative(alternativeRun.runId, f.id);
       setChosen(f);
       setScheduleRun(r);
       return r;

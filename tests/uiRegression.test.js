@@ -450,7 +450,7 @@ test("live matching still loads API festivals and sends selected date, time and 
   delete globalThis.localStorage;
 });
 
-test("weather simulation still asks for consent, offers alternatives, and confirms a replacement schedule", async () => {
+test("weather simulation confirms a replacement festival without changing the meeting date", async () => {
   globalThis.testAuth = { user: { id: "weather_auth" } };
   const calls = [];
   const weather = { data: { date: "2099-11-20", weatherCode: 61, precipitationProbability: 90 }, source: "simulation", mode: "simulation" };
@@ -464,10 +464,11 @@ test("weather simulation still asks for consent, offers alternatives, and confir
     if (path.endsWith("/weather-check")) return { weather, risk: true };
     if (path.endsWith("/weather-review")) return { weatherCheck: { weather, risk: true, isTest: true },
       run: { runId: "wx_run", checkpointId: "cp_1", status: "waiting_input", interrupt: { type: "weather_confirmation", message: "비가 오는데 괜찮으세요?" } } };
-    if (path === "/agents/runs/wx_run/resume") return { runId: "risk_run", status: "completed", weatherDecision: "alternatives",
+    if (path === "/agents/runs/wx_run/resume") return { runId: "risk_run", status: "completed", weatherDecision: "alternatives", conditions: { date: "2099-11-20" },
       candidate: { items: [{ id: "alternative", name: "대체 축제", startDate: "2099-11-19", endDate: "2099-11-22" }] } };
     if (path === "/workflow/risk-runs/risk_run/select") return {
       runId: "new_schedule", checkpointId: "cp_schedule", status: "waiting_approval",
+      conditions: { date: options.body.conditions?.date ?? "2099-11-20" },
       comparison: { before: { items: [{ time: "15:00", label: "기존 관람" }] }, after: { items: [{ time: "16:00", label: "새 축제 관람" }] } },
     };
     if (path === "/agents/runs/new_schedule/resume") return { runId: "new_schedule", status: "completed" };
@@ -481,7 +482,8 @@ test("weather simulation still asks for consent, offers alternatives, and confir
   assert.equal(calls.find((c) => c.path.endsWith("/resume")).body.weatherDecision, "alternatives");
   assert.match(JSON.stringify(renderer.toJSON()), /대체 축제/);
   await act(async () => button(renderer, "일정 보기").props.onClick());
-  assert.deepEqual(calls.find((c) => c.path.endsWith("/select")).body, { festivalId: "alternative", conditions: { date: "2099-11-19" } });
+  assert.deepEqual(calls.find((c) => c.path.endsWith("/select")).body, { festivalId: "alternative" });
+  assert.match(JSON.stringify(renderer.toJSON()), /11\/20\([^)]*\) 기준으로 다시 만든 일정/);
   assert.match(JSON.stringify(renderer.toJSON()), /새 축제 관람/);
   await act(async () => button(renderer, "이 축제·일정으로 변경 확정").props.onClick());
   const approval = calls.find((c) => c.path === "/agents/runs/new_schedule/resume").body;
