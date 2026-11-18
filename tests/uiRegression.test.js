@@ -30,7 +30,7 @@ await build({
     b.onResolve({ filter: /^actual-app-state$/ }, () => ({ path: join(root, 'src/app/AppStateProvider.jsx') }));
     b.onResolve({ filter: /^(?:react(?:\/.*)?|react-router-dom)$/ }, (args) => ({ path: args.path, external: true }));
     b.onResolve({ filter: /(?:AuthProvider|AppStateProvider|AppLayout|apiClient)\.jsx?$/ }, (args) => ({ path: args.path, namespace: "stub" }));
-    b.onResolve({ filter: /(?:FestivalExplorePage|CommunityPage|ChatPage|SchedulePage|AlertsPage|ProfilePage|OnboardingPage|LoginPage)\.jsx$/ }, (args) => ({ path: args.path, namespace: "page" }));
+    b.onResolve({ filter: /(?:HomePage|FestivalExplorePage|CommunityPage|ChatPage|SchedulePage|AlertsPage|ProfilePage|OnboardingPage|LoginPage)\.jsx$/ }, (args) => ({ path: args.path, namespace: "page" }));
     b.onLoad({ filter: /.*/, namespace: "page" }, (args) => ({ contents: `import React from 'react'; export default () => React.createElement('div', {'data-page': ${JSON.stringify(args.path.split("/").at(-1))}});` }));
     b.onLoad({ filter: /.*/, namespace: "stub" }, (args) => {
       if (args.path.includes("AuthProvider")) return { contents: `export const AuthProvider = ({children}) => children; export const useAuth = () => globalThis.testAuth;` };
@@ -62,7 +62,9 @@ test("anonymous root ignores the persisted private page while signed-in navigati
     globalThis.testDemo = { state: { page: "alerts" } };
     globalThis.testApi = () => { throw new Error("anonymous routing must not request private data"); };
     const renderer = await mount(h(App), "/");
-    assert.equal(renderer.root.findByType("output").props["data-location"], session ? "/alerts" : "/festivals");
+    // `/` = 홈: 로그인 여부·저장된 마지막 화면과 상관없이 홈을 보여 주고, 다른 화면으로 보내지 않는다
+    assert.equal(renderer.root.findByType("output").props["data-location"], "/");
+    assert.equal(renderer.root.findByProps({ "data-page": "HomePage.jsx" }).props["data-page"], "HomePage.jsx");
     await act(async () => renderer.unmount());
   }
   globalThis.testAuth = { session: null, loading: false };
