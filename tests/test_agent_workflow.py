@@ -107,7 +107,9 @@ async def test_weather_window_overrun_uses_a_validated_basic_draft(running, monk
     monkeypatch.setattr(service.model, "generate", generate)
     run = await start(service, group, conditions=Conditions(date=day, start_time="13:00", avoid_rain=rain_on_draft or rain_on_approval))
 
-    generate.assert_awaited_once()
+    # 자가 성찰 먼저: 첫 초안 실패 → reflect_and_repair → AI 재생성(2회째) → 그래도 벗어나면 기본 일정으로 대체
+    # 비 예보(WEATHER_RISK)가 함께 있으면 성찰이 사용자에게 되묻기로 가므로 재생성하지 않는다
+    assert generate.await_count == (1 if rain_on_draft else 2)
     assert checked_windows == [("13:00", "14:30")]
     assert [item["code"] for item in run["candidateHistory"][0]["errors"]].count("WEATHER_TIME_CONFLICT") == 3
     assert (await repo.group(group["id"]))["schedule"]["items"] == original_schedule
@@ -120,7 +122,7 @@ async def test_weather_window_overrun_uses_a_validated_basic_draft(running, monk
         assert run["errors"] == []
         assert run["candidate"]["items"][0]["time"] == "13:00"
         assert run["candidate"]["items"][-1]["endTime"] == "14:30"
-        assert len(run["candidateHistory"]) == 2
+        assert len(run["candidateHistory"]) == 3  # 첫 초안, 성찰 후 재생성, 기본 일정 대체
         result = await resume(service, run)
         if rain_on_approval:
             assert result["status"] == "waiting_input"
