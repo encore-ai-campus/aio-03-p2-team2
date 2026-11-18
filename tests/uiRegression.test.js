@@ -1,6 +1,6 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join } from "node:path";
 import { build } from "esbuild";
@@ -24,7 +24,7 @@ await build({
     export { default as ProfilePage } from './src/features/auth/pages/ProfilePage.jsx';
     export { AppStateProvider as ActualProvider, useAppState as useActualState } from 'actual-app-state';
     export { default as MatchingPage } from './src/features/matching/pages/MatchingPage.jsx';
-    export { ApiResults } from './src/features/matching/pages/MatchingPage.jsx';
+    export { default as MatchingResults } from './src/features/matching/components/MatchingResults.jsx';
     export { default as AgentChatPanel } from './src/features/matching/components/AgentChatPanel.jsx';
     export { default as CreatePostBox } from './src/features/groups/components/CreatePostBox.jsx';`, resolveDir: root },
   bundle: true, platform: "node", format: "esm", packages: "external", jsx: "automatic",
@@ -43,10 +43,9 @@ await build({
       if (args.path.endsWith("/supabase.js")) return { contents: `export const supabase = { auth: { getSession: async () => ({ data: { session: { access_token: "test-token" } } }) } };` };
       return { contents: `export const apiFetch = (path, options) => globalThis.testApi(path, options);` };
     });
-    b.onLoad({ filter: /MatchingPage\.jsx$/ }, async (args) => ({ contents: `${await readFile(args.path, "utf8")}\nexport { ApiResults };`, loader: "jsx" }));
   } }],
 });
-const { App, MatchingPage, ApiResults, AgentChatPanel, CreatePostBox, ActualProvider, useActualState, LiveAlerts, LiveChat, LiveSchedule, ProfilePage } = await import(pathToFileURL(join(temporary, "components.mjs")));
+const { App, MatchingPage, MatchingResults, AgentChatPanel, CreatePostBox, ActualProvider, useActualState, LiveAlerts, LiveChat, LiveSchedule, ProfilePage } = await import(pathToFileURL(join(temporary, "components.mjs")));
 const h = React.createElement;
 const festival = { id: "fst_tour_1", name: "실제 축제", start: "2099-11-19", end: "2099-11-22" };
 
@@ -206,7 +205,7 @@ test("alert settings reflect saves from both profile and alerts after reopening"
   const renderer = await mount(h(LiveAlerts, { festivals: [] }), "/alerts");
   t.after(() => act(async () => renderer.unmount()));
   const open = (element) => act(async () => renderer.update(h(MemoryRouter, null, element)));
-  const riskSwitch = () => renderer.root.findByProps({ role: "switch", "aria-label": "내 악천후 알림 받기" });
+  const riskSwitch = () => renderer.root.findByProps({ role: "switch", "aria-label": "내 비 예보 알림 받기" });
 
   assert.equal(riskSwitch().props["aria-checked"], false);
   await open(h(ProfilePage));
@@ -244,7 +243,7 @@ test("changing selected companions preserves the draft and saving sends exactly 
     calls.push({ path, ...options });
     return new Promise((resolve) => { release = resolve; });
   };
-  const renderer = await mount(h(ApiResults, {
+  const renderer = await mount(h(MatchingResults, {
     run: { status: "done", conditions: { date: "2099-11-20", startTime: "15:00" }, result: { candidates: [
       { id: "a", name: "하늘", profile: {} }, { id: "b", name: "바다", profile: {} },
     ] } }, festival, profile: { party: "2", interests: [] }, summary: "11월 20일 오후 3시",
@@ -292,18 +291,42 @@ test("failed agent recruitment keeps the edited draft and supports retry", async
   await act(async () => renderer.unmount());
 });
 
-test("chatbot request omits a stale demo ID even when it is passed directly to the component", async () => {
+test("chatbot skips a stale demo ID and resumes with the festival and date the user picks", async () => {
   const calls = [];
+  const picks = [];
+  const results = [];
   globalThis.testApi = async (path, options) => {
     calls.push({ path, ...options });
-    return { runId: "run_ask", status: "waiting_input", interrupt: { missing: ["festivalId"], message: "축제 선택" } };
+    if (path === "/agents/runs") return {
+      runId: "run_ask", checkpointId: "cp_festival", status: "waiting_input", interrupt: { missing: ["festivalId"], message: "축제 선택" },
+    };
+    if (path === "/agents/runs/run_ask/resume" && options.body.festivalId === festival.id) return {
+      runId: "run_ask", checkpointId: "cp_date", status: "waiting_input", interrupt: { missing: ["date"] },
+    };
+    if (path === "/agents/runs/run_ask/resume" && options.body.answers?.date === "2099-11-20") return {
+      runId: "run_ask", status: "completed", conditions: { date: "2099-11-20", start_time: "15:00", party_size: 3 },
+      candidate: { items: [{ user: { id: "usr_candidate", displayName: "추천 동행" }, score: 90 }] },
+    };
+    throw new Error(`Unexpected request: ${path}`);
   };
-  const renderer = await mount(h(AgentChatPanel, { festivals: [festival], festivalId: "f07", selectedDate: "2099-11-20" }));
+  const renderer = await mount(h(AgentChatPanel, {
+    festivals: [festival], festivalId: "f07", selectedDate: "2099-11-20",
+    onPickFestival: (id) => picks.push(id), onResult: (result) => results.push(result),
+  }));
   await act(async () => change(renderer, "동행 조건 입력", "동행 찾아줘"));
   await act(async () => renderer.root.findByType("form").props.onSubmit({ preventDefault() {} }));
   assert.equal(calls[0].path, "/agents/runs");
   assert.equal(calls[0].body.festivalId, undefined);
   assert.deepEqual(calls[0].body.conditions, {});
+  await act(async () => button(renderer, festival.name).props.onClick());
+  assert.deepEqual(picks, [festival.id]);
+  assert.equal(calls[1].body.checkpointId, "cp_festival");
+  await act(async () => change(renderer, "동행 조건 입력", "2099-11-20"));
+  await act(async () => renderer.root.findByType("form").props.onSubmit({ preventDefault() {} }));
+  assert.equal(calls[2].body.checkpointId, "cp_date");
+  assert.deepEqual(calls[2].body.answers, { date: "2099-11-20" });
+  assert.equal(results[0].conditions.startTime, "15:00");
+  assert.equal(results[0].result.candidates[0].id, "usr_candidate");
   await act(async () => renderer.unmount());
 });
 
@@ -372,7 +395,7 @@ test("live matching still loads API festivals and sends selected date, time and 
   delete globalThis.localStorage;
 });
 
-test("weather simulation still asks for consent and resumes to alternative festivals", async () => {
+test("weather simulation still asks for consent, offers alternatives, and confirms a replacement schedule", async () => {
   globalThis.testAuth = { user: { id: "weather_auth" } };
   const calls = [];
   const weather = { data: { date: "2099-11-20", weatherCode: 61, precipitationProbability: 90 }, source: "simulation", mode: "simulation" };
@@ -386,8 +409,13 @@ test("weather simulation still asks for consent and resumes to alternative festi
     if (path.endsWith("/weather-check")) return { weather, risk: true };
     if (path.endsWith("/weather-review")) return { weatherCheck: { weather, risk: true, isTest: true },
       run: { runId: "wx_run", checkpointId: "cp_1", status: "waiting_input", interrupt: { type: "weather_confirmation", message: "비가 오는데 괜찮으세요?" } } };
-    if (path === "/agents/runs/wx_run/resume") return { status: "completed", weatherDecision: "alternatives",
+    if (path === "/agents/runs/wx_run/resume") return { runId: "risk_run", status: "completed", weatherDecision: "alternatives",
       candidate: { items: [{ id: "alternative", name: "대체 축제", startDate: "2099-11-19", endDate: "2099-11-22" }] } };
+    if (path === "/workflow/risk-runs/risk_run/select") return {
+      runId: "new_schedule", checkpointId: "cp_schedule", status: "waiting_approval",
+      comparison: { before: { items: [{ time: "15:00", label: "기존 관람" }] }, after: { items: [{ time: "16:00", label: "새 축제 관람" }] } },
+    };
+    if (path === "/agents/runs/new_schedule/resume") return { runId: "new_schedule", status: "completed" };
     throw new Error(`Unexpected request: ${path}`);
   };
   const renderer = await mount(h(LiveAlerts, { festivals: [festival] }));
@@ -397,5 +425,13 @@ test("weather simulation still asks for consent and resumes to alternative festi
   await act(async () => button(renderer, "아니요, 대체 축제 추천").props.onClick());
   assert.equal(calls.find((c) => c.path.endsWith("/resume")).body.weatherDecision, "alternatives");
   assert.match(JSON.stringify(renderer.toJSON()), /대체 축제/);
+  await act(async () => button(renderer, "일정 보기").props.onClick());
+  assert.deepEqual(calls.find((c) => c.path.endsWith("/select")).body, { festivalId: "alternative", conditions: { date: "2099-11-19" } });
+  assert.match(JSON.stringify(renderer.toJSON()), /새 축제 관람/);
+  await act(async () => button(renderer, "이 축제·일정으로 변경 확정").props.onClick());
+  const approval = calls.find((c) => c.path === "/agents/runs/new_schedule/resume").body;
+  assert.equal(approval.checkpointId, "cp_schedule");
+  assert.equal(approval.decision, "approve");
+  assert.match(JSON.stringify(renderer.toJSON()), /대체 축제와 새 일정으로 확정했어요/);
   await act(async () => renderer.unmount());
 });
