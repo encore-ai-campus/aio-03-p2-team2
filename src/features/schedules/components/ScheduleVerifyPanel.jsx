@@ -12,6 +12,11 @@ const HOW_STEPS = [
 export default function ScheduleVerifyPanel({ run, before, after, beforeKeys }) {
   const attempts = run?.candidateHistory || [];
   const repaired = attempts.length > 1;
+  // 마지막 초안이 검증에 실패했거나 실행이 실패로 끝났으면 「통과」로 표시하지 않음
+  const failed = attempts[attempts.length - 1]?.errors?.length > 0 || ["failed", "waiting_input", "rejected", "cancelled"].includes(run?.status);
+  const badge = failed
+    ? ["closed", repaired ? `검증 실패 · 자가 수정 ${attempts.length - 1}회` : "검증 실패"]
+    : [repaired ? "approval" : "open", repaired ? `자가 수정 ${attempts.length - 1}회` : "첫 초안 검증 통과"];
   return (
     <section className="sc-side">
       {!run ? (
@@ -35,7 +40,7 @@ export default function ScheduleVerifyPanel({ run, before, after, beforeKeys }) 
         <>
           <div className="sc-side-head">
             <h2 className="sc-h">AI 검증·자가 수정 기록</h2>
-            <span className={`cm-badge ${repaired ? "approval" : "open"}`}>{repaired ? `자가 수정 ${attempts.length - 1}회` : "첫 초안 검증 통과"}</span>
+            <span className={`cm-badge ${badge[0]}`}>{badge[1]}</span>
           </div>
           <ol className="sc-attempts">
             {attempts.map((a, i) => {

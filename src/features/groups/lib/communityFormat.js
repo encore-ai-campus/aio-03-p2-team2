@@ -30,7 +30,9 @@ export const FILTERS = [
 export const fmt = (iso) => (iso ? new Date(iso).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 export const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : "");
 const md = (d) => (d ? d.slice(5).replace("-", ".") : "");
-export const when = (item, f) => (item.date ? md(item.date) : f ? `${md(f.start)}–${md(f.end || f.start)}` : "-");
+// 모임 날짜가 없으면 축제 기간으로 대신 표시 — 단 상시·장기 운영(120일 이상)이면 1년 전체가 찍히므로 「날짜 미정」
+const longRun = (f) => f?.start && f?.end && (new Date(f.end) - new Date(f.start)) / 864e5 >= 120;
+export const when = (item, f) => (item.date ? md(item.date) : !f ? "-" : longRun(f) ? "날짜 미정" : `${md(f.start)}–${md(f.end || f.start)}`);
 export const where = (f) => (f ? [f.region, f.city].filter(Boolean).join(" ") || "지역 미정" : "지역 미정");
 export const pct = (item) => Math.min(100, ((item.memberCount || 0) / (item.capacity || 1)) * 100);
 

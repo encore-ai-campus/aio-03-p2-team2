@@ -30,6 +30,16 @@ export async function listAlerts() {
   return [...items.values()];
 }
 
+// GET /alerts?page&pageSize[&status=unread] — 알림 드롭다운용 페이지 조회 { items, page, pageSize, total }
+export const listAlertsPage = ({ page = 1, pageSize = 10, status } = {}) =>
+  apiFetch(`/alerts?page=${page}&pageSize=${pageSize}${status ? `&status=${enc(status)}` : ""}`).then((d) => ({
+    items: d?.items || [],
+    total: typeof d?.total === "number" ? d.total : null,
+  }));
+
+// PATCH /alerts/{id}/read — 단건 읽음 처리 (unread 항목에만 호출: answered·dismissed를 read로 덮어쓰지 않도록)
+export const markAlertRead = (alertId) => apiFetch(`/alerts/${enc(alertId)}/read`, { method: "PATCH" });
+
 // POST /alerts/{id}/answer — 참여 의사: continue(그대로 참여) | find_alternative(대체 축제) | dismiss
 export async function answerAlert(alertId, answer) {
   const result = await apiFetch(`/alerts/${enc(alertId)}/answer`, { method: "POST", body: { answer } });
