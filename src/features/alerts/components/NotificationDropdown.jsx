@@ -1,7 +1,8 @@
 // 상단 종 → 알림 드롭다운 (목록형 · 전체/안 읽음 탭 · 오늘/이전 묶음 · 이전 알림 더 보기)
 // 알림을 누르면 읽음 처리 후 관련 화면으로: rain → /alerts?groupId= / festival_changed → /groups?groupId=
+// 종 숫자 = 응답이 필요한 날씨 알림 수, 하단 「알림 전체 보기」 → AI 알림 화면(승인 안내 포함 전체 목록)
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications.js";
 import { needsWeatherResponse } from "../lib/alertStatus.js";
 import "../notificationDropdown.css";
@@ -135,7 +136,7 @@ export default function NotificationDropdown({ userId, hidden = false }) {
           <header className="nd-head">
             <h2 id={id + "-title"}>알림</h2>
             <div className="nd-tabs" role="tablist" aria-label="알림 보기">
-              {[["all", "전체"], ["unread", `안 읽음${n.unreadCount ? ` ${n.unreadCount}` : ""}`]].map(([v, label]) => (
+              {[["all", "전체"], ["unread", "안 읽음"]].map(([v, label]) => (
                 <button key={v} type="button" role="tab" aria-selected={n.tab === v} className={n.tab === v ? "on" : ""} onClick={() => n.setTab(v)}>
                   {label}
                 </button>
@@ -197,13 +198,19 @@ export default function NotificationDropdown({ userId, hidden = false }) {
                               <span className="nd-copy">
                                 <span className="nd-title">
                                   {item.title || "모임 알림"}
-                                  {needsWeatherResponse(item) ? <em className="nd-chip">응답 필요</em> : null}
                                 </span>
                                 {item.message ? <span className="nd-msg">{item.message}</span> : null}
                               </span>
                               <span className="nd-side">
                                 <time dateTime={item.createdAt}>{relTime(item.createdAt, now)}</time>
-                                {unread ? <span className="nd-dot" aria-hidden="true" /> : null}
+                                <span className="nd-tag-row">
+                                  {unread ? <span className="nd-dot" aria-hidden="true" /> : null}
+                                  {needsWeatherResponse(item) ? (
+                                    <em className="nd-chip">응답 필요</em>
+                                  ) : (
+                                    <em className="nd-tag">{item.type === "rain" ? "응답 완료" : "안내"}</em>
+                                  )}
+                                </span>
                               </span>
                             </button>
                           </li>
@@ -220,6 +227,11 @@ export default function NotificationDropdown({ userId, hidden = false }) {
               </>
             )}
           </div>
+          <footer className="nd-foot">
+            <Link className="nd-all" to="/alerts" onClick={() => setOpen(false)}>
+              알림 전체 보기 <i className="ti ti-chevron-right" aria-hidden="true" />
+            </Link>
+          </footer>
         </section>
       )}
     </div>

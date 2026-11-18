@@ -1,9 +1,9 @@
-// 알림 드롭다운 상태 — 탭(전체/안 읽음)·페이지 이어 받기·안 읽음 수·단건 읽음 처리(낙관적 업데이트)
+// 알림 드롭다운 상태 — 탭(전체/안 읽음)·페이지 이어 받기·응답 필요 수·단건 읽음 처리(낙관적 업데이트)
 // 서버: GET /alerts?page&pageSize[&status=unread] → { items, total } / PATCH /alerts/{id}/read
 // 「모두 읽음」 API는 없어서 제공하지 않음
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listAlertsPage, markAlertRead } from "../api/alertsApi.js";
-import { isVisibleAlert } from "../lib/alertStatus.js";
+import { isVisibleAlert, needsWeatherResponse } from "../lib/alertStatus.js";
 
 const PAGE_SIZE = 10;
 
@@ -21,11 +21,11 @@ export function useNotifications({ userId, refreshKey }) {
 
   const fetchPage = useCallback((p) => listAlertsPage({ page: p, pageSize: PAGE_SIZE, status: tab === "unread" ? "unread" : undefined }), [tab]);
 
-  // 종 숫자: 서버의 안 읽음 total 기준
+  // 종 숫자: 응답이 필요한 날씨 알림 수 (PM 기준 — alertStatus.needsWeatherResponse)
   const loadUnread = useCallback(
     () =>
-      listAlertsPage({ page: 1, pageSize: 1, status: "unread" })
-        .then((r) => setUnreadCount(r.total ?? r.items.length))
+      listAlertsPage({ page: 1, pageSize: 50 })
+        .then((r) => setUnreadCount(r.items.filter(needsWeatherResponse).length))
         .catch(() => {}),
     [],
   );
@@ -84,10 +84,8 @@ export function useNotifications({ userId, refreshKey }) {
   const markRead = (item) => {
     if (item.status !== "unread") return;
     setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, status: "read" } : x)));
-    setUnreadCount((n) => Math.max(0, n - 1));
     markAlertRead(item.id).catch(() => {
       setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, status: "unread" } : x)));
-      setUnreadCount((n) => n + 1);
     });
   };
 

@@ -50,6 +50,11 @@
 .nd-side { flex: none; display: grid; justify-items: end; gap: 8px; padding-top: 2px; }
 .nd-side time { font-size: 13px; color: #958B85; white-space: nowrap; }
 .nd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--coral, #F06448); }
+.nd-tag-row { display: flex; align-items: center; gap: 6px; }
+.nd-tag { font-style: normal; font-size: 13px; color: #958B85; }
+.nd-foot { flex: none; border-top: 1px solid var(--line, #ECE6E2); }
+.nd-all { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 12px 20px; font-size: 14px; font-weight: 600; color: var(--ink, #38251F); text-decoration: none; }
+.nd-all:hover { background: var(--gray, #FAF8F6); }
 
 /* 더 보기 */
 .nd-more { display: block; width: calc(100% - 40px); margin: 8px 20px 4px; padding: 10px 0; border: 1px solid var(--line, #ECE6E2); border-radius: 10px; background: var(--bg, #fff); color: var(--ink, #38251F); font-size: 14px; font-weight: 600; cursor: pointer; }
