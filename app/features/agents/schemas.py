@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from datetime import date as Date, time
+from datetime import date as Date, datetime, time, timedelta, timezone
 from typing import Literal, Annotated
 
 from pydantic import Field, field_validator, model_validator
 
 from app.core.models import APIModel
+
+
+# 프로필 여행 스타일 값(온보딩 선택지)과 맞춘다. AI가 "계획적"처럼 줄여 말해도 점수 계산에서 같은 값으로 본다.
+_TRAVEL_STYLES = {"계획": "계획적으로", "여유": "여유롭게", "활동": "활동적으로"}
+
+
+def _seoul_today() -> Date:
+    return datetime.now(timezone(timedelta(hours=9))).date()
 
 
 class Conditions(APIModel):
@@ -32,6 +40,31 @@ class Conditions(APIModel):
                     raise ValueError()
             except ValueError:
                 raise ValueError("time must use HH:mm") from None
+        return value
+
+    @field_validator("travel_style")
+    @classmethod
+    def canonical_style(cls, value: str | None) -> str | None:
+        if value:
+            for prefix, canonical in _TRAVEL_STYLES.items():
+                if value.strip().startswith(prefix):
+                    return canonical
+        return value
+
+    @field_validator("date")
+    @classmethod
+    def plausible_year(cls, value: Date | None) -> Date | None:
+        # "11월 21일"처럼 연도 없이 말하면 AI가 1111년 등 엉뚱한 연도를 채울 수 있다.
+        # 명백히 잘못된 연도(작년보다 이전)만 다가오는 같은 월·일로 바로잡는다.
+        today = _seoul_today()
+        if value is not None and value.year < today.year - 1:
+            try:
+                fixed = value.replace(year=today.year)
+                if fixed < today:
+                    fixed = fixed.replace(year=today.year + 1)
+            except ValueError:  # 2월 29일
+                return value
+            return fixed
         return value
 
     @model_validator(mode="after")
