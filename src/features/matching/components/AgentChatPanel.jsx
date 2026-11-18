@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../../../shared/components/Primitives.jsx";
 import { resumeAgentRun, startAgentRun } from "../api/agentsApi.js";
 import { toCandidateModel } from "../api/matchingApi.js";
+import { matchingAgentRequest, selectedApiFestival } from "../lib/agentFestival.js";
 
 // 시간을 일부러 빼 둔 예시 → 에이전트가 "몇 시에 참여하실 건가요?"를 되묻는 장면을 보여줄 수 있다
 // 첫 예시는 선택한 축제 이름을 넣는다 (선택 전이면 축제를 되묻는다)
@@ -244,8 +245,8 @@ export default function AgentChatPanel({ onEditConditions, festivals, festivalId
       );
     }
     return call(
-      () => startAgentRun({ message: value, festivalId: festivalId || undefined, sessionId: run?.sessionId,
-        conditions: selectedDate ? { date: selectedDate } : {} }),
+      () => startAgentRun(matchingAgentRequest({ festivals, festivalId, selectedDate,
+        message: value, sessionId: run?.sessionId })),
       value,
     );
   }
@@ -257,6 +258,10 @@ export default function AgentChatPanel({ onEditConditions, festivals, festivalId
     call(() => resumeAgentRun(run.runId, { checkpointId: run.checkpointId, answers: { startTime } }), label + "부터 가능해요");
 
   const answerFestival = (id) => {
+    if (!selectedApiFestival(festivals, id)) {
+      push({ role: "bot", type: "text", text: "실제 축제 목록에서 참여할 축제를 선택해 주세요." });
+      return;
+    }
     setFestQuery("");
     onPickFestival?.(id);
     call(() => resumeAgentRun(run.runId, { checkpointId: run.checkpointId, festivalId: id }), festival(id)?.name || id);

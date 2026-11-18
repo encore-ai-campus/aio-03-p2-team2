@@ -6,6 +6,7 @@ import AiChatPanel from "../components/AiChatPanel.jsx";
 import AgentChatPanel from "../components/AgentChatPanel.jsx";
 import { AI_JOIN } from "../lib/aiParse.js";
 import { recruitmentJoinMode } from "../lib/matchingConditions.js";
+import { matchingView, selectedApiFestival } from "../lib/agentFestival.js";
 import { SOURCE_LABEL, useFestivals } from "../../festivals/hooks/useFestivals.js";
 import { DEMO_MODE } from "../../../shared/lib/demoMode.js";
 import { ApiError, ApiLoading } from "../../../shared/components/ApiState.jsx";
@@ -39,10 +40,18 @@ export default function MatchingPage() {
   // 축제 목록: 실제 API 우선, 실패 시 데모 데이터 (축제 탐색 화면과 같은 규칙)
   const { festivals: liveFestivals, source } = useFestivals(state.festivals);
   const useApi = source === "api";
-  const findFestival = (id) => liveFestivals.find((x) => x.id === id) || festival(id);
+  const findFestival = (id) => selectedApiFestival(liveFestivals, id) || (!useApi && DEMO_MODE ? festival(id) : undefined);
   const isOpen = (x) => (x.apiStatus ? x.apiStatus !== "past" && x.riskStatus !== "cancelled" : active(x));
   const f = findFestival(state.festivalId) || liveFestivals.find(isOpen) || liveFestivals[0];
   const all = liveFestivals.filter(isOpen);
+  const apiFestival = useApi ? selectedApiFestival(all, state.festivalId) : undefined;
+  useEffect(() => {
+    if (!useApi || !state.festivalId || apiFestival) return;
+    mutate((s) => {
+      s.festivalId = null;
+      s.matchingDone = false;
+    });
+  }, [useApi, state.festivalId, apiFestival, mutate]);
   // 직접 조건 매칭(실제 API) — 조건이 바뀌면 이전 결과는 숨긴다
   const { run, execute } = useMatchingRun();
   const [formMsg, setFormMsg] = useState("");
@@ -351,8 +360,16 @@ export default function MatchingPage() {
   );
 
   // 데모 모드가 아니면: 불러오는 중엔 스켈레톤, 연결 실패면 안내 (예전 데모 화면이 먼저 뜨던 문제)
-  if (!DEMO_MODE && source === "loading") return <ApiLoading text="축제 불러오는 중…" />;
-  if (!DEMO_MODE && source === "demo") return <ApiError />;
+  const view = matchingView(source, DEMO_MODE);
+  if (view === "loading") return <ApiLoading text="축제 불러오는 중…" />;
+  if (view === "error") return <ApiError />;
+  if (view === "empty") return (
+    <section className="empty" role="status">
+      <h2>등록된 축제가 없어요</h2>
+      <p>축제 데이터가 등록되면 동행을 찾을 수 있어요.</p>
+      <Link to="/festivals">축제 탐색으로 이동</Link>
+    </section>
+  );
   return (
     <div className={useApi ? "mp-v3" : undefined}>
       {/* 실서버 모드: v3 머리글 — 제목·설명 왼쪽, 진행 단계 오른쪽 (실제 진행한 단계까지만 ✓) */}
@@ -416,7 +433,7 @@ export default function MatchingPage() {
           <div hidden={tab !== "chat"}>
         <AgentChatPanel
           festivals={all}
-          festivalId={state.festivalId}
+          festivalId={apiFestival?.id}
           selectedDate={chosen && pr.date >= chosen.start && pr.date <= chosen.end ? pr.date : undefined}
           pill={pill}
           onResult={setAgentRun}
@@ -610,6 +627,7 @@ function ScoreWhy({ parts }) {
 const REASON_ICON = (r) => (/합류|시/.test(r) ? "ti-clock" : /나이/.test(r) ? "ti-user" : /관심|취향/.test(r) ? "ti-heart" : /예산/.test(r) ? "ti-wallet" : /스타일/.test(r) ? "ti-walk" : "ti-check");
 function ApiResults({ run, festival, profile, summary, joinLabel, onEdit }) {
   const [picked, setPicked] = useState([]); // 함께하고 싶은 동행 id (모집글 초안에 들어감)
+  const [saving, setSaving] = useState(false);
   if (run.status === "loading")
     return (
       <div className="ws-body ws-pad">
@@ -668,7 +686,6 @@ function ApiResults({ run, festival, profile, summary, joinLabel, onEdit }) {
     });
   const full = max > 1 && picked.length >= max;
   const names = candidates.filter((o) => picked.includes(o.id)).map((o) => o.name);
-  const postSummary = [summary, names.length && `함께하고 싶은 동행: ${names.join(", ")}`].filter(Boolean).join("\n");
   return (
     <>
       <div className="ws-head">
@@ -688,6 +705,7 @@ function ApiResults({ run, festival, profile, summary, joinLabel, onEdit }) {
                 key={o.id}
                 role="checkbox"
                 aria-checked={on}
+                disabled={saving}
                 className={`pick-card${full && !on ? " dim" : ""}`}
                 onClick={() => toggle(o.id)}
               >
@@ -724,7 +742,7 @@ function ApiResults({ run, festival, profile, summary, joinLabel, onEdit }) {
               <b>더 잘 맞는 동행을 찾고 싶다면</b>
               <span>관심사·스타일·예산을 더하면 더 정확해져요</span>
             </div>
-            <button type="button" onClick={onEdit}>조건 더하기 <i className="ti ti-chevron-right" aria-hidden="true" /></button>
+            <button type="button" onClick={onEdit} disabled={saving}>조건 더하기 <i className="ti ti-chevron-right" aria-hidden="true" /></button>
           </div>
         )}
       </div>
@@ -739,12 +757,13 @@ function ApiResults({ run, festival, profile, summary, joinLabel, onEdit }) {
         </div>
         <CreatePostBox
           cta
-          key={postSummary}
           festival={festival}
           runId={run.runId}
           partySize={party}
           joinMode={recruitmentJoinMode(run.runId, profile.joinMode)}
-          summary={postSummary}
+          summary={summary}
+          selectedCompanions={names}
+          onBusyChange={setSaving}
           date={date}
           startTime={start}
         />
