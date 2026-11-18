@@ -19,6 +19,9 @@ after(() => rm(temporary, { recursive: true, force: true }));
 await build({
   stdin: { contents: `export { default as App } from './src/app/App.jsx';
     export { default as LiveAlerts } from './src/features/alerts/components/LiveAlerts.jsx';
+    export { default as LiveChat } from './src/features/chat/components/LiveChat.jsx';
+    export { default as LiveSchedule } from './src/features/schedules/components/LiveSchedule.jsx';
+    export { default as ProfilePage } from './src/features/auth/pages/ProfilePage.jsx';
     export { AppStateProvider as ActualProvider, useAppState as useActualState } from 'actual-app-state';
     export { default as MatchingPage } from './src/features/matching/pages/MatchingPage.jsx';
     export { ApiResults } from './src/features/matching/pages/MatchingPage.jsx';
@@ -29,20 +32,21 @@ await build({
   plugins: [{ name: "test-boundaries", setup(b) {
     b.onResolve({ filter: /^actual-app-state$/ }, () => ({ path: join(root, 'src/app/AppStateProvider.jsx') }));
     b.onResolve({ filter: /^(?:react(?:\/.*)?|react-router-dom)$/ }, (args) => ({ path: args.path, external: true }));
-    b.onResolve({ filter: /(?:AuthProvider|AppStateProvider|AppLayout|apiClient)\.jsx?$/ }, (args) => ({ path: args.path, namespace: "stub" }));
-    b.onResolve({ filter: /(?:HomePage|FestivalExplorePage|CommunityPage|ChatPage|SchedulePage|AlertsPage|ProfilePage|OnboardingPage|LoginPage)\.jsx$/ }, (args) => ({ path: args.path, namespace: "page" }));
+    b.onResolve({ filter: /(?:AuthProvider|AppStateProvider|AppLayout|apiClient|supabase)\.jsx?$/ }, (args) => ({ path: args.path, namespace: "stub" }));
+    b.onResolve({ filter: /(?:HomePage|FestivalExplorePage|CommunityPage|ChatPage|SchedulePage|AlertsPage|OnboardingPage|LoginPage)\.jsx$/ }, (args) => ({ path: args.path, namespace: "page" }));
     b.onLoad({ filter: /.*/, namespace: "page" }, (args) => ({ contents: `import React from 'react'; export default () => React.createElement('div', {'data-page': ${JSON.stringify(args.path.split("/").at(-1))}});` }));
     b.onLoad({ filter: /.*/, namespace: "stub" }, (args) => {
       if (args.path.includes("AuthProvider")) return { contents: `export const AuthProvider = ({children}) => children; export const useAuth = () => globalThis.testAuth;` };
       if (args.path.includes("AppStateProvider")) return { contents: `export const AppStateProvider = ({children}) => children; export const useAppState = () => globalThis.testDemo;
         export const paths = {discover:'/festivals', match:'/matching', community:'/groups', room:'/chat', schedule:'/schedules', alerts:'/alerts'};` };
       if (args.path.includes("AppLayout")) return { contents: `import React from 'react'; import {Outlet} from 'react-router-dom'; export default () => React.createElement(Outlet);` };
+      if (args.path.endsWith("/supabase.js")) return { contents: `export const supabase = { auth: { getSession: async () => ({ data: { session: { access_token: "test-token" } } }) } };` };
       return { contents: `export const apiFetch = (path, options) => globalThis.testApi(path, options);` };
     });
     b.onLoad({ filter: /MatchingPage\.jsx$/ }, async (args) => ({ contents: `${await readFile(args.path, "utf8")}\nexport { ApiResults };`, loader: "jsx" }));
   } }],
 });
-const { App, MatchingPage, ApiResults, AgentChatPanel, CreatePostBox, ActualProvider, useActualState, LiveAlerts } = await import(pathToFileURL(join(temporary, "components.mjs")));
+const { App, MatchingPage, ApiResults, AgentChatPanel, CreatePostBox, ActualProvider, useActualState, LiveAlerts, LiveChat, LiveSchedule, ProfilePage } = await import(pathToFileURL(join(temporary, "components.mjs")));
 const h = React.createElement;
 const festival = { id: "fst_tour_1", name: "실제 축제", start: "2099-11-19", end: "2099-11-22" };
 
@@ -55,6 +59,168 @@ async function mount(element, path = "/matching") {
 const change = (renderer, label, value) => renderer.root.findByProps({ "aria-label": label }).props.onChange({ target: { value } });
 const textOf = (value) => typeof value === "string" ? value : Array.isArray(value) ? value.map(textOf).join("") : textOf(value?.props?.children || "");
 const button = (renderer, text) => renderer.root.findAllByType("button").find((b) => textOf(b.props.children).includes(text));
+
+test("a delayed chat send never changes the room opened after sending", async (t) => {
+  const chooseRoom = (renderer, title) => button(renderer, title).props.onClick();
+  const messages = (renderer) => renderer.root.findAllByProps({ className: "chat-bubble" }).map((node) => node.props.children);
+  const message = (id, groupId, text, clientMessageId) => ({
+    id, groupId, text, clientMessageId, type: "user", sender: { id: "chat_member" }, createdAt: "2026-11-18T12:00:00Z",
+  });
+  const groups = ["a", "b"].map((id) => ({
+    id, title: `채팅방 ${id.toUpperCase()}`, members: [{ userId: "chat_member" }], memberCount: 1, capacity: 4,
+  }));
+  const originalA = message("msg_a", "a", "A방 기존 메시지");
+  const originalB = message("msg_b", "b", "B방 기존 메시지");
+  const histories = { a: [originalA], b: [originalB] };
+  let finishA;
+  globalThis.testAuth = { user: { id: "chat_auth" } };
+  t.mock.method(globalThis, "WebSocket", class {
+    close() {}
+  });
+  globalThis.testApi = async (path, options) => {
+    if (path === "/me") return { id: "chat_member" };
+    if (path.startsWith("/festivals?")) return { items: [], total: 0 };
+    if (path.startsWith("/groups?")) return { items: groups };
+    const group = groups.find(({ id }) => path === `/groups/${id}`);
+    if (group) return group;
+    if (path === "/groups/a/messages?limit=50") return { items: histories.a };
+    if (path === "/groups/b/messages?limit=50") return { items: histories.b };
+    if (options?.method === "POST" && path === "/groups/a/messages") {
+      return new Promise((resolve) => {
+        finishA = () => {
+          const saved = message("msg_saved_a", "a", options.body.text, options.body.clientMessageId);
+          histories.a.push(saved);
+          resolve(saved);
+        };
+      });
+    }
+    if (options?.method === "POST" && path === "/groups/b/messages") {
+      return message("msg_saved_b", "b", options.body.text, options.body.clientMessageId);
+    }
+    throw new Error(`Unexpected request: ${path}`);
+  };
+
+  const renderer = await mount(h(LiveChat), "/chat?groupId=a");
+  t.after(() => act(async () => renderer.unmount()));
+  const submit = async (text) => {
+    await act(async () => change(renderer, "채팅 메시지", text));
+    await act(async () => renderer.root.findByType("form").props.onSubmit({ preventDefault() {} }));
+  };
+
+  await submit("A방 새 메시지");
+  assert.deepEqual(messages(renderer), ["A방 기존 메시지", "A방 새 메시지"]);
+  await act(async () => chooseRoom(renderer, "채팅방 B"));
+  assert.deepEqual(messages(renderer), ["B방 기존 메시지"]);
+  await act(async () => finishA());
+  assert.deepEqual(messages(renderer), ["B방 기존 메시지"]);
+  await submit("B방 새 메시지");
+  assert.deepEqual(messages(renderer), ["B방 기존 메시지", "B방 새 메시지"]);
+  await act(async () => chooseRoom(renderer, "채팅방 A"));
+  assert.deepEqual(messages(renderer), ["A방 기존 메시지", "A방 새 메시지"]);
+});
+
+test("late group and schedule responses cannot replace the selected group's schedule", async (t) => {
+  globalThis.testAuth = { user: { id: "schedule_auth" } };
+  const group = (id, title) => ({
+    id, title, leaderId: "schedule_user", status: "open", memberCount: 1, capacity: 4,
+    members: [{ userId: "schedule_user", role: "leader", user: { displayName: "일정 모임장" } }],
+  });
+  const groups = [group("a", "모임 A"), group("b", "모임 B"), group("c", "모임 C")];
+  const schedule = (letter) => ({ items: [{ label: `${letter} 일정`, time: "15:00" }] });
+  let finishA;
+  let finishC;
+  const draftRequests = [];
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "schedule_user" };
+    if (path.startsWith("/groups?")) return { items: groups, total: groups.length };
+    if (path === "/groups/a") return groups[0];
+    if (path === "/groups/a/schedule") return new Promise((resolve) => { finishA = () => resolve(schedule("A")); });
+    if (path === "/groups/b") return groups[1];
+    if (path === "/groups/b/schedule") return schedule("B");
+    if (path === "/groups/c") return new Promise((resolve) => { finishC = () => resolve(groups[2]); });
+    if (path === "/groups/c/schedule") return schedule("C");
+    if (path.startsWith("/workflow/groups/")) {
+      draftRequests.push(path);
+      return { runId: "schedule_run", status: "waiting_approval" };
+    }
+    throw new Error(`Unexpected request: ${path}`);
+  };
+  const renderer = await mount(h(LiveSchedule, { festivals: [] }), "/schedules?groupId=a");
+  t.after(() => act(async () => renderer.unmount()));
+  const select = (id) => act(async () => change(renderer, "모임 변경", id));
+  await select("c");
+  await select("b");
+  assert.match(JSON.stringify(renderer.toJSON()), /B 일정/);
+  await act(async () => { finishA(); finishC(); });
+  assert.equal(textOf(renderer.root.findByType("h3").props.children), "모임 B모집 중");
+  assert.match(JSON.stringify(renderer.toJSON()), /B 일정/);
+  assert.doesNotMatch(JSON.stringify(renderer.toJSON()), /[AC] 일정/);
+  await act(async () => button(renderer, "AI 일정 초안 만들기").props.onClick());
+  assert.deepEqual(draftRequests, ["/workflow/groups/b/schedule"]);
+});
+
+test("chat can open a member's group from the second page of a 101-group list", async (t) => {
+  globalThis.testAuth = { user: { id: "paged_chat_auth" } };
+  t.mock.method(globalThis, "WebSocket", class { close() {} });
+  const groups = Array.from({ length: 101 }, (_, i) => ({
+    id: `grp_${i + 1}`, title: `모임 ${i + 1}`, memberCount: 1, capacity: 4,
+  }));
+  const pages = [];
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "paged_chat_member" };
+    if (path.startsWith("/festivals?")) return { items: [], total: 0 };
+    if (path.startsWith("/groups?")) {
+      const page = Number(new URL(path, "http://test").searchParams.get("page") || "1");
+      pages.push(page);
+      return { items: groups.slice((page - 1) * 100, page * 100), total: groups.length };
+    }
+    if (path === "/groups/grp_101/messages?limit=50") return { items: [] };
+    const group = groups.find(({ id }) => path === `/groups/${id}`);
+    if (group) return { ...group, members: group.id === "grp_101" ? [{ userId: "paged_chat_member" }] : [] };
+    throw new Error(`Unexpected request: ${path}`);
+  };
+  const renderer = await mount(h(LiveChat), "/chat?groupId=grp_101");
+  t.after(() => act(async () => renderer.unmount()));
+  assert.deepEqual(pages, [1, 2]);
+  assert.ok(renderer.root.findByProps({ "aria-label": "채팅 메시지" }));
+});
+
+test("alert settings reflect saves from both profile and alerts after reopening", async (t) => {
+  globalThis.testAuth = { user: { id: "risk_settings_auth" } };
+  let riskAlert = false;
+  const group = {
+    id: "grp_risk", title: "알림 모임", leaderId: "risk_settings_user", memberCount: 1, capacity: 4,
+    members: [{ userId: "risk_settings_user", role: "leader", user: { displayName: "모임장" } }],
+  };
+  globalThis.testApi = async (path, options) => {
+    if (path === "/me") return { id: "risk_settings_user", notificationConsent: { riskAlert } };
+    if (path.startsWith("/groups?")) return { items: [group], total: 1 };
+    if (path === "/groups/grp_risk") return group;
+    if (path === "/groups/grp_risk/schedule" || path.startsWith("/alerts?")) return { items: [], total: 0 };
+    if (path === "/me/notification-consents" && options.method === "PATCH") {
+      riskAlert = options.body.riskAlert;
+      return { riskAlert };
+    }
+    throw new Error(`Unexpected request: ${path}`);
+  };
+  const renderer = await mount(h(LiveAlerts, { festivals: [] }), "/alerts");
+  t.after(() => act(async () => renderer.unmount()));
+  const open = (element) => act(async () => renderer.update(h(MemoryRouter, null, element)));
+  const riskSwitch = () => renderer.root.findByProps({ role: "switch", "aria-label": "내 비 예보 알림 받기" });
+
+  assert.equal(riskSwitch().props["aria-checked"], false);
+  await open(h(ProfilePage));
+  await act(async () => button(renderer, "악천후 알림 받기").props.onClick());
+  assert.equal(riskAlert, true);
+  await open(h(LiveAlerts, { festivals: [] }));
+  assert.equal(riskSwitch().props["aria-checked"], true);
+  await act(async () => riskSwitch().props.onClick());
+  assert.equal(riskAlert, false);
+  await open(h(ProfilePage));
+  assert.equal(button(renderer, "악천후 알림 받기").props["aria-pressed"], false);
+  await open(h(LiveAlerts, { festivals: [] }));
+  assert.equal(riskSwitch().props["aria-checked"], false);
+});
 
 test("anonymous root ignores the persisted private page while signed-in navigation stays intact", async () => {
   for (const session of [null, { user: { id: "auth_me", user_metadata: { onboarded: true } } }]) {

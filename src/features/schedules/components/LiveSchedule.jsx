@@ -1,6 +1,6 @@
 // 공동 일정 — 실제 API 버전 (플로우: 참여 승인 → 일정 초안 → 검증·자가 수정 → 모임장 승인 → 확정)
 // v3 화면: 모임 카드 → 한 장 카드(왼쪽 확정 일정·AI 초안 | 오른쪽 검증·자가 수정 기록·기존/새 비교)
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { getGroup, listGroups } from "../../groups/api/groupsApi.js";
@@ -76,43 +76,57 @@ const keysOf = (items) => new Set((items || []).map((x) => `${x.label}|${x.time}
 
 export default function LiveSchedule({ festivals, onFail }) {
   const me = useMe();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [groups, setGroups] = useState(null);
-  const [group, setGroup] = useState(null);
-  const [schedule, setSchedule] = useState(null);
-  const [run, setRun] = useState(null); // 일정 초안 에이전트 실행 결과
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
   const groupId = params.get("groupId") || groups?.[0]?.id;
-  const festival = (id) => festivals.find((f) => f.id === id);
 
   useEffect(() => {
     listGroups()
       .then(setGroups)
       .catch((e) => {
-        console.warn("[schedule] 모임 목록 실패 → 데모", e);
+        console.warn("[schedule] 모임 목록 실패", e);
         onFail?.();
       });
   }, [onFail]);
 
-  const load = useCallback(async () => {
-    if (!groupId) return;
-    setGroup(null);
-    setSchedule(null);
-    try {
-      const g = await getGroup(groupId);
-      setGroup(g);
-      if (me && g.members.some((m) => m.userId === me.id)) setSchedule(await getSchedule(groupId));
-    } catch (e) {
-      setNotice(msg(e));
-    }
-  }, [groupId, me]);
+  return (
+    <SelectedSchedule
+      key={groupId}
+      groupId={groupId}
+      groups={groups}
+      festivals={festivals}
+      me={me}
+      onGroupChange={(id) => setParams({ groupId: id })}
+    />
+  );
+}
+
+function SelectedSchedule({ groupId, groups, festivals, me, onGroupChange }) {
+  const meId = me?.id;
+  const navigate = useNavigate();
+  const [group, setGroup] = useState(null);
+  const [schedule, setSchedule] = useState(null);
+  const [run, setRun] = useState(null); // 일정 초안 에이전트 실행 결과
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [reload, setReload] = useState(0);
+  const festival = (id) => festivals.find((f) => f.id === id);
+
   useEffect(() => {
-    setRun(null);
-    setNotice("");
-    load();
-  }, [load]);
+    if (!groupId) return;
+    let alive = true;
+    getGroup(groupId)
+      .then(async (g) => {
+        if (!alive) return;
+        setGroup(g);
+        const nextSchedule = g.members.some((m) => m.userId === meId) ? await getSchedule(groupId) : null;
+        if (alive) setSchedule(nextSchedule);
+      })
+      .catch((e) => {
+        if (alive) setNotice(msg(e));
+      });
+    return () => { alive = false; };
+  }, [groupId, meId, reload]);
 
   async function act(fn, done) {
     if (busy) return;
@@ -236,7 +250,7 @@ export default function LiveSchedule({ festivals, onFail }) {
         </div>
         <label className="sc-group-change">
           <span>모임 변경</span>
-          <select value={groupId || ""} onChange={(e) => setParams({ groupId: e.target.value })} aria-label="모임 변경">
+          <select value={groupId || ""} onChange={(e) => onGroupChange(e.target.value)} aria-label="모임 변경">
             {groups.map((x) => (
               <option key={x.id} value={x.id}>
                 {x.title}
@@ -282,7 +296,11 @@ export default function LiveSchedule({ festivals, onFail }) {
                 <Timeline items={run.candidate?.items} changedKeys={beforeKeys} />
                 {isLeader ? (
                   <div className="sc-draft-btns">
-                    <button type="button" className="btn primary" disabled={busy} onClick={() => act(() => decideSchedule(run, "approve")).then(load)}>
+                    <button type="button" className="btn primary" disabled={busy} onClick={() => act(async () => {
+                      const result = await decideSchedule(run, "approve");
+                      setReload((n) => n + 1);
+                      return result;
+                    })}>
                       이 일정으로 확정하기
                     </button>
                     <button type="button" className="btn" disabled={busy} onClick={() => act(() => decideSchedule(run, "reject"), () => "초안을 거절했어요. 기존 일정은 그대로예요.")}>

@@ -1,7 +1,7 @@
 // 모임 채팅방 — 실제 API 버전 (1단계: 내 모임방 목록 전체 폭 → 입장하면 목록은 왼쪽 좁은 칸, 채팅방이 오른쪽에서 밀려 들어옴)
 // 흐름: 내 모임방 찾기(목록 → 상세 3개씩) → 최근 50개 조회 → WebSocket 실시간 수신 → 전송(POST, 먼저 화면에 표시)
 // WebSocket이 끊기면 5초마다 다시 불러오고, 15초 뒤 재연결을 시도한다.
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { useFestivals } from "../../festivals/hooks/useFestivals.js";
@@ -46,6 +46,7 @@ export default function LiveChat({ onFail }) {
   const [text, setText] = useState("");
   const [reload, setReload] = useState(0);
   const [showAll, setShowAll] = useState(false);
+  const activeRoom = useRef(null);
   const inputRef = useRef(null);
   const { festivals } = useFestivals();
   const festivalName = (id) => festivals.find((f) => f.id === id)?.name || "";
@@ -82,16 +83,18 @@ export default function LiveChat({ onFail }) {
   const roomId = room?.id;
 
   // 2) 메시지 조회 + 실시간 연결
-  useEffect(() => {
-    if (!roomId) return;
-    let alive = true;
-    let ws = null;
-    let poll = null;
-    let retry = null;
+  useLayoutEffect(() => {
     setMessages(null);
     setPending([]);
     setLoadError(null);
     setLive("connecting");
+    setText("");
+    if (!roomId) return;
+    let alive = true;
+    activeRoom.current = () => alive;
+    let ws = null;
+    let poll = null;
+    let retry = null;
 
     const refresh = () =>
       listMessages(roomId)
@@ -135,6 +138,7 @@ export default function LiveChat({ onFail }) {
 
     return () => {
       alive = false;
+      activeRoom.current = null;
       clearInterval(poll);
       clearTimeout(retry);
       if (ws) ws.close();
@@ -144,16 +148,19 @@ export default function LiveChat({ onFail }) {
   // 3) 전송 — 먼저 화면에 표시, 실패하면 「다시 보내기」
   const send = useCallback(
     async (body, cid = newId()) => {
-      if (!roomId) return;
+      const isActive = activeRoom.current;
+      if (!roomId || !isActive?.()) return;
       setPending((p) => [
         ...p.filter((x) => x.clientMessageId !== cid),
         { clientMessageId: cid, text: body, status: "sending", createdAt: new Date().toISOString() },
       ]);
       try {
         const m = await sendMessage(roomId, body, cid);
+        if (!isActive()) return;
         setMessages((prev) => mergeMsgs(prev, [m]));
         setPending((p) => p.filter((x) => x.clientMessageId !== cid));
       } catch (e) {
+        if (!isActive()) return;
         console.warn("[chat] 전송 실패", e);
         setPending((p) => p.map((x) => (x.clientMessageId === cid ? { ...x, status: "failed", error: msg(e) } : x)));
       }
