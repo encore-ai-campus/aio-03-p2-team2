@@ -82,10 +82,10 @@ export default function LoginPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <div className="brandicon">F</div>
+          <img src="/brand/fesroam_symbol.png" alt="" style={{ height: 36, width: "auto" }} />
           <div>
-            <b>페스타메이트</b>
-            <small>FESTA MATE · AI TRAVEL</small>
+            <b>페스로움</b>
+            <small>FESROAM · 축제 동행 매칭</small>
           </div>
         </div>
 
