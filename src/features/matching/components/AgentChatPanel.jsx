@@ -76,7 +76,7 @@ export default function AgentChatPanel({ onEditConditions, festivals, festivalId
             <h3>
               <TypeText
                 key={festivalId || "none"}
-                text={festival(festivalId) ? `안녕하세요! ‘${festival(festivalId).name}’에 함께 갈 동행을 찾아 드릴게요` : "어떤 축제에 함께 갈 동행을 찾고 계세요?"}
+                text={festival(festivalId) ? `안녕하세요! ‘${festival(festivalId).name}’에\n함께 갈 동행을 찾아 드릴게요` : "어떤 축제에 함께 갈 동행을 찾고 계세요?"}
               />
             </h3>
             <p className="ai-intro-sub">원하는 조건을 편하게 말하거나, 아래 예시를 눌러 보세요.</p>

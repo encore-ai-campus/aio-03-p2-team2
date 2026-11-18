@@ -19,9 +19,21 @@ export default function MatchingPage() {
   function openMore() {
     setTab("form");
     setOptOpen(true);
-    requestAnimationFrame(() =>
-      document.querySelector(".mp-v3 .tab-form .opt-fold")?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
+    // 페이지는 그대로 두고(카드가 헤더에 가려졌을 때만 보정), 폼 안에서만 선택 조건 위치로 부드럽게 이동
+    requestAnimationFrame(() => {
+      const card = document.querySelector(".mp-v3 .mtabs-card");
+      const box = document.querySelector(".mp-v3 .tab-form");
+      const fold = box?.querySelector(".opt-fold");
+      if (!card || !box || !fold) return;
+      const cardTop = card.getBoundingClientRect().top;
+      if (cardTop < 72) window.scrollTo({ top: Math.max(0, cardTop + window.scrollY - 88), behavior: "smooth" });
+      const y = fold.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
+      box.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+      fold.classList.remove("opt-flash");
+      void fold.offsetWidth; // 애니메이션 재시작
+      fold.classList.add("opt-flash");
+      setTimeout(() => fold.classList.remove("opt-flash"), 1600);
+    });
   }
 
   if (view === "loading") return <ApiLoading text="축제 불러오는 중…" />;
