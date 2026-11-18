@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, nullcontext
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
@@ -82,10 +82,13 @@ class AgentService:
         initial = dict(run_id=run_id,session_id=session_id,user_id=user_id,message=payload.message,intent=payload.intent,group_id=payload.group_id,festival_id=payload.festival_id,conditions=conditions,explicit_conditions=conditions,iteration=0,trace=[],errors=[],repair={},status="running",tool_results={},result=None)
         initial.update(target_festival_id=target_festival_id, candidate_history=[], original_schedule=group.get("schedule") if group else None)
         initial.update(weather_review=weather_review, weather_decision=None)
-        await self.graph.ainvoke(initial,self.config(run_id))
-        return await self.get(user_id,run_id)
+        # Draft cleanup shares this lock with all graph calls that can save a proposal.
+        lock = self.storage.run_lock(run_id) if group and payload.intent in {"scheduling", "auto"} else nullcontext()
+        async with lock:
+            await self.graph.ainvoke(initial,self.config(run_id))
+            return await self.get(user_id,run_id)
 
-    async def get(self, user_id, run_id):
+    async def get(self, user_id, run_id, *, update_index=True):
         await self.user(user_id)
         await self.memory.run(run_id,user_id)
         snapshot = await self.graph.aget_state(self.config(run_id))
@@ -94,12 +97,14 @@ class AgentService:
             raise RepositoryError("AGENT_RUN_INCOMPLETE","실행 초기화가 완료되지 않았습니다.",409)
         interrupts = [item.value for task in snapshot.tasks for item in task.interrupts]
         status = "waiting_approval" if interrupts and interrupts[0]["type"] == "approval_required" else "waiting_input" if interrupts else state["status"]
-        await self.memory.update_run({**state,"status":status})
+        if update_index:
+            await self.memory.update_run({**state,"status":status})
         history = state.get("candidate_history", [])
         return {
             "runId": run_id, "sessionId": state["session_id"], "status": status,
             "checkpointId": snapshot.config["configurable"].get("checkpoint_id"),
             "intent": state["intent"], "festivalId": state.get("festival_id"), "groupId": state.get("group_id"),
+            "targetFestivalId": state.get("target_festival_id"),
             "modelProvider": self.model.name, "repositoryMode": getattr(self.repository, "mode", "database"),
             "conditions": state["conditions"], "candidate": state.get("candidate"),
             "proposalId": state.get("proposal_id"), "result": state.get("result"),

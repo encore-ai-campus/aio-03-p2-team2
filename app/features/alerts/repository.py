@@ -13,15 +13,26 @@ class AlertRepositoryMixin(RepositoryBase):
         row = await self._pool().fetchrow("select * from alerts where id=$1 and user_id=$2", alert_id, user_id)
         return self._alert_view(row) if row else None
 
-    async def alerts(self, user_id: str, status: str | None, alert_type: str | None) -> list[dict]:
+    async def alerts(
+        self, user_id: str, status: str | None, alert_type: str | None, *, offset: int, limit: int
+    ) -> tuple[list[dict], int]:
         clauses = ["user_id=$1"]
         args: list[Any] = [user_id]
         if status:
             args.append(status); clauses.append(f"status=${len(args)}")
         if alert_type:
             args.append(alert_type); clauses.append(f"type=${len(args)}")
-        rows = await self._pool().fetch(f"select * from alerts where {' and '.join(clauses)} order by created_at desc", *args)
-        return [self._alert_view(row) for row in rows]
+        pool = self._pool()
+        where = " and ".join(clauses)
+        total = await pool.fetchval(f"select count(*) from alerts where {where}", *args)
+        if offset >= total:
+            return [], total
+        rows = await pool.fetch(
+            f"select * from alerts where {where} order by created_at desc, id desc "
+            f"limit ${len(args) + 1} offset ${len(args) + 2}",
+            *args, limit, offset,
+        )
+        return [self._alert_view(row) for row in rows], total
 
     @staticmethod
     def _alert_view(row: asyncpg.Record) -> dict:

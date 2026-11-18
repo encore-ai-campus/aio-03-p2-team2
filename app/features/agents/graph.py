@@ -10,6 +10,7 @@ from langgraph.types import interrupt
 
 from app.core.repository import RepositoryError
 from app.features.matching.interests import extracted_interests
+from .memory import proposal_id_for_run
 from .policy import error, infer_intent, required_tools, validate_plan
 from .schemas import Conditions
 from .state import AgentState
@@ -246,7 +247,7 @@ class AgentNodes:
 
     async def save_proposal(self, state):
         group = state["group"]
-        proposal_id = f"prp_{state['run_id'].replace('run_','')[:20]}_{state['iteration']}"
+        proposal_id = proposal_id_for_run(state["run_id"], state["iteration"])
         try:
             plan = {**state["candidate"]}
             if state.get("target_festival_id"):

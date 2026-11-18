@@ -5,6 +5,7 @@ from copy import deepcopy
 
 from langgraph.checkpoint.memory import InMemorySaver
 from app.core.repository import RepositoryError
+from app.features.agents.memory import proposal_run_prefix
 
 
 class EphemeralAgentStorage:
@@ -18,7 +19,11 @@ class EphemeralAgentStorage:
 
     @asynccontextmanager
     async def run_lock(self, run_id):
-        async with self.locks.setdefault(run_id, asyncio.Lock()): yield
+        lock = self.locks.setdefault(run_id, asyncio.Lock())
+        if lock.locked():
+            raise RepositoryError("AGENT_RUN_BUSY", "다른 요청이 실행을 처리하고 있습니다.", 409)
+        async with lock:
+            yield
 
     async def session(self, session_id, user_id):
         row=self.sessions.setdefault(session_id,dict(user_id=user_id,summary={},messages=[],conditions={}))
@@ -36,6 +41,11 @@ class EphemeralAgentStorage:
         return deepcopy(row)
     async def run_for_proposal(self,proposal_id,user_id):
         row=next((r for r in self.runs.values() if r["proposal_id"] == proposal_id),None)
+        if not row and (prefix := proposal_run_prefix(proposal_id)):
+            matches = [r for r in self.runs.values() if r["user_id"] == user_id and r["id"].startswith(prefix)]
+            if len(matches) > 1:
+                raise RepositoryError("AGENT_PROPOSAL_AMBIGUOUS", "일정 제안의 실행을 확인할 수 없습니다.", 409)
+            row = next(iter(matches), None)
         if not row: raise RepositoryError("AGENT_PROPOSAL_REQUIRED","에이전트 제안이 필요합니다.",409)
         return await self.run(row["id"],user_id)
     async def update_run(self,state):

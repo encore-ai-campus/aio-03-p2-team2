@@ -47,9 +47,8 @@ async def get_admin_sync_job(job_id: str, request: Request):
 async def list_alerts(request: Request, status: str | None = None, type: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize")):
     repository = get_repository(request)
     user_id = current_user_id(request)
-    items = await repository.alerts(user_id, status, type)
-    start = (page - 1) * page_size
-    return success({"items": items[start : start + page_size], "page": page, "pageSize": page_size, "total": len(items)}, request)
+    items, total = await repository.alerts(user_id, status, type, offset=(page - 1) * page_size, limit=page_size)
+    return success({"items": items, "page": page, "pageSize": page_size, "total": total}, request)
 
 
 @router.patch("/{alert_id}/read", operation_id="markAlertRead")

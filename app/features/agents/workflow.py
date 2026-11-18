@@ -12,6 +12,7 @@ from app.core.repository import RepositoryError
 from app.features.groups.schemas import GroupCreate
 from app.features.groups.service import GroupService
 from .schemas import Conditions, RunStart
+from .weather import schedule_conditions
 
 
 class RecruitmentCreate(APIModel):
@@ -30,6 +31,14 @@ class AlternativeSelect(ScheduleRequest):
 
 class WeatherCheckRequest(APIModel):
     simulate_risk: bool = False
+
+
+def _saved_schedule_conditions(group):
+    schedule = group["schedule"]
+    items = schedule.get("items") or ([schedule["current"]] if schedule.get("current") else [])
+    if not items:
+        raise RepositoryError("SCHEDULE_MISSING", "날씨를 확인할 일정이 없습니다.", 409)
+    return schedule_conditions(items)
 
 
 class WorkflowService:
@@ -88,17 +97,14 @@ class WorkflowService:
 
     async def risk(self, user_id, group_id):
         group = await self.leader_group(user_id, group_id)
-        from .weather import schedule_conditions
-        items = group["schedule"].get("items") or [group["schedule"]["current"]]
+        conditions = await self.conditions(user_id, group, _saved_schedule_conditions(group))
         return await self.agents.start(user_id, RunStart(message="악천후에 대비한 대체 축제를 추천해줘",
-            intent="risk_response", group_id=group_id, conditions=await self.conditions(user_id, group, schedule_conditions(items))))
+            intent="risk_response", group_id=group_id, conditions=conditions))
 
     async def review_weather(self, user_id, group_id, monitor, *, simulate=False):
         group = await self.leader_group(user_id, group_id)
         check = await monitor.check(group_id, simulate=simulate)
-        from .weather import schedule_conditions
-        items = group["schedule"].get("items") or [group["schedule"]["current"]]
-        conditions = await self.conditions(user_id, group, schedule_conditions(items))
+        conditions = await self.conditions(user_id, group, _saved_schedule_conditions(group))
         run = await self.agents.start(user_id, RunStart(message="모임 예보를 확인하고 진행 의사를 물어봐 주세요.",
             intent="risk_response", group_id=group_id, conditions=conditions), weather_review={
                 "weather": check["weather"], "groupVersion": group["version"],

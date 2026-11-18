@@ -17,6 +17,8 @@ class PostgresAgentStorage:
     def __init__(self, settings):
         self.settings = settings
         self.pool = None
+        # A lock holder still needs another connection for checkpoints and execution metadata.
+        self._run_lock_slots = asyncio.BoundedSemaphore(settings.agent_database_pool_max_size - 1)
 
     async def open(self):
         if not self.settings.database_url:
@@ -74,7 +76,7 @@ class PostgresAgentStorage:
     @asynccontextmanager
     async def run_lock(self, run_id):
         key = int.from_bytes(hashlib.blake2b(run_id.encode(), digest_size=8).digest(), "big", signed=True)
-        async with self.pool.connection() as connection:
+        async with self._run_lock_slots, self.pool.connection() as connection:
             row = await (await connection.execute("SELECT pg_try_advisory_lock(%s) AS acquired", (key,))).fetchone()
             if not row["acquired"]:
                 raise RepositoryError("AGENT_RUN_BUSY", "다른 요청이 실행을 재개하고 있습니다. 최신 상태를 조회해 주세요.", 409)

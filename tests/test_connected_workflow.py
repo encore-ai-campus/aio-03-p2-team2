@@ -1,3 +1,4 @@
+import asyncio
 from copy import deepcopy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -13,6 +14,131 @@ from app.main import create_app
 from tests.auth_helpers import install_test_identity, token_headers
 from tests.ephemeral_storage import EphemeralAgentStorage
 from tests.test_agent_workflow import USER, FirstWrongModel, make_service, seed, settings, running
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("alternative,decision,expected_status", [(False, "approve", "completed"), (True, "reject", "rejected")])
+async def test_leader_can_reopen_and_decide_saved_schedule_draft(tmp_path, alternative, decision, expected_status):
+    from tests.test_agent_workflow import group as create_group
+
+    repo, _ = seed()
+    group = await create_group(repo)
+    app = create_app(settings(tmp_path), repository=repo, agent_storage=EphemeralAgentStorage())
+    install_test_identity(app, repo)
+    base = f"/api/v1/groups/{group['id']}/schedule/draft"
+    leader = token_headers()
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            empty = await client.get(base, headers=leader)
+            assert empty.status_code == 200
+            assert empty.json()["data"] is None
+            workflow = WorkflowService(app.state.agents)
+            target = None
+            if alternative:
+                risk = await workflow.risk(USER, group["id"])
+                target = risk["candidate"]["items"][0]["id"]
+                created = await workflow.select(USER, risk["runId"], AlternativeSelect(festival_id=target))
+            else:
+                created = await workflow.schedule(USER, group["id"], ScheduleRequest())
+
+            assert (await client.get(base)).status_code == 401
+            assert (await client.get(base, headers=token_headers("usr_demo_01"))).status_code == 403
+            reopened = (await client.get(base, headers=leader)).json()["data"]
+            assert reopened["status"] == "waiting_approval"
+            assert reopened["runId"] == created["runId"]
+            assert reopened["checkpointId"] == created["checkpointId"]
+            assert reopened["targetFestivalId"] == target
+
+            response = await client.post(f"/api/v1/agents/runs/{reopened['runId']}/resume", headers=leader,
+                json={"checkpointId": reopened["checkpointId"], "decision": decision})
+            assert response.json()["data"]["status"] == expected_status
+            assert (await client.get(base, headers=leader)).json()["data"] is None
+
+
+@pytest.mark.asyncio
+async def test_leader_can_discard_an_unrecoverable_proposal(tmp_path):
+    from tests.test_agent_workflow import group as create_group
+
+    repo, _ = seed()
+    group = await create_group(repo)
+    proposal_id = "legacy_draft"
+    await repo.save_agent_proposal(group["id"], USER, proposal_id,
+        {"summary": "이전 초안", "items": group["schedule"]["items"]}, group["version"], group["schedule"]["version"])
+    app = create_app(settings(tmp_path), repository=repo, agent_storage=EphemeralAgentStorage())
+    install_test_identity(app, repo)
+    base = f"/api/v1/groups/{group['id']}/schedule"
+    body = {"version": group["version"]}
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            assert (await client.get(f"{base}/draft", headers=token_headers())).json()["data"] is None
+            url = f"{base}/proposals/{proposal_id}"
+            assert (await client.post(f"{url}/approve", json=body, headers=token_headers())).status_code == 409
+            assert (await client.post(f"{url}/reject", json=body, headers=token_headers("usr_demo_01"))).status_code == 403
+            assert (await client.post(f"{url}/reject", json=body, headers=token_headers())).status_code == 200
+            schedule = (await client.get(base, headers=token_headers())).json()["data"]
+            assert schedule["proposals"][0]["status"] == "rejected"
+            assert schedule["items"] == group["schedule"]["items"]
+
+
+@pytest.mark.asyncio
+async def test_cannot_discard_draft_while_its_run_is_being_saved(tmp_path, monkeypatch):
+    from tests.test_agent_workflow import group as create_group
+
+    repo, _ = seed()
+    group = await create_group(repo)
+    save_proposal = repo.save_agent_proposal
+    draft_written = asyncio.Event()
+    finish_save = asyncio.Event()
+
+    async def pause_after_write(*args):
+        proposal = await save_proposal(*args)
+        draft_written.set()
+        await finish_save.wait()
+        return proposal
+
+    monkeypatch.setattr(repo, "save_agent_proposal", pause_after_write)
+    app = create_app(settings(tmp_path), repository=repo, agent_storage=EphemeralAgentStorage())
+    install_test_identity(app, repo)
+    group_id = group["id"]
+    base = f"/api/v1/groups/{group_id}/schedule"
+    leader = token_headers()
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            creating = asyncio.create_task(client.post(f"/api/v1/workflow/groups/{group_id}/schedule", json={}, headers=leader))
+            try:
+                await asyncio.wait_for(draft_written.wait(), timeout=5)
+                schedule = (await client.get(base, headers=leader)).json()["data"]
+                draft = schedule["proposals"][0]
+                response = await asyncio.wait_for(client.get(f"{base}/draft", headers=leader), timeout=5)
+                assert response.status_code == 409
+                assert response.json()["error"]["code"] == "AGENT_RUN_BUSY"
+                response = await asyncio.wait_for(client.post(f"{base}/proposals/{draft['id']}/reject",
+                    json={"version": group["version"]}, headers=leader), timeout=5)
+                assert response.status_code == 409
+                assert response.json()["error"]["code"] == "AGENT_RUN_BUSY"
+            finally:
+                finish_save.set()
+                created = await creating
+
+            assert created.json()["data"]["status"] == "waiting_approval"
+            recovered = (await client.get(f"{base}/draft", headers=leader)).json()["data"]
+            assert recovered["runId"] == created.json()["data"]["runId"]
+
+
+@pytest.mark.asyncio
+async def test_risk_response_without_a_schedule_returns_structured_conflict(tmp_path):
+    from tests.test_agent_workflow import group as create_group
+
+    repo, _ = seed()
+    group = await create_group(repo)
+    repo.store.groups[group["id"]]["schedule"].update(current=None, items=[])
+    app = create_app(settings(tmp_path), repository=repo, agent_storage=EphemeralAgentStorage())
+    install_test_identity(app, repo)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test") as client:
+            response = await client.post(f"/api/v1/workflow/groups/{group['id']}/risk-response", headers=token_headers())
+            assert response.status_code == 409
+            assert response.json()["error"]["code"] == "SCHEDULE_MISSING"
 
 
 @pytest.mark.asyncio

@@ -112,11 +112,20 @@ class DemoRepository:
             if group["version"] != version: return None
             group.update(values); group["version"] += 1
             self.store.update_status(group); self.persist(); return deepcopy(group)
-    async def messages(self,group_id,*,before=None,after=None,limit=50):
+    async def active_chat_member_ids(self, group_id):
+        group = self.store.groups.get(group_id)
+        return {member["userId"] for member in group["members"]} if group else set()
+
+    async def messages(self, group_id, *, before=None, after=None, limit=50):
         rows = deepcopy(self.store.groups[group_id]["messages"])
-        if before: rows = [r for r in rows if r["id"] < before]
-        if after: rows = [r for r in rows if r["id"] > after]
-        return rows[-limit:]
+        rows.sort(key=lambda row: (row["createdAt"], row["id"]))
+        positions = {row["id"]: index for index, row in enumerate(rows)}
+        if (before and before not in positions) or (after and after not in positions):
+            return []
+        start = positions[after] + 1 if after else 0
+        stop = positions[before] if before else len(rows)
+        rows = rows[start:stop]
+        return rows[:limit] if after is not None else rows[-limit:]
     async def add_message(self,group_id,user_id,text,client_message_id=None):
         group = self.store.groups[group_id]
         existing = next((r for r in group["messages"] if client_message_id and r.get("clientMessageId") == client_message_id and r["sender"]["id"] == user_id),None)

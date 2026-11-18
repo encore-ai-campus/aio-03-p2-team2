@@ -1,7 +1,21 @@
 """User-owned sessions and preferences in the shared Supabase PostgreSQL database."""
+import re
+
 from psycopg.types.json import Jsonb
 
 from app.core.repository import RepositoryError
+
+
+PROPOSAL_RUN_PREFIX_LENGTH = 20
+
+
+def proposal_id_for_run(run_id, iteration):
+    return f"prp_{run_id.removeprefix('run_')[:PROPOSAL_RUN_PREFIX_LENGTH]}_{iteration}"
+
+
+def proposal_run_prefix(proposal_id):
+    match = re.fullmatch(rf"prp_([0-9a-f]{{{PROPOSAL_RUN_PREFIX_LENGTH}}})_[0-9]+", proposal_id)
+    return f"run_{match[1]}" if match else None
 
 
 class AgentMemory:
@@ -58,11 +72,22 @@ class AgentMemory:
     async def run_for_proposal(self, proposal_id, user_id):
         async with self.pool.connection() as connection:
             row = await (await connection.execute(
-                "SELECT id FROM agent_storage.executions WHERE proposal_id=%s", (proposal_id,)
+                "SELECT * FROM agent_storage.executions WHERE proposal_id=%s", (proposal_id,)
             )).fetchone()
+            if not row and (prefix := proposal_run_prefix(proposal_id)):
+                # The execution exists before its draft is saved and before the proposal index is updated.
+                matches = await (await connection.execute(
+                    "SELECT * FROM agent_storage.executions WHERE user_id=%s AND starts_with(id,%s) LIMIT 2",
+                    (user_id, prefix),
+                )).fetchall()
+                if len(matches) > 1:
+                    raise RepositoryError("AGENT_PROPOSAL_AMBIGUOUS", "일정 제안의 실행을 확인할 수 없습니다.", 409)
+                row = next(iter(matches), None)
         if not row:
             raise RepositoryError("AGENT_PROPOSAL_REQUIRED", "에이전트에서 생성한 제안만 이 경로로 승인할 수 있습니다.", 409)
-        return await self.run(row["id"], user_id)
+        if row["user_id"] != user_id:
+            raise RepositoryError("AGENT_RUN_FORBIDDEN", "다른 사용자의 실행에 접근할 수 없습니다.", 403)
+        return row
 
     async def update_run(self, state):
         async with self.pool.connection() as connection:

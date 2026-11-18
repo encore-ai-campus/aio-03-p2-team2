@@ -51,9 +51,15 @@ class SandboxRepository(DemoRepository):
         items = [deepcopy(item) for item in self.store.groups[group_id]["joinRequests"] if not status or item["status"] == status]
         return items[offset:offset+limit], len(items)
 
-    async def alerts(self, user_id, status=None, alert_type=None):
-        return [deepcopy(item) for item in self.store.alerts.values() if item.get("userId") == user_id
-                and (not status or item["status"] == status) and (not alert_type or item["type"] == alert_type)]
+    async def alerts(self, user_id, status=None, alert_type=None, *, offset, limit):
+        items = [
+            item for item in self.store.alerts.values()
+            if item.get("userId") == user_id
+            and (not status or item["status"] == status)
+            and (not alert_type or item["type"] == alert_type)
+        ]
+        items.sort(key=lambda item: (item["createdAt"], item["id"]), reverse=True)
+        return deepcopy(items[offset:offset + limit]), len(items)
 
     async def alert(self, alert_id, user_id):
         item = self.store.alerts.get(alert_id)

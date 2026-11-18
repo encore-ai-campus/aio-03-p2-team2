@@ -1,6 +1,7 @@
 """Run against a prepared disposable PostgreSQL DB; never auto-create/drop shared schemas."""
 import asyncio
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,43 @@ from tests.test_agent_workflow import seed, group, USER
 from tests.auth_helpers import SECRET, ISSUER, token_headers
 
 DSN=os.environ.get("TEST_AGENT_DATABASE_URL")
+
+
+@pytest.mark.asyncio
+async def test_run_locks_leave_a_pool_connection_for_checkpoint_reads():
+    connections = asyncio.BoundedSemaphore(2)
+
+    class Connection:
+        async def execute(self, *_):
+            return self
+
+        async def fetchone(self):
+            return {"acquired": True}
+
+    class Pool:
+        @asynccontextmanager
+        async def connection(self):
+            async with connections:
+                yield Connection()
+
+    storage = PostgresAgentStorage(Settings(_env_file=None, agent_database_pool_max_size=2))
+    storage.pool = Pool()
+    second_attempting = asyncio.Event()
+    second_entered = asyncio.Event()
+
+    async def take_second_lock():
+        second_attempting.set()
+        async with storage.run_lock("second"):
+            second_entered.set()
+
+    async with storage.run_lock("first"):
+        second = asyncio.create_task(take_second_lock())
+        await second_attempting.wait()
+        assert not second_entered.is_set()
+        async with storage.pool.connection():
+            pass
+    await second
+    assert second_entered.is_set()
 
 
 @pytest.mark.asyncio
