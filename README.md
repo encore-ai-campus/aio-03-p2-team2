@@ -28,6 +28,7 @@ DB 담당자가 기존 스키마를 준비한 뒤 `db/supabase_auth_rls.sql`과 
 
 - `DATABASE_URL`: Supabase PostgreSQL Direct 또는 Session pooler 연결 문자열. Transaction pooler(6543)는 지원하지 않습니다.
 - 동시성 RPC: 기본 스키마와 `db/supabase_auth_rls.sql` 적용 후 `db/concurrency_rpc.sql`도 적용해야 합니다. 정원 변경·참여 승인·일정 승인은 이 migration의 PostgreSQL RPC에서 행 잠금, 트랜잭션, 낙관적 버전 검사를 함께 수행합니다.
+- 모임 인원·대기 수: 같은 DB에 `db/003_group_counts.sql`을 적용해야 비로그인 사용자도 공개 모임의 실제 인원·대기 수를 볼 수 있습니다. 함수 미적용 시 서버는 기존 계산을 유지하지만, RLS 때문에 다른 사람의 대기 수가 적게 보일 수 있습니다. 각 실행 환경에서 SQL 적용 여부를 확인하세요.
 - `SUPABASE_URL`: 해당 프로젝트의 Project URL. DB 연결 문자열과 다릅니다.
 - `SUPABASE_JWT_ISSUER`: 미설정 시 Project URL에서 계산합니다.
 - `SUPABASE_JWT_SECRET`: HS256 레거시 프로젝트만 설정합니다. JWKS signing key 프로젝트는 비워 둡니다. DB 비밀번호·API key와 다른 값입니다.

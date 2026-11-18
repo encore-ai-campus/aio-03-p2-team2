@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 
 from app.core.repository import RepositoryBase
-from .service import profile_coverage
+from .service import candidate_profile, profile_coverage
 
 
 class MatchingRepositoryMixin(RepositoryBase):
@@ -15,6 +15,13 @@ class MatchingRepositoryMixin(RepositoryBase):
             "user": {"id": row["candidate_user_id"], "displayName": row["display_name"], "avatarUrl": row["avatar_url"]},
             "score": row["score"], "parts": parts, "reasons": row["reasons"] or [],
             "coverage": profile_coverage(parts),
+            # 후보 프로필 요약 (user_profiles 조인 값, 없으면 빈 값)
+            "profile": candidate_profile({
+                "ageBand": row.get("age_band"),
+                "interests": row.get("interests") or [],
+                "travelStyle": row.get("travel_style"),
+                "availableFrom": (row["available_from"].strftime("%H:%M") if hasattr(row.get("available_from"), "strftime") else row.get("available_from")),
+            }),
         }
     async def matching_run_exists(self, run_id: str, user_id: str) -> bool:
         return bool(await self._pool().fetchval("select 1 from matching_runs where id=$1 and user_id=$2", run_id, user_id))
@@ -23,7 +30,7 @@ class MatchingRepositoryMixin(RepositoryBase):
         row = await self._pool().fetchrow("select * from matching_runs where id=$1 and user_id=$2", run_id, user_id)
         if not row:
             return None
-        candidates = await self._pool().fetch("select mc.*, u.display_name, u.avatar_url from matching_candidates mc join users u on u.id=mc.candidate_user_id where mc.run_id=$1 order by mc.rank", run_id)
+        candidates = await self._pool().fetch("select mc.*, u.display_name, u.avatar_url, p.age_band, p.interests, p.travel_style, p.available_from from matching_candidates mc join users u on u.id=mc.candidate_user_id left join user_profiles p on p.user_id=mc.candidate_user_id where mc.run_id=$1 order by mc.rank", run_id)
         items = [self._matching_candidate_view(row) for row in candidates]
         return {"runId": row["id"], "festivalId": row["festival_id"], "userId": row["user_id"], "conditions": row["conditions"], "candidates": items, "group": {"id": row["group_id"], "created": True} if row["group_id"] else None, "status": row["status"]}
 
@@ -43,9 +50,11 @@ class MatchingRepositoryMixin(RepositoryBase):
         rows = await self._pool().fetch(
             """
             select mc.candidate_user_id, mc.score, mc.parts, mc.reasons,
-                   u.display_name, u.avatar_url
+                   u.display_name, u.avatar_url,
+                   p.age_band, p.interests, p.travel_style, p.available_from
             from matching_candidates mc
             join users u on u.id=mc.candidate_user_id
+            left join user_profiles p on p.user_id=mc.candidate_user_id
             where mc.run_id=$1
             order by mc.rank
             offset $2 limit $3

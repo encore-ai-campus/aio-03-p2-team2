@@ -1,4 +1,4 @@
-"""매칭 점수: 가중치 합 100, 미선택 조건 제외, 빈 정보 0점, 80% 기준, 성별 선택 조건."""
+"""매칭 점수: 가중치 합 100, 미선택 조건 제외, 빈 정보 0점, 60% 기준, 성별 선택 조건."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ TWIN = user("twin", availableFrom="12:00", budgetManwon=8, interests=["음악", 
 
 def test_weights_sum_to_100():
     assert sum(MATCH_WEIGHTS.values()) == 100
-    assert MATCH_THRESHOLD == 80
+    assert MATCH_THRESHOLD == 60
 
 
 def test_perfect_match_scores_100_with_reasons():
