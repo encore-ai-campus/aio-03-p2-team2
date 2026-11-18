@@ -20,14 +20,12 @@ export function toCardModel(f) {
     description: f.description || "",
     tags: f.tags || [],
     emoji: CATEGORY_EMOJI[f.category] || "🎪",
-    imageUrl: f.imageUrl || null,
+    imageUrl: f.imageUrl || null, // TourAPI 대표 이미지 (없으면 null → 화면은 이모지)
     thumbnailUrl: f.thumbnailUrl || null,
     riskStatus: f.riskStatus, // normal | weather_risk | changed | cancelled
     venue: f.venue, // { name, address, latitude, longitude }
     operatingHours: f.operatingHours || [], // [{ date, open, close, note }]
     apiStatus: f.status, // past | live | upcoming (서버가 오늘 날짜로 계산)
-    imageUrl: f.imageUrl || null, // TourAPI 대표 이미지 (없으면 null → 화면은 이모지)
-    thumbnailUrl: f.thumbnailUrl || null,
     source: f.source, // official_api(한국관광공사 TourAPI) | manual
     sourceUpdatedAt: f.sourceUpdatedAt || null,
   };
