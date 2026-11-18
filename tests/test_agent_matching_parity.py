@@ -11,6 +11,7 @@ from app.features.agents.policy import parse_text
 from app.features.agents.providers import OpenAIModel
 from app.features.agents.schemas import Conditions, ParsedRequest
 from app.features.matching.repository import MatchingRepositoryMixin
+from app.features.matching.service import MATCH_THRESHOLD
 from app.main import create_app
 from tests.auth_helpers import install_test_identity, token_headers
 from tests.ephemeral_storage import EphemeralAgentStorage
@@ -43,6 +44,10 @@ def repository():
             "candidate_user_id": item["user"]["id"], "display_name": item["user"]["displayName"],
             "avatar_url": item["user"]["avatarUrl"], "score": item["score"],
             "parts": json.dumps(item["parts"]), "reasons": item["reasons"],
+            "age_band": repo.store.users[item["user"]["id"]]["profile"].get("ageBand"),
+            "interests": repo.store.users[item["user"]["id"]]["profile"].get("interests"),
+            "travel_style": repo.store.users[item["user"]["id"]]["profile"].get("travelStyle"),
+            "available_from": repo.store.users[item["user"]["id"]]["profile"].get("availableFrom"),
         }) for item in candidates]
         return {"runId":"matching_test", "candidates":persisted, "group":None}
 
@@ -94,8 +99,9 @@ async def test_http_matching_api_and_agent_return_identical_candidates(tmp_path,
             if not conditions:
                 assert "same" in ids and "far" not in ids
             if conditions.get("budgetManwon") == 100:
-                assert not ids
-            assert all(item["score"] >= 80 for item in run["candidate"]["items"])
+                # 60점 정책에서는 예산 불일치가 있어도 나머지 선호 점수가 충분하면 추천한다.
+                assert ids == {"weak"}
+            assert all(item["score"] >= MATCH_THRESHOLD for item in run["candidate"]["items"])
 
 
 @pytest.mark.asyncio

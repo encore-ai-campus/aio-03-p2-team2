@@ -9,6 +9,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
 from app.core.repository import RepositoryError
+from app.features.matching.interests import extracted_interests
 from .policy import error, infer_intent, required_tools, validate_plan
 from .schemas import Conditions
 from .state import AgentState
@@ -43,8 +44,16 @@ class AgentNodes:
         try:
             parsed = await self.model.parse(state["message"],state["context"])
             intent = state["intent"] if state["intent"] != "auto" else parsed["intent"]
+            parsed_conditions = dict(parsed.get("conditions", {}))
+            if intent == "matching" and parsed_conditions.get("interests"):
+                interests = extracted_interests(parsed_conditions["interests"])
+                if interests:
+                    parsed_conditions["interests"] = interests
+                else:
+                    # 잘못 추출된 행사명으로 이전 대화의 유효한 관심사를 지우지 않는다.
+                    parsed_conditions.pop("interests")
             # Explicit structured fields have precedence over model extraction and memory.
-            conditions = {**state["conditions"],**parsed.get("conditions",{}),**state.get("explicit_conditions",{})}
+            conditions = {**state["conditions"],**parsed_conditions,**state.get("explicit_conditions",{})}
             conditions = Conditions.model_validate(conditions).model_dump(mode="json",exclude_none=True)
         except Exception:
             return self.update(state,"parse_request",status="failed",errors=[error("MODEL_UNAVAILABLE","조건 해석에 실패했습니다. 모델 설정 또는 입력을 확인해 주세요.")])

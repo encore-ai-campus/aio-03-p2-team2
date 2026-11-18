@@ -43,19 +43,28 @@ class AuthRepositoryMixin(RepositoryBase):
         return self._user_view(row) if row else None
 
     async def users(self, *, exclude_id: str | None = None) -> list[dict]:
-        query = "select id from users where status = 'active'"
+        # 활성 사용자 전체를 한 번의 조인 쿼리로 조회한다.
+        # (이전: id 목록 조회 후 사용자마다 user()를 다시 호출하는 N+1 → 110명 기준 매칭 1회 약 54초)
+        # user()와 같은 컬럼·같은 조건(status='active')·같은 정렬(id)이라 결과는 동일하다.
+        # user_profiles·notification_consents는 user_id가 유일(on conflict (user_id))해 조인으로 행이 늘지 않는다.
+        query = """
+            select u.id, u.display_name, u.avatar_url,
+                   p.interests, p.budget_manwon, p.travel_style, p.mbti,
+                   p.preferred_party_size, p.available_from, p.default_join_mode,
+                   p.gender, p.age_band,
+                   n.push, n.email, n.risk_alert
+            from users u
+            left join user_profiles p on p.user_id = u.id
+            left join notification_consents n on n.user_id = u.id
+            where u.status = 'active'
+            """
         args: list[Any] = []
         if exclude_id:
-            query += " and id <> $1"
+            query += " and u.id <> $1"
             args.append(exclude_id)
-        query += " order by id"
+        query += " order by u.id"
         rows = await self._pool().fetch(query, *args)
-        result = []
-        for row in rows:
-            item = await self.user(row["id"])
-            if item:
-                result.append(item)
-        return result
+        return [self._user_view(row) for row in rows]
 
     @staticmethod
     def _user_view(row: asyncpg.Record) -> dict:
