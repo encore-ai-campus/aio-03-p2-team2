@@ -31,13 +31,8 @@ export function useAlerts({ festivals, onFail }) {
   const [festInfo, setFestInfo] = useState(null); // 축제 목록에 없을 때 상세로 불러온 축제
   const [showAllAlternatives, setShowAllAlternatives] = useState(false);
   const [groups, setGroups] = useState(null);
-  // 알림에서 들어오면 주소의 groupId(/alerts?groupId=…)로 그 모임을 먼저 선택
-  const [params] = useSearchParams();
-  const urlGroupId = params.get("groupId") || "";
-  const [groupId, setGroupId] = useState(urlGroupId);
-  useEffect(() => {
-    if (urlGroupId) setGroupId(urlGroupId);
-  }, [urlGroupId]);
+  const [params, setParams] = useSearchParams();
+  const groupId = params.get("groupId");
   const [alerts, setAlerts] = useState([]);
   const [forecast, setForecast] = useState(null); // 마지막 날씨 확인 결과 (weatherCheck)
   const [weatherPrompt, setWeatherPrompt] = useState(null); // 「그래도 진행할까요?」 대기 중인 실행
@@ -78,10 +73,27 @@ export function useAlerts({ festivals, onFail }) {
   const detail = groupData?.id === selectedGroupId ? groupData.detail : null;
   const schedule = groupData?.id === selectedGroupId ? groupData.schedule : null;
 
+  const resetFlow = useCallback(() => {
+    setForecast(null);
+    setForecastStatus("");
+    setWeatherPrompt(null);
+    setOutcome(null);
+    setAlternativeRun(null);
+    setChosen(null);
+    setScheduleRun(null);
+    setShowAllAlternatives(false);
+    setNotice("");
+  }, []);
+
   useLayoutEffect(() => {
     groupScope.current = {};
+    if (currentAction.current?.groupScoped) {
+      currentAction.current = null;
+      setBusy("");
+    }
+    resetFlow();
     return () => { groupScope.current = null; };
-  }, [selectedGroupId]);
+  }, [selectedGroupId, resetFlow]);
 
   // 내 악천후 알림 수신 상태
   useEffect(() => {
@@ -156,17 +168,6 @@ export function useAlerts({ festivals, onFail }) {
   const sameDay = items.filter((x) => x.date === day);
   const startTime = sameDay.length ? sameDay.map((x) => x.time).sort()[0] : "";
   const endTime = sameDay.length ? sameDay.map((x) => x.endTime || x.time).sort().slice(-1)[0] : "";
-
-  function resetFlow() {
-    setForecast(null);
-    setForecastStatus("");
-    setWeatherPrompt(null);
-    setOutcome(null);
-    setAlternativeRun(null);
-    setChosen(null);
-    setScheduleRun(null);
-    setNotice("");
-  }
 
   async function act(name, fn, groupScoped = true) {
     if (currentAction.current) return null;
@@ -269,12 +270,9 @@ export function useAlerts({ festivals, onFail }) {
   function selectGroup(id) {
     if (id === selectedGroupId) return;
     groupScope.current = null;
-    if (currentAction.current?.groupScoped) {
-      currentAction.current = null;
-      setBusy("");
-    }
-    setGroupId(id);
-    resetFlow();
+    const next = new URLSearchParams(params);
+    next.set("groupId", id);
+    setParams(next, { replace: true });
   }
 
   const visibleAlerts = alerts.filter(isVisibleAlert);

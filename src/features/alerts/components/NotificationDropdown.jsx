@@ -168,7 +168,7 @@ export default function NotificationDropdown({ userId, hidden = false }) {
                   다시 시도
                 </button>
               </div>
-            ) : !n.items.length ? (
+            ) : !n.items.length && !n.hasMore ? (
               <div className="nd-state">
                 <i className="ti ti-bell-check" aria-hidden="true" />
                 <strong>{n.tab === "unread" ? "읽지 않은 알림이 없어요" : "아직 받은 알림이 없어요"}</strong>
@@ -219,12 +219,12 @@ export default function NotificationDropdown({ userId, hidden = false }) {
                     </ul>
                   </div>
                 ))}
-                {n.hasMore ? (
-                  <button type="button" className="nd-more" onClick={n.loadMore} disabled={n.loadingMore}>
-                    {n.loadingMore ? "불러오는 중…" : "이전 알림 더 보기"}
-                  </button>
-                ) : null}
               </>
+            )}
+            {n.status === "ready" && n.hasMore && (
+              <button type="button" className="nd-more" onClick={n.loadMore} disabled={n.loadingMore}>
+                {n.loadingMore ? "불러오는 중…" : "이전 알림 더 보기"}
+              </button>
             )}
           </div>
           <footer className="nd-foot">

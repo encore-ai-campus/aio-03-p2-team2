@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { build } from "esbuild";
 import React from "react";
 import { act, create } from "react-test-renderer";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { initialState } from "../src/app/appState.js";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -725,4 +725,59 @@ test("weather simulation confirms a replacement festival without changing the me
   assert.equal(approval.decision, "approve");
   assert.match(JSON.stringify(renderer.toJSON()), /대체 축제와 새 일정으로 확정했어요/);
   await act(async () => renderer.unmount());
+});
+
+test("navigation via groupId clears the previous group's weather prompt", async (t) => {
+  globalThis.testAuth = { user: { id: "pr_deeplink_auth" } };
+  const groups = ["a", "b"].map((id) => ({
+    id, title: `group ${id}`, leaderId: "pr_deeplink", members: [], festivalId: festival.id,
+  }));
+  let move;
+  function Harness() {
+    move = useNavigate();
+    return h(LiveAlerts, { festivals: [festival] });
+  }
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "pr_deeplink" };
+    if (path.startsWith("/groups?")) return { items: groups, total: 2 };
+    if (path.startsWith("/alerts?")) return { items: [], total: 0 };
+    if (path.endsWith("/schedule")) return { items: [{ date: "2099-11-20", time: "15:00", label: "plan" }] };
+    if (path.endsWith("/weather-check")) return { risk: false, weather: { data: {} } };
+    if (path === "/workflow/groups/a/weather-review") return {
+      weatherCheck: { risk: true, weather: { data: {} } },
+      run: { runId: "run_a", status: "waiting_input", interrupt: { type: "weather_confirmation" } },
+    };
+    return groups.find((group) => path === `/groups/${group.id}`);
+  };
+  const renderer = await mount(h(Harness), "/alerts?groupId=a");
+  t.after(() => act(async () => renderer.unmount()));
+  await act(async () => button(renderer, "비 예보 만들기").props.onClick());
+  assert.ok(button(renderer, "아니요, 대체 축제 추천"));
+  await act(async () => move("/alerts?groupId=b"));
+  assert.equal(renderer.root.findByType("select").props.value, "b");
+  assert.ok(!button(renderer, "아니요, 대체 축제 추천"), "group B must not show group A's prompt");
+});
+
+test("older visible notifications remain reachable when page one is dismissed", async (t) => {
+  globalThis.document = new EventTarget();
+  let renderer;
+  t.after(async () => {
+    if (renderer) await act(async () => renderer.unmount());
+    delete globalThis.document;
+  });
+  const hidden = Array.from({ length: 10 }, (_, index) => ({
+    id: `hidden_${index}`, status: "answered", choice: "dismiss", type: "rain",
+  }));
+  const older = { id: "visible", status: "unread", type: "rain", title: "older alert" };
+  globalThis.testApi = async (path) => {
+    const params = new URL(path, "http://test").searchParams;
+    if (params.get("pageSize") === "50") return { items: [...hidden, older], total: 11 };
+    return { items: params.get("page") === "2" ? [older] : hidden, total: 11 };
+  };
+  renderer = await mount(h(NotificationDropdown, { userId: "pr_more" }));
+  await act(async () => renderer.root.findByProps({ "aria-label": "AI 알림" }).props.onClick());
+  const loadOlder = button(renderer, "이전 알림 더 보기");
+  assert.ok(loadOlder, "hidden rows must not remove access to the next page");
+  await act(async () => loadOlder.props.onClick());
+  assert.ok(button(renderer, "older alert"));
 });
