@@ -1,0 +1,22 @@
+/* ===== 페스로움 팔레트 (로고 03 티켓에서 추출, 11/18) =====
+   넓은 면적 = 흰색·짙은 갈색 / 코랄 = 주 버튼·현재 위치·단계 번호·선택 상태만
+   app.css의 :root 값을 덮어쓴다(app.css 다음에 불러옴). */
+:root {
+  --coral: #f06448;
+  --coral2: #d94f35;
+  --coral-soft: #fdeee9;
+  --coral-softer: #fef6f3;
+  --ink: #38251f;
+  --dark: #2a1c17;
+  --sub: #6b625d;
+  --mute: #958b85;
+  --line: #ece6e2;
+  --gray: #faf8f6;
+  --bg: #ffffff;
+  --navy: #2a1c17;
+  --shadow: 0 6px 24px rgba(42, 28, 23, 0.05);
+}
+body {
+  background: #ffffff;
+  color: var(--ink);
+}

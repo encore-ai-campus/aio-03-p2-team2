@@ -15,7 +15,7 @@ export default function FestivalExplorePage() {
     const official = festivals.some((f) => f.source === "official_api");
     const latest = festivals.map((f) => f.sourceUpdatedAt).filter(Boolean).sort().slice(-1)[0];
     const when = latest ? new Date(latest).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
-    sourceText = `${official ? "출처: 한국관광공사 TourAPI" : "출처: 페스타메이트 DB"}${when ? ` · ${when} 갱신` : ""}`;
+    sourceText = `${official ? "출처: 한국관광공사 TourAPI" : "출처: 페스로움 DB"}${when ? ` · ${when} 갱신` : ""}`;
   }
   const all = festivals.filter(
     (f) => f.start <= "2026-12-31" && f.end >= "2026-01-01",
@@ -271,7 +271,7 @@ export default function FestivalExplorePage() {
       )}
 
       <div className="section-head">
-        <h2>페스타메이트 이용 흐름</h2>
+        <h2>페스로움 이용 흐름</h2>
       </div>
       <div className="how">
         <div className="box">
