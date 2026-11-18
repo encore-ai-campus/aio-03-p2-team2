@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { DemoProvider, paths, useDemo } from "./DemoProvider.jsx";
-import { AuthProvider } from "../features/auth/AuthProvider.jsx";
+import { AuthProvider, useAuth } from "../features/auth/AuthProvider.jsx";
 import RequireAuth from "../features/auth/components/RequireAuth.jsx";
 import LoginPage from "../features/auth/pages/LoginPage.jsx";
 import OnboardingPage from "../features/auth/pages/OnboardingPage.jsx";
@@ -14,7 +14,8 @@ import SchedulePage from "../features/schedules/pages/SchedulePage.jsx";
 import AlertsPage from "../features/alerts/pages/AlertsPage.jsx";
 function HomeRedirect() {
   const { state } = useDemo();
-  return <Navigate to={paths[state.page] || paths.discover} replace />;
+  const { session } = useAuth();
+  return <Navigate to={session ? paths[state.page] || paths.discover : paths.discover} replace />;
 }
 export default function App() {
   return (
