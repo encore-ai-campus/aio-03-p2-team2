@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { getGroup, listGroups } from "../../groups/api/groupsApi.js";
 import { decideSchedule, getSchedule } from "../../schedules/api/scheduleApi.js";
@@ -31,7 +32,13 @@ export function useAlerts({ festivals, onFail }) {
   const [festInfo, setFestInfo] = useState(null); // 축제 목록에 없을 때 상세로 불러온 축제
   const [showAllAlternatives, setShowAllAlternatives] = useState(false);
   const [groups, setGroups] = useState(null);
-  const [groupId, setGroupId] = useState("");
+  // 알림에서 들어오면 주소의 groupId(/alerts?groupId=…)로 그 모임을 먼저 선택
+  const [params] = useSearchParams();
+  const urlGroupId = params.get("groupId") || "";
+  const [groupId, setGroupId] = useState(urlGroupId);
+  useEffect(() => {
+    if (urlGroupId) setGroupId(urlGroupId);
+  }, [urlGroupId]);
   const [alerts, setAlerts] = useState([]);
   const [forecast, setForecast] = useState(null); // 마지막 날씨 확인 결과 (weatherCheck)
   const [weatherPrompt, setWeatherPrompt] = useState(null); // 「그래도 진행할까요?」 대기 중인 실행
@@ -57,7 +64,7 @@ export function useAlerts({ festivals, onFail }) {
   }, [onFail]);
 
   const myGroups = (groups || []).filter((g) => me && g.leaderId === me.id);
-  const selectedGroupId = groupId || myGroups[0]?.id || "";
+  const selectedGroupId = (myGroups.some((g) => g.id === groupId) ? groupId : "") || myGroups[0]?.id || "";
   const group = myGroups.find((g) => g.id === selectedGroupId);
 
   // 내 악천후 알림 수신 상태
