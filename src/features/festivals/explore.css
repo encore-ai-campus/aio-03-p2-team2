@@ -1,3 +1,14 @@
+.fx-year-select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
 .fx-hero-banner {
   position: relative;
   overflow: hidden;

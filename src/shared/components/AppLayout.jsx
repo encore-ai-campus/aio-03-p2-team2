@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { createPath, Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { paths } from "../../app/AppStateProvider.jsx";
 import { useAuth } from "../../features/auth/AuthProvider.jsx";
 import { Button } from "./Primitives.jsx";
@@ -58,7 +58,7 @@ export default function AppLayout() {
     </>
   ) : (
     // 비로그인: 로그인 버튼 → 로그인 후 지금 보던 화면으로 돌아옴
-    <Link to="/login" state={{ from: location.pathname }} className="gnb-login">
+    <Link to="/login" state={{ from: createPath(location) }} className="gnb-login">
       로그인
     </Link>
   );

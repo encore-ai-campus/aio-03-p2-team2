@@ -2,9 +2,33 @@
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 
 const enc = encodeURIComponent;
+const alertChanges = new EventTarget();
+
+export function subscribeToAlertChanges(listener) {
+  alertChanges.addEventListener("change", listener);
+  return () => alertChanges.removeEventListener("change", listener);
+}
+
+function announceNewAlerts(result) {
+  if (result?.createdAlertCount > 0) alertChanges.dispatchEvent(new Event("change"));
+  return result;
+}
 
 // GET /alerts — 내 알림 (최신순) { id, type, festivalId, groupId, title, message, status, choice, isTest, createdAt }
-export const listAlerts = () => apiFetch("/alerts?pageSize=50").then((d) => d.items);
+export async function listAlerts() {
+  const pageSize = 50;
+  const items = new Map();
+  let page = 1;
+  let total;
+  do {
+    const result = await apiFetch(`/alerts?pageSize=${pageSize}&page=${page}`);
+    for (const item of result.items) if (!items.has(item.id)) items.set(item.id, item);
+    if (!result.items.length) break;
+    total = result.total;
+    page += 1;
+  } while ((page - 1) * pageSize < total);
+  return [...items.values()];
+}
 
 // GET /alerts?page&pageSize[&status=unread] — 알림 드롭다운용 페이지 조회 { items, page, pageSize, total }
 export const listAlertsPage = ({ page = 1, pageSize = 10, status } = {}) =>
@@ -17,7 +41,11 @@ export const listAlertsPage = ({ page = 1, pageSize = 10, status } = {}) =>
 export const markAlertRead = (alertId) => apiFetch(`/alerts/${enc(alertId)}/read`, { method: "PATCH" });
 
 // POST /alerts/{id}/answer — 참여 의사: continue(그대로 참여) | find_alternative(대체 축제) | dismiss
-export const answerAlert = (alertId, answer) => apiFetch(`/alerts/${enc(alertId)}/answer`, { method: "POST", body: { answer } });
+export async function answerAlert(alertId, answer) {
+  const result = await apiFetch(`/alerts/${enc(alertId)}/answer`, { method: "POST", body: { answer } });
+  alertChanges.dispatchEvent(new Event("change"));
+  return result;
+}
 
 // PATCH /me/notification-consents — 악천후 알림 수신 동의 (꺼져 있으면 알림이 생성되지 않음)
 export const enableRiskAlert = () => apiFetch("/me/notification-consents", { method: "PATCH", body: { riskAlert: true } });
@@ -28,7 +56,7 @@ export const setRiskAlert = (on) => apiFetch("/me/notification-consents", { meth
 // simulateRisk: true 면 개발 환경에서 시험용 악천후 알림 생성 (제목 [테스트], isTest=true)
 // 응답 { groupId, date, risk, createdAlertCount, isTest, nextAction }
 export const weatherCheck = (groupId, simulateRisk = false) =>
-  apiFetch(`/workflow/groups/${enc(groupId)}/weather-check`, { method: "POST", body: { simulateRisk } });
+  apiFetch(`/workflow/groups/${enc(groupId)}/weather-check`, { method: "POST", body: { simulateRisk } }).then(announceNewAlerts);
 
 // 대체 축제 추천 (모임장만) — 알림에서 시작하거나, 알림 없이 모임에서 바로 시작
 // 응답 = 에이전트 실행: status completed → candidate.items(대체 축제 목록)
@@ -47,5 +75,8 @@ export const selectAlternative = (runId, festivalId) =>
 //   → resumeAgentRun(runId, { checkpointId, weatherDecision: "keep" | "alternatives" })
 //   keep = 기존 축제 유지(완료) / alternatives = 대체 축제 추천 결과(candidate.items)로 완료 → selectAlternative 흐름
 // 비 예보가 없으면 질문 없이 바로 completed(keep)
-export const weatherReview = (groupId, simulateRisk = false) =>
-  apiFetch(`/workflow/groups/${enc(groupId)}/weather-review`, { method: "POST", body: { simulateRisk } });
+export async function weatherReview(groupId, simulateRisk = false) {
+  const result = await apiFetch(`/workflow/groups/${enc(groupId)}/weather-review`, { method: "POST", body: { simulateRisk } });
+  announceNewAlerts(result.weatherCheck);
+  return result;
+}

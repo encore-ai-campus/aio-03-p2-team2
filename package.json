@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test tests/demoModel.test.js tests/aiParse.test.js tests/calendar.test.js tests/conditions.test.js tests/matchingConditions.test.js tests/integrationGuards.test.js tests/appState.test.js tests/uiRegression.test.js"
+    "test": "node --test tests/demoModel.test.js tests/aiParse.test.js tests/calendar.test.js tests/conditions.test.js tests/matchingConditions.test.js tests/integrationGuards.test.js tests/appState.test.js tests/uiRegression.test.js tests/navigationRegression.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

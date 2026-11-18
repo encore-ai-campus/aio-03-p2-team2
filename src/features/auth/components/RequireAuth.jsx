@@ -3,7 +3,7 @@
 //  - 둘 중 하나라도 "완료"면 통과 (다른 기기에서 완료했거나, 방금 온보딩을 마친 경우)
 //  - 서버가 판단 못 하면(null·연결 실패) 계정 정보만으로 판단
 import { useEffect, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { createPath, Navigate, Outlet, useLocation } from "react-router-dom";
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 import { useAuth } from "../AuthProvider.jsx";
 
@@ -31,12 +31,12 @@ export default function RequireAuth({ optional = false }) {
   if (!session && optional) return <Outlet />;
   if (!session) {
     // 원래 가려던 주소를 기억해 두었다가 로그인 후 그곳으로 보낸다
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: createPath(location) }} />;
   }
   if (!metaDone && location.pathname !== "/onboarding") {
     if (server.userId !== userId) return <div className="auth-loading">프로필을 확인하고 있어요…</div>;
     // 첫 로그인: 서버에서 완료가 아니면 메인 화면보다 먼저 온보딩으로
-    if (server.completed !== true) return <Navigate to="/onboarding" replace />;
+    if (server.completed !== true) return <Navigate to="/onboarding" replace state={{ from: createPath(location) }} />;
   }
   return <Outlet />;
 }

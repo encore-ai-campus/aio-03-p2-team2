@@ -2,7 +2,7 @@
 // 서버: GET /alerts?page&pageSize[&status=unread] → { items, total } / PATCH /alerts/{id}/read
 // 「모두 읽음」 API는 없어서 제공하지 않음
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listAlertsPage, markAlertRead } from "../api/alertsApi.js";
+import { listAlerts, listAlertsPage, markAlertRead, subscribeToAlertChanges } from "../api/alertsApi.js";
 import { isVisibleAlert, needsWeatherResponse } from "../lib/alertStatus.js";
 
 const PAGE_SIZE = 10;
@@ -24,8 +24,8 @@ export function useNotifications({ userId, refreshKey }) {
   // 종 숫자: 응답이 필요한 날씨 알림 수 (PM 기준 — alertStatus.needsWeatherResponse)
   const loadUnread = useCallback(
     () =>
-      listAlertsPage({ page: 1, pageSize: 50 })
-        .then((r) => setUnreadCount(r.items.filter(needsWeatherResponse).length))
+      listAlerts()
+        .then((items) => setUnreadCount(items.filter(needsWeatherResponse).length))
         .catch(() => {}),
     [],
   );
@@ -49,8 +49,12 @@ export function useNotifications({ userId, refreshKey }) {
     loadUnread();
   }, [fetchPage, loadUnread, userId, refreshKey, reload]);
 
+  // 새 알림이 생기면(날씨 확인 등) 바로 다시 조회 — alertsApi.subscribeToAlertChanges
+  useEffect(() => subscribeToAlertChanges(() => setReload((n) => n + 1)), []);
+
   // 다른 탭·창에서 돌아오면 다시 조회
   useEffect(() => {
+    if (typeof document === "undefined") return undefined; // 테스트·서버 환경 대비
     const onVisible = () => {
       if (document.visibilityState === "visible") setReload((n) => n + 1);
     };

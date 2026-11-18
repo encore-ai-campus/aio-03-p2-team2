@@ -9,16 +9,15 @@ export function sourceText(festivals, source, fallback) {
   return `${official ? "출처: 한국관광공사 TourAPI" : "출처: 페스로움 DB"}${when ? ` · ${when} 갱신` : ""}`;
 }
 
-// 월 조건: 선택한 달(2026년)에 기간이 걸치는 축제
-const inMonth = (f, month) => {
-  const ym = `2026-${String(month).padStart(2, "0")}`;
+// 월 조건: 선택한 연도와 달에 기간이 걸치는 축제
+const inMonth = (f, year, month) => {
+  const ym = `${year}-${String(month).padStart(2, "0")}`;
   return f.start.slice(0, 7) <= ym && f.end.slice(0, 7) >= ym;
 };
 
-// 상태·지역·유형·검색어 조건 (월 조건은 withMonth일 때만)
-export function matchesFilters(f, state, active, q, withMonth) {
+export function matchesFilters(f, state, active, q, year, month) {
   return (
-    (!withMonth || !state.month || inMonth(f, state.month)) &&
+    (!month || inMonth(f, year, month)) &&
     (state.status === "all" || (state.status === "available" && active(f)) || (state.status === "past" && !active(f))) &&
     (state.region === "all" || f.region === state.region) &&
     (state.category === "all" || f.category === state.category) &&

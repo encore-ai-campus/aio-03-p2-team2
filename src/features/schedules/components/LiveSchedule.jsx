@@ -41,7 +41,9 @@ export default function LiveSchedule({ festivals, onFail }) {
 
 function SelectedSchedule({ groupId, groups, festivals, me, onGroupChange }) {
   const navigate = useNavigate();
-  const { group, schedule, run, busy, notice, approve, reject, draft } = useSelectedSchedule(groupId, me?.id);
+  const {
+    group, schedule, run, busy, notice, loading, unrecoverableDraft, draftReadFailed, approve, reject, discard, draft, retry,
+  } = useSelectedSchedule(groupId, me?.id);
   const festival = (id) => festivals.find((f) => f.id === id);
 
   if (!groups)
@@ -99,11 +101,17 @@ function SelectedSchedule({ groupId, groups, festivals, me, onGroupChange }) {
             run={run}
             notice={notice}
             busy={busy}
+            loading={loading}
+            unrecoverableDraft={unrecoverableDraft}
+            draftReadFailed={draftReadFailed}
             isLeader={isLeader}
             beforeKeys={beforeKeys}
+            targetFestivalName={run?.targetFestivalId ? festival(run.targetFestivalId)?.name : null}
             onApprove={approve}
             onReject={reject}
+            onDiscard={discard}
             onDraft={draft}
+            onRetry={retry}
           />
           <ScheduleVerifyPanel run={run} before={before} after={after} beforeKeys={beforeKeys} />
         </div>

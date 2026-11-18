@@ -5,10 +5,13 @@ import { supabase } from "../../../shared/lib/supabase.js";
 
 const enc = encodeURIComponent;
 
-// GET /groups/{id}/messages — 최근 메시지 (오래된 순)
-// 백엔드 커서(before/after)는 id 크기 비교라 순서 보장이 안 돼서 쓰지 않고 최근 N개만 받는다
-export const listMessages = (groupId, limit = 50) =>
-  apiFetch(`/groups/${enc(groupId)}/messages?limit=${limit}`).then((d) => d.items || []);
+// GET /groups/{id}/messages — 메시지 한 페이지 (오래된 순)
+export function listMessages(groupId, { before, after, limit = 50 } = {}) {
+  const params = new URLSearchParams({ limit });
+  if (before != null) params.set("before", before);
+  if (after != null) params.set("after", after);
+  return apiFetch(`/groups/${enc(groupId)}/messages?${params}`).then(({ items = [], nextCursor = null }) => ({ items, nextCursor }));
+}
 
 // POST /groups/{id}/messages — 같은 clientMessageId로 다시 보내면 중복 저장되지 않음
 export const sendMessage = (groupId, text, clientMessageId) =>
@@ -30,6 +33,6 @@ export async function openChatSocket(groupId, { onOpen, onMessage, onClose }) {
       /* 형식이 다른 메시지는 무시 */
     }
   };
-  ws.onclose = () => onClose?.();
+  ws.onclose = (event) => onClose?.(event);
   return ws;
 }

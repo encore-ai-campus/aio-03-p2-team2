@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMe } from "../../auth/hooks/useMe.js";
 import { getGroup, listGroups } from "../../groups/api/groupsApi.js";
-import { decideSchedule, getSchedule } from "../../schedules/api/scheduleApi.js";
+import { decideSchedule, getSchedule, getScheduleDraft } from "../../schedules/api/scheduleApi.js";
 import { fetchFestival } from "../../festivals/api/festivalsApi.js";
 import { resumeAgentRun } from "../../matching/api/agentsApi.js";
 import { answerAlert, listAlerts, riskResponseForGroup, selectAlternative, setRiskAlert, weatherCheck, weatherReview } from "../api/alertsApi.js";
-import { isVisibleAlert } from "../lib/alertStatus.js";
+import { isVisibleAlert, needsWeatherResponse } from "../lib/alertStatus.js";
 
 const ERROR_TEXT = {
   LEADER_ONLY: "모임장만 할 수 있어요.",
@@ -24,8 +24,7 @@ const alertError = (e) => ERROR_TEXT[e.code] || e.message || "요청에 실패�
 
 export function useAlerts({ festivals, onFail }) {
   const me = useMe();
-  const [detail, setDetail] = useState(null); // 선택한 모임 상세 (축제·참여자)
-  const [schedule, setSchedule] = useState(null); // 선택한 모임의 확정 일정
+  const [groupData, setGroupData] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [riskOn, setRiskOn] = useState(null); // 내 악천후 알림 수신 (null = 아직 모름)
   const [forecastStatus, setForecastStatus] = useState("");
@@ -48,24 +47,41 @@ export function useAlerts({ festivals, onFail }) {
   const [scheduleRun, setScheduleRun] = useState(null); // 대체 축제 기준 일정 재생성 실행
   const [busy, setBusy] = useState(""); // 진행 중인 작업 이름
   const [notice, setNotice] = useState("");
+  const groupScope = useRef(null);
+  const currentAction = useRef(null);
+  const inboxRequest = useRef(0);
   const festival = (id) => festivals.find((f) => f.id === id);
 
-  const loadAlerts = useCallback(() => listAlerts().then(setAlerts), []);
+  const loadAlerts = useCallback(async () => {
+    const request = ++inboxRequest.current;
+    const items = await listAlerts();
+    if (inboxRequest.current === request) setAlerts(items);
+  }, []);
+  const refreshAlerts = useCallback(() => loadAlerts().catch((e) => console.warn("[alerts] 알림 갱신 실패", e)), [loadAlerts]);
   useEffect(() => {
-    Promise.all([listGroups(), listAlerts()])
-      .then(([g, a]) => {
-        setGroups(g);
-        setAlerts(a);
-      })
+    let alive = true;
+    Promise.all([listGroups(), loadAlerts()])
+      .then(([g]) => { if (alive) setGroups(g); })
       .catch((e) => {
         console.warn("[alerts] API 조회 실패", e);
-        onFail?.();
+        if (alive) onFail?.();
       });
-  }, [onFail]);
+    return () => {
+      alive = false;
+      inboxRequest.current += 1;
+    };
+  }, [onFail, loadAlerts]);
 
   const myGroups = (groups || []).filter((g) => me && g.leaderId === me.id);
   const selectedGroupId = (myGroups.some((g) => g.id === groupId) ? groupId : "") || myGroups[0]?.id || "";
   const group = myGroups.find((g) => g.id === selectedGroupId);
+  const detail = groupData?.id === selectedGroupId ? groupData.detail : null;
+  const schedule = groupData?.id === selectedGroupId ? groupData.schedule : null;
+
+  useLayoutEffect(() => {
+    groupScope.current = {};
+    return () => { groupScope.current = null; };
+  }, [selectedGroupId]);
 
   // 내 악천후 알림 수신 상태
   useEffect(() => {
@@ -76,12 +92,25 @@ export function useAlerts({ festivals, onFail }) {
   useEffect(() => {
     if (!selectedGroupId) return;
     let alive = true;
-    setDetail(null);
-    setSchedule(null);
-    Promise.all([getGroup(selectedGroupId).catch(() => null), getSchedule(selectedGroupId).catch((e) => ({ loadError: alertError(e) }))]).then(([d, sc]) => {
-      if (!alive) return;
-      setDetail(d);
-      setSchedule(sc);
+    const scope = groupScope.current;
+    const isCurrent = () => alive && scope === groupScope.current;
+    setGroupData(null);
+    Promise.all([getGroup(selectedGroupId).catch(() => null), getSchedule(selectedGroupId).catch((e) => ({ loadError: alertError(e) }))]).then(async ([d, sc]) => {
+      if (!isCurrent()) return;
+      if (sc?.proposals?.some((item) => item.status === "draft")) {
+        try {
+          const run = await getScheduleDraft(selectedGroupId);
+          if (isCurrent() && run?.targetFestivalId) {
+            setScheduleRun((current) => current || run);
+            fetchFestival(run.targetFestivalId)
+              .then((target) => { if (isCurrent()) setChosen((current) => current || target); })
+              .catch(() => null);
+          }
+        } catch (e) {
+          if (isCurrent()) setNotice(alertError(e));
+        }
+      }
+      if (isCurrent()) setGroupData({ id: selectedGroupId, detail: d, schedule: sc });
     });
     return () => {
       alive = false;
@@ -93,18 +122,21 @@ export function useAlerts({ festivals, onFail }) {
   useEffect(() => {
     if (!selectedGroupId || !schedule?.items?.length) return;
     let alive = true;
+    const scope = groupScope.current;
+    const isCurrent = () => alive && scope === groupScope.current;
     setForecastStatus("loading");
     weatherCheck(selectedGroupId, false)
       .then((r) => {
-        if (!alive) return;
+        if (r.createdAlertCount) refreshAlerts();
+        if (!isCurrent()) return;
         setForecast((cur) => cur || r);
         setForecastStatus("");
       })
-      .catch((e) => alive && setForecastStatus(alertError(e)));
+      .catch((e) => isCurrent() && setForecastStatus(alertError(e)));
     return () => {
       alive = false;
     };
-  }, [selectedGroupId, schedule]);
+  }, [selectedGroupId, schedule, refreshAlerts]);
 
   const fid = detail?.festivalId || group?.festivalId;
   useEffect(() => {
@@ -118,7 +150,7 @@ export function useAlerts({ festivals, onFail }) {
       alive = false;
     };
   }, [fid, festivals]);
-  const selectedFestival = festival(fid) || festInfo;
+  const selectedFestival = festival(fid) || (festInfo?.id === fid ? festInfo : null);
   const items = schedule?.items || [];
   const day = items[0]?.date;
   const sameDay = items.filter((x) => x.date === day);
@@ -127,6 +159,7 @@ export function useAlerts({ festivals, onFail }) {
 
   function resetFlow() {
     setForecast(null);
+    setForecastStatus("");
     setWeatherPrompt(null);
     setOutcome(null);
     setAlternativeRun(null);
@@ -135,47 +168,60 @@ export function useAlerts({ festivals, onFail }) {
     setNotice("");
   }
 
-  async function act(name, fn) {
-    if (busy) return null;
+  async function act(name, fn, groupScoped = true) {
+    if (currentAction.current) return null;
+    const scope = groupScope.current;
+    const action = { groupScoped };
+    const isCurrent = () => !groupScoped || scope === groupScope.current;
+    currentAction.current = action;
     setBusy(name);
     setNotice("");
     try {
-      return await fn();
+      return await fn(isCurrent);
     } catch (e) {
       console.warn("[alerts] 실패", e);
-      setNotice(alertError(e));
+      if (isCurrent()) setNotice(alertError(e));
       return null;
     } finally {
-      setBusy("");
+      if (currentAction.current === action) {
+        currentAction.current = null;
+        setBusy("");
+      }
     }
   }
 
   // 날씨 확인 (simulateRisk: 시연용 악천후) → 비 예보면 질문, 아니면 「기존대로 진행」
   const reviewWeather = (simulateRisk) =>
-    act(simulateRisk ? "sim" : "check", async () => {
+    act(simulateRisk ? "sim" : "check", async (isCurrent) => {
+      if (scheduleRun?.status === "waiting_approval") return null;
       resetFlow();
       const r = await weatherReview(selectedGroupId, simulateRisk);
+      const refreshingAlerts = refreshAlerts();
+      if (!isCurrent()) return refreshingAlerts;
       setForecast(r.weatherCheck);
-      loadAlerts();
       if (r.run?.status === "waiting_input" && r.run.interrupt?.type === "weather_confirmation") setWeatherPrompt(r.run);
       else setOutcome("clear");
+      await refreshingAlerts;
       return r;
     });
 
   // 「그래도 진행할까요?」 — keep: 유지 / alternatives: 대체 축제 목록(같은 자리)
   const decideWeather = (weatherDecision) =>
-    act(weatherDecision, async () => {
+    act(weatherDecision, async (isCurrent) => {
       const res = await resumeAgentRun(weatherPrompt.runId, { checkpointId: weatherPrompt.checkpointId, weatherDecision });
-      setWeatherPrompt(null);
       // 모임장 본인 알림이 있으면 같은 답으로 맞춰 둔다 (실패해도 흐름에는 영향 없음)
-      const mine = alerts.find((a) => a.groupId === selectedGroupId && !a.choice);
+      const mine = alerts.find((a) => a.groupId === selectedGroupId && a.festivalId === (forecast?.festivalId || fid) &&
+        Boolean(a.isTest) === Boolean(forecast?.isTest) && a.evidence?.data?.date === forecast?.date && needsWeatherResponse(a));
       if (mine) await answerAlert(mine.id, weatherDecision === "keep" ? "continue" : "find_alternative").catch(() => null);
-      loadAlerts();
+      const refreshingAlerts = refreshAlerts();
+      if (!isCurrent()) return refreshingAlerts;
+      setWeatherPrompt(null);
       if (weatherDecision === "keep") setOutcome("keep");
       else {
         setShowAllAlternatives(false);
         setAlternativeRun(res);
       }
+      await refreshingAlerts;
       return res;
     });
 
@@ -186,43 +232,66 @@ export function useAlerts({ festivals, onFail }) {
       await setRiskAlert(next);
       setRiskOn(next);
       return next;
-    });
+    }, false);
 
   // 유지 후에도 대체 축제를 보고 싶을 때
   const recommendAlternatives = () =>
-    act("recommend", async () => {
+    act("recommend", async (isCurrent) => {
       const r = await riskResponseForGroup(selectedGroupId);
+      if (!isCurrent()) return null;
       setOutcome(null);
       setAlternativeRun(r);
       return r;
     });
 
   const chooseAlternative = (f) =>
-    act(`choose:${f.id}`, async () => {
+    act(`choose:${f.id}`, async (isCurrent) => {
       const r = await selectAlternative(alternativeRun.runId, f.id);
+      if (!isCurrent()) return null;
       setChosen(f);
       setScheduleRun(r);
       return r;
     });
 
   const decideScheduleChange = (decision) =>
-    act(decision, async () => {
+    act(decision, async (isCurrent) => {
       const r = await decideSchedule(scheduleRun, decision);
+      if (!isCurrent()) return null;
       setScheduleRun(r);
-      if (decision === "approve") setReloadKey((k) => k + 1);
+      if (decision === "approve" && r.status === "completed") {
+        setForecast(null);
+        setReloadKey((k) => k + 1);
+      }
       if (decision === "reject") setNotice("변경하지 않았어요. 기존 축제와 일정은 그대로예요.");
       return r;
     });
 
   function selectGroup(id) {
+    if (id === selectedGroupId) return;
+    groupScope.current = null;
+    if (currentAction.current?.groupScoped) {
+      currentAction.current = null;
+      setBusy("");
+    }
     setGroupId(id);
     resetFlow();
   }
 
   const visibleAlerts = alerts.filter(isVisibleAlert);
-  const answerAsMember = (alert, choice) => act(`ans:${alert.id}`, () => answerAlert(alert.id, choice).then(loadAlerts));
+  const answerAsMember = (alert, choice) => act(`ans:${alert.id}`, () => answerAlert(alert.id, choice).then(loadAlerts), false);
   const reloadSchedule = () => setReloadKey((key) => key + 1);
-  const returnToAlternatives = () => setScheduleRun(null);
+  const returnToAlternatives = () => act("back", async (isCurrent) => {
+    if (scheduleRun.status === "waiting_approval") {
+      const result = await decideSchedule(scheduleRun, "reject");
+      if (!isCurrent()) return;
+      if (result.status !== "rejected") {
+        setScheduleRun(result);
+        return;
+      }
+    }
+    setScheduleRun(null);
+    setChosen(null);
+  });
   const toggleAlternatives = () => setShowAllAlternatives((shown) => !shown);
 
   return {

@@ -35,11 +35,11 @@ export function ViewToggle({ ui }) {
   );
 }
 
-export default function CalendarView({ ui, list }) {
+export default function CalendarView({ ui, list, year }) {
   const { state, dispatch, calMonth, today, active, period, fCard } = ui;
   const m = calMonth();
-  const first = new Date(2026, m - 1, 1);
-  const last = new Date(2026, m, 0);
+  const first = new Date(year, m - 1, 1);
+  const last = new Date(year, m, 0);
   const start = new Date(first);
   start.setDate(1 - first.getDay());
   const end = new Date(last);
@@ -48,7 +48,7 @@ export default function CalendarView({ ui, list }) {
   const days = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) days.push(ymd(d));
   const on = (ds) => list.filter((f) => f.start <= ds && f.end >= ds);
-  const monthKey = `2026-${String(m).padStart(2, "0")}`;
+  const monthKey = `${year}-${String(m).padStart(2, "0")}`;
   const monthCount = list.filter(
     (f) => f.start.slice(0, 7) <= monthKey && f.end.slice(0, 7) >= monthKey,
   ).length;
@@ -71,7 +71,7 @@ export default function CalendarView({ ui, list }) {
       <div className="box pad cal-box">
         <div className="cal-top">
           <div className="cal-title">
-            <b>2026.{String(m).padStart(2, "0")}</b>
+            <b>{monthKey.replace("-", ".")}</b>
             <Button
               className="cal-arrow"
               disabled={m <= 1}

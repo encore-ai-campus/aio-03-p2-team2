@@ -78,7 +78,15 @@ export default function LiveChat({ onFail }) {
   } else {
     body = (
       <>
-        <ChatHistory className="chat-messages" roomId={room.id} messageCount={shown.length}>
+        <ChatHistory className="chat-messages" roomId={room.id} firstMessageId={messages[0]?.id} messageCount={shown.length}>
+          {chat.hasOlder && (
+            <div className="ct-history-more">
+              <button type="button" className="btn small" disabled={chat.olderLoading} onClick={chat.loadOlder}>
+                {chat.olderLoading ? "이전 메시지 불러오는 중…" : "이전 메시지 불러오기"}
+              </button>
+              {chat.olderError && <small role="status">{chatError(chat.olderError)}</small>}
+            </div>
+          )}
           <ChatMessages shown={shown} me={me} onResend={chat.send} onDiscard={chat.discard} />
         </ChatHistory>
         <form className="chat-compose" onSubmit={chat.onSubmit}>

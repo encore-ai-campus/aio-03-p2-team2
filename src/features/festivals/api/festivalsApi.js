@@ -32,13 +32,15 @@ export function toCardModel(f) {
 }
 
 // GET /festivals — 한 번에 최대 100건이라 끝까지 페이지를 넘기며 전부 모은다
-export async function fetchAllFestivals(year = 2026) {
+export async function fetchAllFestivals(year) {
   const pageSize = 100;
   let page = 1;
   let items = [];
   let total = Infinity;
   while (items.length < total) {
-    const data = await apiFetch(`/festivals?year=${year}&page=${page}&pageSize=${pageSize}`);
+    const query = new URLSearchParams({ page, pageSize });
+    if (year !== undefined) query.set("year", year);
+    const data = await apiFetch(`/festivals?${query}`);
     items = items.concat(data.items);
     total = data.total;
     if (!data.items.length) break;

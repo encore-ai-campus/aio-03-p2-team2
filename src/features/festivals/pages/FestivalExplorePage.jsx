@@ -51,7 +51,7 @@ export default function FestivalExplorePage() {
         }}
       />
       <div id="fx-hero-results" className="fx-hero-target" ref={resultsRef} tabIndex={-1} role="region" aria-label={x.calendar ? "축제 캘린더" : "축제 검색 결과"}>
-        {x.calendar ? <CalendarView ui={ui} list={x.calList} /> : <FestivalSections ui={ui} x={x} />}
+        {x.calendar ? <CalendarView ui={ui} list={x.calList} year={x.year} /> : <FestivalSections ui={ui} x={x} />}
       </div>
       <ExploreFlow />
     </>

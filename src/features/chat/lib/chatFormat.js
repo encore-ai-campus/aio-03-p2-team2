@@ -13,11 +13,18 @@ export const dayLabel = (s) => {
   const d = new Date(`${s}T00:00:00`);
   return Number.isNaN(+d) ? s : `${d.getMonth() + 1}.${d.getDate()}(${WEEK[d.getDay()]})`;
 };
-export const LIVE_TEXT = { live: "실시간 연결됨", polling: "실시간 끊김 · 5초마다 갱신", connecting: "연결 중…" };
+export const LIVE_TEXT = { live: "실시간 연결됨", polling: "실시간 끊김 · 5초마다 갱신", connecting: "연결 중…", unavailable: "채팅을 이용할 수 없음" };
 
-// id 기준으로 합치고 시간순 정렬
+// DB의 (생성 시각, ID) 정렬과 맞춘다. Date는 밀리초 아래의 정밀도를 버린다.
+const fractionalSecond = (value) => Number(value?.match(/\.\d+/)?.[0] || 0);
+function compareMessages(a, b) {
+  return Date.parse(a.createdAt) - Date.parse(b.createdAt)
+    || fractionalSecond(a.createdAt) - fractionalSecond(b.createdAt)
+    || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
 export const mergeMsgs = (prev, items) => {
   const map = new Map((prev || []).map((m) => [m.id, m]));
   items.forEach((m) => m && map.set(m.id, m));
-  return [...map.values()].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  return [...map.values()].sort(compareMessages);
 };

@@ -6,6 +6,10 @@ const enc = encodeURIComponent;
 
 // GET /groups/{id}/schedule — 현재 확정 일정 { version, current, items[], validation, proposals[] }
 export const getSchedule = (groupId) => apiFetch(`/groups/${enc(groupId)}/schedule`);
+export const getScheduleDraft = (groupId) => apiFetch(`/groups/${enc(groupId)}/schedule/draft`);
+
+export const discardScheduleProposal = (groupId, proposalId, version) =>
+  apiFetch(`/groups/${enc(groupId)}/schedule/proposals/${enc(proposalId)}/reject`, { method: "POST", body: { version } });
 
 // POST /workflow/groups/{id}/schedule — 참여자 가능 시간·기존 조건으로 일정 초안 생성 (모임장만)
 // 응답 = 에이전트 실행: status waiting_approval(승인 대기) | waiting_input | failed

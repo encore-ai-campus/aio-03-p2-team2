@@ -97,13 +97,13 @@ export default function AlertForecast({ forecast, forecastStatus, day, startTime
           {forecast && region ? ` · ${region} 기준` : ""}
         </span>
         <div className="al-wx-links">
-          <button type="button" className="al-link" disabled={!!busy || !selectedGroupId} onClick={() => reviewWeather(false)}>
+          <button type="button" className="al-link" disabled={!!busy || !selectedGroupId || !hasSchedule} onClick={() => reviewWeather(false)}>
             <i className="ti ti-refresh" aria-hidden="true" /> {busy === "check" ? "확인하는 중…" : "다시 확인"}
           </button>
           <button
             type="button"
             className="al-link al-sim"
-            disabled={!!busy || !selectedGroupId}
+            disabled={!!busy || !selectedGroupId || !hasSchedule}
             onClick={() => reviewWeather(true)}
             title="시연용으로 비 예보를 만들어 확인해요. 참여자에게 [테스트] 알림이 함께 가요."
           >
