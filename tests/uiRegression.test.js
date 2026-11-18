@@ -225,7 +225,7 @@ test("weather simulation still asks for consent and resumes to alternative festi
     throw new Error(`Unexpected request: ${path}`);
   };
   const renderer = await mount(h(LiveAlerts, { festivals: [festival] }));
-  await act(async () => button(renderer, "악천후 시뮬레이션").props.onClick());
+  await act(async () => button(renderer, "비 예보 만들기").props.onClick());
   assert.equal(calls.find((c) => c.path.endsWith("/weather-review")).body.simulateRisk, true);
   assert.match(JSON.stringify(renderer.toJSON()), /그래도 이 축제로 진행할까요/);
   await act(async () => button(renderer, "아니요, 대체 축제 추천").props.onClick());
