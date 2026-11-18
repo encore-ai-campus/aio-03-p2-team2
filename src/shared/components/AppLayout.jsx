@@ -55,7 +55,9 @@ export default function AppLayout() {
     return () => {
       alive = false;
     };
-  }, [location.pathname, user]);
+    // user 객체는 로그인 상태 이벤트(창 포커스·토큰 갱신)마다 새로 만들어져 매번 다시 조회됐다 → 계정 id 기준으로만 다시 조회
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, user?.id]);
   const bell = liveBell ?? 0;
 
   const right = user ? (
