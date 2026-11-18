@@ -8,7 +8,7 @@ export default function FestivalSections({ ui, x }) {
     return (
       <>
         <div className="empty">
-          <div className="big">🔎</div>
+          <div className="big"><i className="ti ti-search-off" aria-hidden="true" /></div>
           <h3>조건에 맞는 축제가 없어요</h3>
           <p>다른 달 또는 다른 지역을 선택해 보세요.</p>
         </div>

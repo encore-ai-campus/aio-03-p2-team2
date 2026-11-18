@@ -51,7 +51,7 @@ export default function ExploreFilters({ ui, x }) {
         <input
           id="filter-keyword"
           className="searchbox"
-          placeholder="🔎 축제명·지역·태그 검색"
+          placeholder="축제명·지역·태그 검색"
           aria-label="축제 검색어"
           {...fieldProps("filter-keyword")}
         />
