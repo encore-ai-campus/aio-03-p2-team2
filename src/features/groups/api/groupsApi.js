@@ -3,8 +3,16 @@ import { apiFetch } from "../../../shared/lib/apiClient.js";
 
 const enc = encodeURIComponent;
 
-// GET /groups — 목록 (members·joinRequests는 빠진 요약본)
-export const listGroups = () => apiFetch("/groups?pageSize=100").then((d) => d.items);
+// GET /groups — 페이지별 모임 요약
+export async function listGroups() {
+  const pageSize = 100;
+  const groups = new Map();
+  for (let page = 1; ; page += 1) {
+    const { items, total } = await apiFetch(`/groups?page=${page}&pageSize=${pageSize}`);
+    for (const group of items) groups.set(group.id, group);
+    if (items.length < pageSize || page * pageSize >= total) return [...groups.values()];
+  }
+}
 
 // GET /groups/{id} — 상세 (members·comments·version 포함, joinRequests는 빠짐)
 export const getGroup = (id) => apiFetch(`/groups/${enc(id)}`);

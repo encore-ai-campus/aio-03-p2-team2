@@ -4,19 +4,22 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 import { useAuth } from "../AuthProvider.jsx";
 
-const cache = new Map(); // Supabase 계정 ID → GET /me 요청 (같은 계정이면 한 번만 호출)
-
 export function useMe() {
   const { user } = useAuth();
-  const [me, setMe] = useState(null);
+  const accountId = user?.id;
+  const [result, setResult] = useState(null);
   useEffect(() => {
-    if (!user) return setMe(null);
-    if (!cache.has(user.id)) cache.set(user.id, apiFetch("/me").catch((e) => (cache.delete(user.id), Promise.reject(e))));
+    if (!accountId) {
+      setResult(null);
+      return;
+    }
     let alive = true;
-    cache.get(user.id).then((data) => alive && setMe(data)).catch(() => alive && setMe(null));
+    apiFetch("/me")
+      .then((me) => { if (alive) setResult({ accountId, me }); })
+      .catch(() => { if (alive) setResult(null); });
     return () => {
       alive = false;
     };
-  }, [user]);
-  return me; // { id: "usr_…", displayName, profile … } | null
+  }, [accountId]);
+  return result?.accountId === accountId ? result?.me ?? null : null;
 }
