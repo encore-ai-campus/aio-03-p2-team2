@@ -10,6 +10,7 @@ import { getGroup, listGroups } from "../../groups/api/groupsApi.js";
 import { decideSchedule, getSchedule } from "../../schedules/api/scheduleApi.js";
 import { fetchFestival } from "../../festivals/api/festivalsApi.js";
 import { resumeAgentRun } from "../../matching/api/agentsApi.js";
+import HourlyTable from "./HourlyTable.jsx";
 import { answerAlert, listAlerts, riskResponseForGroup, selectAlternative, setRiskAlert, weatherCheck, weatherReview } from "../api/alertsApi.js";
 
 const ERROR_TEXT = {
@@ -272,25 +273,76 @@ export default function LiveAlerts({ festivals, onFail }) {
   // 진행 단계
   const doneCount = scheduleRun?.status === "completed" ? 4 : scheduleRun ? 3 : riskRun ? 2 : outcome ? 4 : wx ? 1 : 0;
   const curCount = outcome && !riskRun ? 2 : doneCount; // 유지·문제 없음이면 「진행 여부」까지만 완료로 보이게
+  // 머리글: [제목 | 모임 전환] / [설명 | 모임 날짜·장소·인원] / [진행 단계]
+  // 머리글: [제목·설명 | 진행 단계] + [모임 이름(선택) | 일정·장소·인원] — 목업 public/mockup/alerts.html
   const head = (
-    <div className="mp-head">
-      <div>
-        <h1>AI 알림·대체 축제</h1>
-        <p>모임 날짜의 실제 예보를 확인하고, 비가 오면 진행할지 먼저 물어봐요</p>
+    <header className="al-head">
+      <div className="al-head-row">
+        <div>
+          <h1>AI 알림·대체 축제</h1>
+          <p>모임 날짜의 실제 예보를 확인하고, 비가 오면 진행할지 먼저 물어봐요</p>
+        </div>
+        <ol className="al-steps" aria-label="알림 진행 단계">
+          {STEPS.map((x, i) => {
+            const done = i < curCount;
+            const cls = done ? "done" : i === curCount ? "cur" : "";
+            return (
+              <li key={x} className={cls}>
+                {done ? <i className="ti ti-circle-check" aria-hidden="true" /> : <b>{pad(i + 1)}</b>}
+                {x}
+              </li>
+            );
+          })}
+        </ol>
       </div>
-      <ol className="mp-steps" aria-label="알림 진행 단계">
-        {STEPS.map((x, i) => {
-          const done = i < curCount;
-          const cls = done ? "done" : i === curCount ? "cur" : "";
-          return (
-            <li key={x} className={cls}>
-              {done ? <i className="ti ti-circle-check" aria-hidden="true" /> : <span>{pad(i + 1)}</span>}
-              {x}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
+      {myGroups.length > 0 && (
+        <div className="al-ctx">
+          <span className="al-ctx-label">모임</span>
+          <label className="al-ctx-pick" title="모임 바꾸기">
+            <select
+              value={selectedGroupId}
+              onChange={(e) => {
+                setGroupId(e.target.value);
+                resetFlow();
+              }}
+              aria-label="모임 바꾸기"
+            >
+              {myGroups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </select>
+            <i className="ti ti-chevron-down" aria-hidden="true" />
+          </label>
+          <span className="al-ctx-bar" aria-hidden="true" />
+          <div className="al-ctx-meta">
+            {day ? (
+              <span>
+                <i className="ti ti-calendar" aria-hidden="true" />
+                {dayLabel(day)}{" "}
+                <b>
+                  {startT}
+                  {endT && endT !== startT ? `–${endT}` : ""}
+                </b>
+              </span>
+            ) : null}
+            {gf ? (
+              <span>
+                <i className="ti ti-map-pin" aria-hidden="true" />
+                {[gf.region, gf.city].filter(Boolean).join(" ") || "지역 미정"}
+              </span>
+            ) : null}
+            {detail ? (
+              <span>
+                <i className="ti ti-user-check" aria-hidden="true" />
+                참여 {detail.memberCount}/{detail.capacity}명
+              </span>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </header>
   );
 
   // 참여자 알림 (내가 모임장이 아닌 모임의 알림)
@@ -330,7 +382,7 @@ export default function LiveAlerts({ festivals, onFail }) {
   // 모임장인 모임이 없으면 참여자 화면만
   if (!myGroups.length)
     return (
-      <>
+      <div className="al-v3">
         {head}
         {memberSection || (
           <div className="sc-lock">
@@ -339,7 +391,7 @@ export default function LiveAlerts({ festivals, onFail }) {
             <span>모임 날짜에 비가 예보되면 여기로 알려 드려요. 날씨 확인은 모임장이 할 수 있어요.</span>
           </div>
         )}
-      </>
+      </div>
     );
 
   // 왼쪽: 날씨 카드
@@ -355,9 +407,22 @@ export default function LiveAlerts({ festivals, onFail }) {
           return { time: `${data.date || day}T${hh}:00`, precipitationProbability: data.precipitationProbability, weatherCode: data.weatherCode };
         })
       : [];
+  const rainHours = hours.filter((h) => (h.precipitationProbability ?? 0) >= 60).length;
+  const maxWind = hours.reduce((m, h) => (h.windSpeed != null && h.windSpeed > m ? h.windSpeed : m), data?.windSpeed ?? -1);
+  const isSim = wx?.isTest || wx?.weather?.mode === "simulation";
+  const srcLabel = isSim ? "시연용 비 예보" : wx?.weather?.mode === "demo" ? "데모 날씨" : `${wx?.weather?.source || "날씨 예보"} 실시간 예보`;
+  const region = gf ? [gf.region, gf.city].filter(Boolean).join(" ") : "";
   const weatherCard = (
     <section className="al-weather">
-      <h2 className="sc-h">모임 시간 날씨</h2>
+      <div className="al-card-h">
+        <h2 className="sc-h">모임 시간 날씨</h2>
+        {wx ? (
+          <span className={`al-src${isSim ? " sim" : ""}`}>
+            <i className={`ti ${isSim ? "ti-flask" : "ti-circle-check"}`} aria-hidden="true" />
+            {srcLabel}
+          </span>
+        ) : null}
+      </div>
       {!wx ? (
         <div className="al-wx-empty">
           <i className={`ti ${autoWx === "loading" ? "ti-loader-2 al-spin" : "ti-cloud"}`} aria-hidden="true" />
@@ -366,67 +431,71 @@ export default function LiveAlerts({ festivals, onFail }) {
         </div>
       ) : (
         <>
-          <div className={`al-wx-now ${look.tone}`}>
-            <span className="al-wx-ico">
-              <i className={`ti ${look.icon}`} aria-hidden="true" />
-            </span>
-            <div>
-              <b>
-                {look.label}
-                {data?.precipitationProbability != null ? ` · 강수 ${data.precipitationProbability}%` : ""}
-              </b>
-              <span>
-                {dayLabel(data?.date || wx.date)}
-                {data?.startTime ? ` ${data.startTime}–${data.endTime}` : startT ? ` ${startT}–${endT}` : ""}
-                {data?.windSpeed != null ? ` · 바람 ${data.windSpeed}${data.windSpeedUnit || "m/s"}` : ""}
+          <div className="al-wx-top">
+            <div className={`al-wx-main ${look.tone}`}>
+              <span className="al-wx-ico">
+                <i className={`ti ${look.icon}`} aria-hidden="true" />
               </span>
+              <div>
+                <small>최대 강수확률</small>
+                <b>{data?.precipitationProbability != null ? `${data.precipitationProbability}%` : "–"}</b>
+                <span>{look.label}</span>
+              </div>
             </div>
-            <span className={`cm-badge ${wx.risk ? "approval" : "open"} al-wx-risk`}>{wx.risk ? "악천후 주의" : "진행 문제 없음"}</span>
+            <div className="al-chips">
+              <div className="al-chip">
+                <small>비 예보 시간</small>
+                <b>
+                  {rainHours}
+                  <em>/ {hours.length || 0}시간</em>
+                </b>
+              </div>
+              <div className="al-chip">
+                <small>최대 바람</small>
+                <b>
+                  {maxWind >= 0 ? maxWind : "–"}
+                  <em>{data?.windSpeedUnit || "m/s"}</em>
+                </b>
+              </div>
+              <div className="al-chip">
+                <small>판단 기준</small>
+                <b>
+                  60%<em>이상</em>
+                </b>
+              </div>
+            </div>
           </div>
-          {hours.length > 0 && (
-            <div className="al-hours" aria-label="시간별 예보">
-              {hours.map((h) => {
-                const hl = weatherLook(h.weatherCode);
-                const p = h.precipitationProbability ?? 0;
-                return (
-                  <div key={h.time} className={`al-hour ${p >= 60 ? "hi" : ""}`}>
-                    <small>{String(h.time).slice(11, 13)}시</small>
-                    <i className={`ti ${hl.icon}`} aria-hidden="true" />
-                    <div className="al-hour-bar">
-                      <span style={{ height: `${Math.max(4, p)}%` }} />
-                    </div>
-                    <b>{p}%</b>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <p className="al-source">
-            <i className="ti ti-database" aria-hidden="true" />
-            {wx.isTest || wx.weather?.mode === "simulation"
-              ? "시연용 악천후 시뮬레이션 데이터"
-              : wx.weather?.mode === "demo"
-                ? "데모 날씨 데이터 (실시간 예보 꺼짐)"
-                : `${wx.weather?.source || "날씨 예보"} 실시간 예보`}
-            {wx.weather?.fetchedAt ? ` · ${fetchedTime(wx.weather.fetchedAt)} 조회` : ""}
-          </p>
+          <HourlyTable hours={hours} look={weatherLook} />
         </>
       )}
-      <div className="al-wx-btns">
-        <button type="button" className="btn primary" disabled={!!busy || !selectedGroupId} onClick={() => review(false)}>
-          <i className="ti ti-refresh" aria-hidden="true" /> {busy === "check" ? "확인하는 중…" : wx?.risk ? "진행 여부 정하기" : "날씨 다시 확인"}
-        </button>
-        <button type="button" className="btn" disabled={!!busy || !selectedGroupId} onClick={() => review(true)}>
-          ☔ {busy === "sim" ? "시뮬레이션 중…" : "악천후 시뮬레이션"}
-        </button>
+      {/* 주 행동(진행 여부 정하기)은 위 결론 띠 하나에만. 여기는 출처·보조 행동 */}
+      <div className="al-wx-foot">
+        <span>
+          {wx?.weather?.fetchedAt ? `${fetchedTime(wx.weather.fetchedAt)} 업데이트` : wx ? "방금 확인" : ""}
+          {wx && region ? ` · ${region} 기준` : ""}
+        </span>
+        <div className="al-wx-links">
+          <button type="button" className="al-link" disabled={!!busy || !selectedGroupId} onClick={() => review(false)}>
+            <i className="ti ti-refresh" aria-hidden="true" /> {busy === "check" ? "확인하는 중…" : "다시 확인"}
+          </button>
+          <button
+            type="button"
+            className="al-link al-sim"
+            disabled={!!busy || !selectedGroupId}
+            onClick={() => review(true)}
+            title="시연용으로 비 예보를 만들어 확인해요. 참여자에게 [테스트] 알림이 함께 가요."
+          >
+            {busy === "sim" ? "만드는 중…" : "시연용: 비 예보 만들기"}
+          </button>
+        </div>
       </div>
-      <p className="al-hint">「악천후 시뮬레이션」은 시연용으로 비 예보를 만들어 확인해요. 참여자에게 [테스트] 알림이 함께 가요.</p>
     </section>
   );
 
   // 오른쪽: 단계별 결과
   const alternatives = riskRun?.candidate?.items || [];
   let panel;
+  let showRiskbar = false; // 첫 화면 + 비 예보일 때만 두 칸 위에 상태 띠
   if (weatherQ) {
     const choices = weatherQ.interrupt.choices || [
       { value: "keep", label: "네, 기존 축제 유지" },
@@ -559,150 +628,122 @@ export default function LiveAlerts({ festivals, onFail }) {
     );
   } else {
     // 처음: 날씨의 영향을 받는 확정 일정
+    showRiskbar = !!wx?.risk;
+    const cap = detail?.capacity || 0;
+    const empty = Math.max(0, cap - (detail?.members?.length || 0));
     panel = (
       <>
-        {wx?.risk && (
-          <button type="button" className="al-riskbar" disabled={!!busy} onClick={askDecision}>
-            <i className="ti ti-cloud-rain" aria-hidden="true" />
-            <span>
-              <b>모임 시간에 비 예보가 있어요</b>
-              <small>그대로 진행할지, 대체 축제를 찾을지 정해 주세요</small>
-            </span>
-            <em>{busy === "check" ? "확인하는 중…" : "진행 여부 정하기"}</em>
-          </button>
-        )}
-        <h2 className="sc-h">확정된 모임 일정</h2>
-        <p className="sc-sub">이 일정의 날짜·시간·장소 기준으로 날씨를 확인해요.</p>
-        {items.length ? (
-          <ol className="sc-tl">
-            {items.map((x, i) => (
-              <li key={i}>
-                <span className="sc-tl-time">
-                  <b>{x.time}</b>
-                  {x.endTime ? <small>~{x.endTime}</small> : null}
-                </span>
-                <span className="sc-tl-body">
-                  <b>{x.label}</b>
-                  {x.date || x.description ? (
-                    <small>
-                      {x.date ? `${dayLabel(x.date)}${x.description ? " · " : ""}` : ""}
-                      {x.description || ""}
-                    </small>
-                  ) : null}
-                </span>
-              </li>
-            ))}
-          </ol>
-        ) : sched === null && !detail ? (
-          <p className="sc-empty-line">일정 불러오는 중…</p>
-        ) : sched?.loadError ? (
-          <div className="sc-fail">
-            <b>
-              <i className="ti ti-plug-connected-x" aria-hidden="true" /> 일정을 불러오지 못했어요
-            </b>
-            <span>{sched.loadError} 서버 연결을 확인한 뒤 다시 시도해 주세요.</span>
-            <button type="button" className="btn small al-go" onClick={() => setReloadKey((k) => k + 1)}>
-              다시 불러오기
-            </button>
-          </div>
-        ) : (
-          <div className="sc-fail">
-            <b>
-              <i className="ti ti-calendar-off" aria-hidden="true" /> 아직 확정된 일정이 없어요
-            </b>
-            <span>날씨는 확정된 일정 기준으로 확인해요. 공동 일정을 먼저 확정해 주세요.</span>
-            <button type="button" className="btn small al-go" onClick={() => navigate(`/schedules?groupId=${encodeURIComponent(selectedGroupId)}`)}>
-              공동 일정으로 가기 →
-            </button>
-          </div>
-        )}
-        {detail?.members?.length ? (
-          <div className="al-who">
-            <div className="al-who-head">
-              <span className="al-who-title">
-                <i className="ti ti-bell" aria-hidden="true" /> 비가 예보되면 알림을 받는 참여자
-              </span>
-              <a className="al-who-link" href="/profile" onClick={(e) => (e.preventDefault(), navigate("/profile"))}>
-                알림 설정 →
-              </a>
-            </div>
-            <div className="al-toggle-row">
-              <span>
-                <b>내 악천후 알림 받기</b>
-                <small>{riskOn ? "비가 예보되면 알림 센터로 알려 드려요" : "꺼져 있으면 비 예보 알림이 오지 않아요"}</small>
-              </span>
-              <button type="button" role="switch" aria-checked={!!riskOn} aria-label="내 악천후 알림 받기" className={`al-switch ${riskOn ? "on" : ""}`} disabled={riskOn === null || busy === "risk"} onClick={toggleRisk}>
-                <span />
+        <div className="al-card-h">
+          <h2 className="sc-h">모임 정보</h2>
+        </div>
+        <div className="al-sec">
+          <h3>확정된 일정</h3>
+          {items.length ? (
+            <ol className="sc-tl">
+              {items.map((x, i) => (
+                <li key={i}>
+                  <span className="sc-tl-time">
+                    <b>{x.time}</b>
+                    {x.endTime ? <small>~{x.endTime}</small> : null}
+                  </span>
+                  <span className="sc-tl-body">
+                    <b>{x.label}</b>
+                    {x.date || x.description ? (
+                      <small>
+                        {x.date ? `${dayLabel(x.date)}${x.description ? " · " : ""}` : ""}
+                        {x.description || ""}
+                      </small>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          ) : sched === null && !detail ? (
+            <p className="sc-empty-line">일정 불러오는 중…</p>
+          ) : sched?.loadError ? (
+            <div className="sc-fail">
+              <b>
+                <i className="ti ti-plug-connected-x" aria-hidden="true" /> 일정을 불러오지 못했어요
+              </b>
+              <span>{sched.loadError} 서버 연결을 확인한 뒤 다시 시도해 주세요.</span>
+              <button type="button" className="btn small al-go" onClick={() => setReloadKey((k) => k + 1)}>
+                다시 불러오기
               </button>
             </div>
-            <div className="cm-members">
-              {detail.members.map((m) => (
-                <span key={m.userId} className={m.role === "leader" ? "leader" : ""}>
-                  {m.role === "leader" ? <i className="ti ti-crown" aria-hidden="true" /> : null}
-                  {m.user.displayName}
-                </span>
-              ))}
+          ) : (
+            <div className="sc-fail">
+              <b>
+                <i className="ti ti-calendar-off" aria-hidden="true" /> 아직 확정된 일정이 없어요
+              </b>
+              <span>날씨는 확정된 일정 기준으로 확인해요. 공동 일정을 먼저 확정해 주세요.</span>
+              <button type="button" className="btn small al-go" onClick={() => navigate(`/schedules?groupId=${encodeURIComponent(selectedGroupId)}`)}>
+                공동 일정으로 가기 →
+              </button>
             </div>
-          </div>
+          )}
+        </div>
+        {detail?.members?.length ? (
+          <>
+            <div className="al-sec">
+              <h3>
+                참여자
+                <em>
+                  {detail.memberCount ?? detail.members.length} / {cap}명
+                </em>
+              </h3>
+              <div className="al-members">
+                {detail.members.map((m) => (
+                  <span key={m.userId} className={m.role === "leader" ? "leader" : ""}>
+                    {m.role === "leader" ? <i className="ti ti-crown" aria-hidden="true" /> : null}
+                    {m.user.displayName}
+                  </span>
+                ))}
+                {Array.from({ length: Math.min(empty, 4) }, (_, i) => (
+                  <span key={`e${i}`} className="empty">
+                    모집 중
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="al-sec al-sec-end">
+              <div className="al-toggle-row">
+                <span>
+                  <b>내 비 예보 알림</b>
+                  <small>{riskOn ? "비가 예보되면 알림 센터로 알려 드려요" : "꺼져 있으면 비 예보 알림이 오지 않아요"}</small>
+                </span>
+                <button type="button" role="switch" aria-checked={!!riskOn} aria-label="내 비 예보 알림 받기" className={`al-switch ${riskOn ? "on" : ""}`} disabled={riskOn === null || busy === "risk"} onClick={toggleRisk}>
+                  <span />
+                </button>
+              </div>
+            </div>
+          </>
         ) : null}
       </>
     );
   }
 
   return (
-    <>
+    <div className="al-v3">
       {head}
-
-      {/* 모임 카드 */}
-      <div className="sc-group">
-        <div className="sc-group-ico">
-          <i className="ti ti-users" aria-hidden="true" />
-        </div>
-        <div className="sc-group-info">
-          <h3>{group?.title}</h3>
-          <div className="sc-group-meta">
-            <span>
-              <i className="ti ti-confetti" aria-hidden="true" /> {gf?.name || (detail ? "축제 정보 없음" : "불러오는 중…")}
-            </span>
-            <span>
-              <i className="ti ti-map-pin" aria-hidden="true" /> {gf ? [gf.region, gf.city].filter(Boolean).join(" ") : "지역 미정"}
-            </span>
-            {day ? (
-              <span>
-                <i className="ti ti-calendar" aria-hidden="true" /> {dayLabel(day)} {startT}
-                {endT && endT !== startT ? `–${endT}` : ""}
-              </span>
-            ) : null}
-            {detail ? (
-              <span>
-                <i className="ti ti-user-check" aria-hidden="true" /> 참여 확정 {detail.memberCount}/{detail.capacity}명
-              </span>
-            ) : null}
-          </div>
-        </div>
-        <label className="sc-group-change">
-          <span>모임 변경</span>
-          <select
-            value={selectedGroupId}
-            onChange={(e) => {
-              setGroupId(e.target.value);
-              resetFlow();
-            }}
-            aria-label="모임 변경"
-          >
-            {myGroups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.title}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
 
       {notice && (
         <div className="cm-notice al-notice" role="status">
           {notice}
         </div>
+      )}
+
+      {/* 결론 먼저: 비 예보면 두 칸 위에 상태 띠 + 이 화면의 유일한 주 버튼 */}
+      {showRiskbar && (
+        <button type="button" className="al-riskbar" disabled={!!busy} onClick={askDecision}>
+          <i className="ti ti-cloud-rain" aria-hidden="true" />
+          <span className="al-rb-txt">
+            <b>모임 시간에 비 예보가 있어요</b>
+            <small>
+              모임 시간 강수확률 최대 <em>{data?.precipitationProbability ?? "–"}%</em> · 판단 기준 60% 이상
+            </small>
+          </span>
+          <em>{busy === "check" ? "확인하는 중…" : "진행 여부 정하기"}</em>
+        </button>
       )}
 
       <div className="sc-card al-card">
@@ -713,6 +754,6 @@ export default function LiveAlerts({ festivals, onFail }) {
       </div>
 
       {memberSection}
-    </>
+    </div>
   );
 }
