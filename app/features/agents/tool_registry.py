@@ -38,7 +38,7 @@ DESCRIPTIONS = {
     "get_availability": "Read every active member's available times in the current group. Required for scheduling.",
     "get_candidates": "Read up to 50 ranked eligible companions for the selected festival using current matching conditions and the authenticated requester's profile. The current user and candidates unavailable at the requested start time are excluded. Required for matching.",
     "get_weather": "Read hourly weather for the selected festival coordinates and server-owned meeting time window. Call get_festival first. Scheduling should read get_availability first to reflect participant start times. Required for scheduling, risk response and rain-avoidance matching.",
-    "search_festivals": "Search alternative festivals for the request date. Required for risk response; optional when alternatives are relevant. Does not change the group's festival.",
+    "search_festivals": "Search the festival database for non-cancelled alternatives whose event dates include the request date. Required for risk response; optional when alternatives are relevant. Does not change the group's festival.",
 }
 
 

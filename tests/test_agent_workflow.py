@@ -5,6 +5,7 @@ from tests.auth_helpers import install_test_identity, token_headers
 from copy import deepcopy
 from datetime import date,timedelta
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -17,6 +18,7 @@ from app.features.agents.providers import RuleBasedModel,OpenAIModel
 from app.features.agents.service import AgentService
 from app.features.agents.schemas import RunStart,ResumeRun,Conditions
 from app.features.agents.tools import AgentTools,ToolFailure
+from app.features.agents.workflow import WorkflowService
 from app.main import create_app
 
 USER = "usr_demo_02"
@@ -291,15 +293,45 @@ async def test_openai_refusal_is_not_accepted():
     finally: await model.close()
 
 @pytest.mark.asyncio
-async def test_tour_api_adapter_does_not_expose_key(tmp_path):
-    repo,day=seed(); config=settings(tmp_path,tour_api_service_key="test-secret")
-    async def response(request):
-        assert request.url.params["serviceKey"] == "test-secret"
-        return httpx.Response(200,json={"response":{"header":{"resultCode":"0000"},"body":{"items":{"item":[{"contentid":"123","title":"공식 축제","eventstartdate":day.replace("-",""),"eventenddate":day.replace("-","")}]}}}})
-    async with httpx.AsyncClient(transport=httpx.MockTransport(response)) as http:
-        result=await AgentTools(repo,config,http_client=http).search_festivals({"conditions":{"date":day}})
-        assert result["data"][0]["id"] == "fst_tour_123"
-        assert "test-secret" not in str(result)
+@pytest.mark.parametrize("tour_api_key", [None, "unused-test-key"], ids=["no-key", "key-configured"])
+async def test_risk_recommendations_use_only_available_db_festivals_on_meeting_day(tmp_path, tour_api_key):
+    repo, meeting_day = seed()
+    meeting = await group(repo)
+    day = date.fromisoformat(meeting_day)
+    previous_day = (day - timedelta(days=1)).isoformat()
+    next_day = (day + timedelta(days=1)).isoformat()
+    template = repo.store.festivals[meeting["festivalId"]]
+    for festival_id, start, end, risk_status in [
+        ("starts_on_day", meeting_day, next_day, "normal"),
+        ("ends_on_day", previous_day, meeting_day, "normal"),
+        ("overlaps_day", previous_day, next_day, "normal"),
+        ("not_yet_open", next_day, next_day, "normal"),
+        ("already_ended", previous_day, previous_day, "normal"),
+        ("cancelled_on_day", meeting_day, meeting_day, "cancelled"),
+    ]:
+        repo.store.festivals[festival_id] = {
+            **template, "id": festival_id, "startDate": start, "endDate": end, "riskStatus": risk_status,
+        }
+    repo.festivals = AsyncMock(wraps=repo.festivals)
+    config = settings(tmp_path, tour_api_service_key=tour_api_key)
+
+    def unexpected_request(request):
+        pytest.fail(f"Alternative search attempted an HTTP request to {request.url.host}")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(unexpected_request)) as http:
+        tools = AgentTools(repo, config, http_client=http)
+        service = await make_service(repo, config, tools=tools).open()
+        try:
+            run = await WorkflowService(service).risk(USER, meeting["id"])
+        finally:
+            await service.close()
+
+    assert run["status"] == "completed"
+    assert run["sources"]["search_festivals"]["source"] == "festival_repository"
+    assert {item["id"] for item in run["candidate"]["items"]} == {
+        "fst_demo_food", "starts_on_day", "ends_on_day", "overlaps_day",
+    }
+    repo.festivals.assert_awaited_once_with(start_date=day, end_date=day, status="available")
 
 @pytest.mark.asyncio
 async def test_weather_http_adapter(tmp_path):

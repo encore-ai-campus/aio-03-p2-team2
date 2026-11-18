@@ -72,7 +72,7 @@ flowchart TD
 | `policy.py` | 최소 필수 조회, 날짜·시간·참여자·운영시간 검증 |
 | `tool_registry.py` | 읽기 도구 정의·인자 스키마·현재 요청 범위 검증 |
 | `providers.py` | OpenAI Function Calling·Structured Outputs, 규칙 기반 시험 모드 |
-| `tools.py` | 저장소 조회, Open-Meteo, TourAPI 어댑터 |
+| `tools.py` | 저장소 조회 및 Open-Meteo 예보 조회 |
 | `memory.py` | 사용자 선호, 세션 요약, 실행 소유권 |
 | `service.py` | 그래프 생명주기, 시작·조회·재개, 동시 승인 방지 |
 | `router.py` | 에이전트 REST API |
@@ -122,7 +122,7 @@ OpenAI 모드는 Responses API Function Calling으로 도구와 인자를 선택
 - `AGENT_MODEL_PROVIDER=openai`: 도구 선택은 OpenAI Responses Function Calling, 자연어 해석·일정 생성·성찰은 Structured Outputs를 사용합니다. 모델명과 키가 필요합니다. 매칭 점수와 대체 후보 정렬은 이 모드에서도 결정적 규칙입니다.
 - `AGENT_WEATHER_PROVIDER=demo`: 강수확률 20% 고정 시험 데이터.
 - `AGENT_WEATHER_PROVIDER=openmeteo`: 지정 날짜·좌표의 실제 일별 강수확률·날씨 코드를 조회합니다. 기상청 API와 다릅니다. 예보 범위 밖은 사용자에게 날짜 확인을 요청합니다.
-- `TOUR_API_SERVICE_KEY`가 있으면 대체 축제 검색에 한국관광공사 TourAPI를 사용합니다. 없으면 기존 축제 저장소를 조회합니다. 상세 운영시간이 없는 대체 후보는 확정 일정으로 취급하지 않습니다.
+- 대체 축제 검색은 DB에서 요청 날짜가 축제 기간에 포함되며 취소되지 않은 후보를 조회합니다. 상세 운영시간은 후보 선택 후 일정 생성 단계에서 다시 확인합니다.
 - 일반 API와 에이전트가 같은 `DATABASE_URL`을 사용합니다. 연결 또는 추가 스키마가 없으면 시작 시 실패하며 SQLite·인메모리로 자동 전환하지 않습니다. 적용 순서는 [DB 담당자 안내](agent-postgres.md)를 확인합니다.
 
 시간 검증은 요청 날짜·시간 범위, 모든 참여자 가능 시간, 축제 운영시간, 항목 순서·겹침, 취소 여부, 명시적 실내·우천 회피 조건을 검사합니다. 비용·이동시간·동선은 원천 데이터가 없어 검증하지 않습니다. 예산은 현재 매칭 점수에만 사용합니다.

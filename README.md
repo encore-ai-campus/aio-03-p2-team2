@@ -62,7 +62,10 @@ OpenAI 모드에서는 `choose_tools`가 Function Calling으로 다음 도구를
 | `AGENT_MODEL_PROVIDER=openai` | OpenAI로 조건 해석·도구 선택·일정 생성·수정 전략 생성 |
 | `AGENT_WEATHER_PROVIDER=demo` | 고정 시험 날씨 |
 | `AGENT_WEATHER_PROVIDER=openmeteo` | 실제 예보 조회 |
-| `TOUR_API_SERVICE_KEY` 설정 | TourAPI 대체 축제 검색 |
+| `TOUR_API_SERVICE_KEY` 설정 | 외부 동기화 워커의 TourAPI 축제 수집 |
+
+축제 탐색과 에이전트 매칭·일정·대체 축제 검색은 DB에 저장한 축제 정보를 사용합니다.
+초기 축제 데이터를 미리 적재하면 API를 단독으로 배포할 수 있습니다.
 
 가상 축제 정보와 실제 날씨는 함께 사용할 수 있습니다. `AGENT_WEATHER_PROVIDER=openmeteo`이면
 축제의 `venue.latitude/longitude`와 모임 날짜·시작/종료 시간으로 Open-Meteo 시간별 예보를 조회합니다.
