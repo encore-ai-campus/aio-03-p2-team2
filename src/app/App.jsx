@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AppStateProvider, paths, useAppState } from "./AppStateProvider.jsx";
-import { AuthProvider, useAuth } from "../features/auth/AuthProvider.jsx";
+import { AppStateProvider } from "./AppStateProvider.jsx";
+import { AuthProvider } from "../features/auth/AuthProvider.jsx";
 import RequireAuth from "../features/auth/components/RequireAuth.jsx";
 import LoginPage from "../features/auth/pages/LoginPage.jsx";
 import OnboardingPage from "../features/auth/pages/OnboardingPage.jsx";
@@ -12,11 +12,7 @@ import CommunityPage from "../features/groups/pages/CommunityPage.jsx";
 import ChatPage from "../features/chat/pages/ChatPage.jsx";
 import SchedulePage from "../features/schedules/pages/SchedulePage.jsx";
 import AlertsPage from "../features/alerts/pages/AlertsPage.jsx";
-function HomeRedirect() {
-  const { state } = useAppState();
-  const { session } = useAuth();
-  return <Navigate to={session ? paths[state.page] || paths.discover : paths.discover} replace />;
-}
+import HomePage from "../features/home/pages/HomePage.jsx";
 export default function App() {
   return (
     <AuthProvider>
@@ -28,8 +24,9 @@ export default function App() {
           </Route>
           <Route element={<AppLayout />}>
             {/* 메인: 로그인 없이 볼 수 있는 화면 (로그인했는데 온보딩 전이면 온보딩으로) */}
+            {/* `/` = 홈(서비스 소개·이용 흐름). 로그인 여부와 상관없이 홈을 보여 준다 */}
             <Route element={<RequireAuth optional />}>
-              <Route index element={<HomeRedirect />} />
+              <Route index element={<HomePage />} />
               <Route path="festivals" element={<FestivalExplorePage />} />
             </Route>
             {/* 로그인해야 볼 수 있는 화면 → 비로그인 시 로그인 화면으로, 로그인 후 원래 화면으로 */}
