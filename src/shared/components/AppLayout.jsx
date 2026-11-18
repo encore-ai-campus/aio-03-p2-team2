@@ -36,6 +36,13 @@ function useHideOnScroll(enabled) {
   return hidden;
 }
 
+// 페이지를 옮기면 맨 위에서 시작 (이전 화면의 스크롤 위치가 남아 푸터부터 보이던 문제)
+function useScrollTopOnNavigate(pathname) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.location.hash) window.scrollTo(0, 0);
+  }, [pathname]);
+}
+
 export default function AppLayout() {
   const { user, signOut } = useAuth();
   const me = useMe();
@@ -43,6 +50,7 @@ export default function AppLayout() {
   const navigate = useNavigate(); // 로그아웃 후 메인(홈)으로
   const isHome = location.pathname === "/";
   const hidden = useHideOnScroll(isHome);
+  useScrollTopOnNavigate(location.pathname);
   const right = user ? (
     <>
       <span className="gnb-user" title={user?.email}>

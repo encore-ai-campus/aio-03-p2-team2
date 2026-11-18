@@ -2451,7 +2451,7 @@ h3 {
 .mp-v3 .ai-intro-ava{width:52px;height:52px;border-radius:16px;background:var(--coral-softer);display:grid;place-items:center;margin-bottom:14px}
 .mp-v3 .ai-intro-ava img{width:30px;height:30px;object-fit:contain}
 .mp-v3 .ai-intro-hi{margin:0 0 4px;font-size:14px;color:var(--sub)}
-.mp-v3 .ai-intro h3{margin:0 0 6px;font-size:18px;font-weight:700;line-height:1.45;letter-spacing:-.01em;min-height:1.45em}
+.mp-v3 .ai-intro h3{margin:0 0 6px;font-size:18px;font-weight:700;line-height:1.45;letter-spacing:-.01em;min-height:1.45em;word-break:keep-all;overflow-wrap:break-word;white-space:pre-line}
 .mp-v3 .ai-intro-sub{margin:0 0 18px;font-size:13.5px;color:var(--sub)}
 .mp-v3 .ai-intro-chips{display:flex;flex-direction:column;align-items:center;gap:8px}
 .mp-v3 .ai-intro-chips .ai-chip{white-space:normal}
@@ -2630,3 +2630,10 @@ h3 {
 .al-v3 .al-sec+.al-sec{padding-top:16px}
 .al-v3 .hs-fade.l{left:88px}
 .al-v3 .al-card{gap:16px}
+/* 매칭: 「조건 더하기」로 직접 설정 탭이 열릴 때 자연스럽게 등장 + 선택 조건 강조 */
+.mp-v3 .tab-form:not([hidden])>.form-v3{animation:mpTabIn .42s cubic-bezier(.2,.7,.3,1) both}
+.mp-v3 .opt-fold[open]>:not(summary){animation:mpTabIn .36s cubic-bezier(.2,.7,.3,1) both}
+.mp-v3 .opt-fold.opt-flash{animation:mpOptFlash 1.5s ease both}
+@keyframes mpTabIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes mpOptFlash{0%{box-shadow:0 0 0 0 rgba(232,103,74,0)}30%{box-shadow:0 0 0 4px rgba(232,103,74,.2);border-color:#f2b5a3}100%{box-shadow:0 0 0 0 rgba(232,103,74,0)}}
+@media (prefers-reduced-motion:reduce){.mp-v3 .tab-form>.form-v3,.mp-v3 .opt-fold>*,.mp-v3 .opt-fold.opt-flash{animation:none}}
