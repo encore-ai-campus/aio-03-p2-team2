@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date as Date, datetime, time, timedelta, timezone
+from datetime import date as Date, time
 from typing import Literal, Annotated
 
 from pydantic import Field, field_validator, model_validator
@@ -16,10 +16,6 @@ _TRAVEL_STYLES = {
     "활동적으로": ("활동적으로", "활동적", "활동적인", "활발하게", "활발한", "부지런히"),
 }
 _STYLE_ALIASES = {alias.replace(" ", ""): canonical for canonical, aliases in _TRAVEL_STYLES.items() for alias in aliases}
-
-
-def _seoul_today() -> Date:
-    return datetime.now(timezone(timedelta(hours=9))).date()
 
 
 class Conditions(APIModel):
@@ -55,22 +51,6 @@ class Conditions(APIModel):
         # 그대로 둔 값은 어떤 프로필과도 같지 않아 스타일 점수가 0 → 반대 성향 후보가 잘못 올라가지 않는다.
         if value:
             return _STYLE_ALIASES.get(value.replace(" ", "").strip(), value)
-        return value
-
-    @field_validator("date")
-    @classmethod
-    def plausible_year(cls, value: Date | None) -> Date | None:
-        # "11월 21일"처럼 연도 없이 말하면 AI가 1111년 등 엉뚱한 연도를 채울 수 있다.
-        # 명백히 잘못된 연도(작년보다 이전)만 다가오는 같은 월·일로 바로잡는다.
-        today = _seoul_today()
-        if value is not None and value.year < today.year - 1:
-            try:
-                fixed = value.replace(year=today.year)
-                if fixed < today:
-                    fixed = fixed.replace(year=today.year + 1)
-            except ValueError:  # 2월 29일
-                return value
-            return fixed
         return value
 
     @model_validator(mode="after")

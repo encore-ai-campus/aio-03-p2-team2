@@ -1,21 +1,58 @@
 """시연 중 발견: AI가 '11월 21일'을 1111-11-21로, '계획적으로'를 '계획적'으로 추출 → 매칭 중단·스타일 점수 0."""
 from datetime import date
+from unittest.mock import AsyncMock
 
-from app.features.agents.schemas import Conditions, _seoul_today
+import pytest
+
+from app.features.agents.providers import OpenAIModel
+from app.features.agents.schemas import Conditions, ParsedRequest, RunStart
 from app.features.matching.service import score_candidate
+from tests.test_agent_workflow import USER, running
 
 
-def test_nonsense_year_becomes_upcoming_same_day():
-    today = _seoul_today()
-    fixed = Conditions.model_validate({"date": "1111-11-21"}).date
-    assert (fixed.month, fixed.day) == (11, 21)
-    assert fixed >= today and fixed.year in (today.year, today.year + 1)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "message, extracted, expected",
+    [
+        ("11월 21일 오후 1시", "1111-11-21", "2026-11-21"),
+        ("10/21 오후 1시", "1111-10-21", "2027-10-21"),
+        ("2월 29일 오후 1시", "1112-02-29", "2028-02-29"),
+        ("2023년 11월 21일", "2023-11-21", "2023-11-21"),
+        ("2023-11-21 오후 1시", "2023-11-21", "2023-11-21"),
+        ("23년 11월 21일", "2023-11-21", "2023-11-21"),
+        ("내년 11월 21일", "1111-11-21", "1111-11-21"),
+        ("동행 찾아줘", "1111-11-21", "1111-11-21"),
+        ("11월 20일", "1111-11-21", "1111-11-21"),
+        ("11월 21일", "2026-11-21", "2026-11-21"),
+    ],
+)
+async def test_openai_repairs_only_an_inferred_year(monkeypatch, message, extracted, expected):
+    monkeypatch.setattr("app.features.agents.providers.today", lambda: "2026-11-18")
+    model = OpenAIModel("test-key", "test-model")
+    try:
+        model._structured = AsyncMock(return_value=ParsedRequest(
+            intent="matching", conditions={"date": extracted},
+        ))
+        result = await model.parse(message, {})
+        assert result["conditions"]["date"] == expected
+    finally:
+        await model.close()
 
 
-def test_real_dates_are_untouched():
-    today = _seoul_today()
-    assert Conditions.model_validate({"date": today.isoformat()}).date == today
-    assert Conditions.model_validate({"date": f"{today.year - 1}-05-01"}).date == date(today.year - 1, 5, 1)
+@pytest.mark.asyncio
+async def test_explicit_past_date_is_validated_against_the_festival(running):
+    service, _, group, day = running
+    festival_day = date.fromisoformat(day)
+    requested = festival_day.replace(year=festival_day.year - 4).isoformat()
+    run = await service.start(USER, RunStart.model_validate({
+        "message": "동행 찾아줘",
+        "intent": "matching",
+        "festivalId": group["festivalId"],
+        "conditions": {"date": requested, "startTime": "13:00"},
+    }))
+    assert run["conditions"]["date"] == requested
+    assert run["status"] == "failed"
+    assert "FESTIVAL_UNAVAILABLE" in {error["code"] for error in run["errors"]}
 
 
 def test_travel_style_short_forms_match_profile_values():
