@@ -6,8 +6,11 @@ import asyncio
 from datetime import datetime, timezone
 
 import asyncpg
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from app.features.groups.repository import GroupRepositoryMixin
+from app.features.groups.router import router
 
 NOW = datetime(2026, 11, 17, tzinfo=timezone.utc)
 
@@ -25,6 +28,10 @@ def request_row(gid, uid, status="pending", name="하늘"):
 class FakePool:
     def __init__(self, counts_available=True):
         self.queries, self.counts_available = [], counts_available
+
+    async def fetchval(self, sql, *args):
+        self.queries.append(sql)
+        return 2
 
     async def fetch(self, sql, *args):
         self.queries.append(sql)
@@ -51,16 +58,59 @@ class Repo(GroupRepositoryMixin):
 
 def test_list_uses_db_counts_and_constant_queries():
     pool = FakePool()
-    items = asyncio.run(Repo(pool).list_groups(festival_id=None, status=None, keyword=None))
+    items, total = asyncio.run(Repo(pool).list_groups(festival_id=None, status=None, keyword=None, offset=0, limit=100))
+    assert total == 2
     assert [(i["memberCount"], i["pendingRequestCount"]) for i in items] == [(3, 2), (1, 0)]
-    assert len(pool.queries) == 6  # 모임 수와 무관
+    assert len(pool.queries) == 7  # 모임 수와 무관
 
 
 def test_join_requests_include_display_name():
-    items = asyncio.run(Repo(FakePool()).list_groups(festival_id=None, status=None, keyword=None))
+    items, _ = asyncio.run(Repo(FakePool()).list_groups(festival_id=None, status=None, keyword=None, offset=0, limit=100))
     assert items[0]["joinRequests"][0]["user"]["displayName"] == "하늘"
 
 
 def test_falls_back_when_count_function_missing():
-    items = asyncio.run(Repo(FakePool(counts_available=False)).list_groups(festival_id=None, status=None, keyword=None))
+    items, _ = asyncio.run(Repo(FakePool(counts_available=False)).list_groups(festival_id=None, status=None, keyword=None, offset=0, limit=100))
     assert items[0]["memberCount"] == 9 and items[0]["pendingRequestCount"] == 1
+
+
+def test_second_page_fetches_related_data_only_for_requested_groups():
+    class PagedPool:
+        def __init__(self):
+            self.rows = [group_row(f"grp_{index:03d}") for index in range(103, 0, -1)]
+            self.related_ids = []
+            self.page_queries = []
+
+        async def fetchval(self, sql, *args):
+            assert "select count(*) from groups" in sql
+            return len(self.rows)
+
+        async def fetch(self, sql, *args):
+            if "from groups where" in sql:
+                self.page_queries.append((sql, args))
+                if "limit" not in sql:
+                    return self.rows
+                limit, offset = args[-2:]
+                return self.rows[offset : offset + limit]
+            self.related_ids.append(args[0])
+            return []
+
+    pool = PagedPool()
+    app = FastAPI()
+    app.include_router(router)
+    app.state.repository = Repo(pool)
+    with TestClient(app) as client:
+        second_page = client.get("/groups?page=2&pageSize=100")
+        out_of_range = client.get("/groups?page=3&pageSize=100")
+
+    assert second_page.status_code == 200
+    data = second_page.json()["data"]
+    assert data["total"] == 103
+    requested_ids = ["grp_003", "grp_002", "grp_001"]
+    assert [item["id"] for item in data["items"]] == requested_ids
+    assert out_of_range.json()["data"] == {"items": [], "page": 3, "pageSize": 100, "total": 103}
+    assert pool.related_ids and all(ids == requested_ids for ids in pool.related_ids)
+    assert len(pool.page_queries) == 1
+    sql, args = pool.page_queries[0]
+    assert "order by created_at desc, id desc" in sql
+    assert args == (100, 100)

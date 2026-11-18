@@ -24,14 +24,14 @@ async def member_group(group_id: str, user_id: str, repository: SupabaseReposito
 
 
 async def broadcast(group_id: str, message: dict) -> None:
-    stale = []
-    for socket in connections[group_id]:
+    sockets = connections[group_id]
+    event = {"event": "chat.message.created", "data": message}
+    # A socket can disconnect while send_json yields.
+    for socket in tuple(sockets):
         try:
-            await socket.send_json({"event": "chat.message.created", "data": message})
+            await socket.send_json(event)
         except Exception:
-            stale.append(socket)
-    for socket in stale:
-        connections[group_id].discard(socket)
+            sockets.discard(socket)
 
 
 @router.get("/groups/{group_id}/messages", operation_id="listMessages", dependencies=[Depends(require_current_user)])

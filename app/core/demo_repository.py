@@ -69,8 +69,15 @@ class DemoRepository:
     async def upsert_festival(self,item):
         result = self.store.add_festival(item); self.persist(); return result
     async def group(self,group_id,**kwargs): return self.store.group(group_id)
-    async def list_groups(self,**filters):
-        return [deepcopy(g) for g in self.store.groups.values() if (not filters.get("festival_id") or g["festivalId"] == filters["festival_id"]) and (not filters.get("status") or g["status"] == filters["status"]) and (not filters.get("keyword") or filters["keyword"] in g["title"])]
+    async def list_groups(self, *, festival_id, status, keyword, offset, limit):
+        groups = [
+            group for group in self.store.groups.values()
+            if (not festival_id or group["festivalId"] == festival_id)
+            and (not status or group["status"] == status)
+            and (not keyword or keyword in group["title"])
+        ]
+        groups.sort(key=lambda group: (group["createdAt"], group["id"]), reverse=True)
+        return deepcopy(groups[offset : offset + limit]), len(groups)
     async def create_group(self,user_id,payload):
         if not await self.festival(payload["festivalId"]): raise RepositoryError("FESTIVAL_NOT_FOUND","축제를 찾을 수 없습니다.",404)
         if payload.get("workflowGroupId") and payload["workflowGroupId"] in self.store.groups:

@@ -79,7 +79,9 @@ class GroupRepositoryMixin(RepositoryBase):
             "proposals": [{"id": p["id"], "groupId": p["group_id"], "status": p["status"], "strategy": p["strategy"], "schedule": ((json.loads(p["items"]) if isinstance(p["items"],str) else p["items"]) or [None])[0], "items": (json.loads(p["items"]) if isinstance(p["items"],str) else p["items"]) or [], "createdAt": _iso(p["created_at"]), "version": p["base_version"], "reason": p["reason"]} for p in proposals],
         }
 
-    async def list_groups(self, *, festival_id: str | None, status: str | None, keyword: str | None) -> list[dict]:
+    async def list_groups(
+        self, *, festival_id: str | None, status: str | None, keyword: str | None, offset: int, limit: int,
+    ) -> tuple[list[dict], int]:
         clauses = ["1 = 1"]
         args: list[Any] = []
         if festival_id:
@@ -88,12 +90,19 @@ class GroupRepositoryMixin(RepositoryBase):
             args.append(status); clauses.append(f"status = ${len(args)}")
         if keyword:
             args.append(f"%{keyword}%"); clauses.append(f"(title ilike ${len(args)} or post_body ilike ${len(args)})")
-        rows = await self._pool().fetch(f"select * from groups where {' and '.join(clauses)} order by created_at desc", *args)
-        if not rows:
-            return []
-        # 모임마다 5~6번 조회하던 것(N+1)을 모임 수와 무관하게 6번으로 묶는다
-        ids = [row["id"] for row in rows]
         pool = self._pool()
+        where = " and ".join(clauses)
+        total = await pool.fetchval(f"select count(*) from groups where {where}", *args)
+        if offset >= total:
+            return [], total
+        rows = await pool.fetch(
+            f"select * from groups where {where} order by created_at desc, id desc limit ${len(args) + 1} offset ${len(args) + 2}",
+            *args, limit, offset,
+        )
+        if not rows:
+            return [], total
+        # 현재 페이지의 관련 데이터만 일괄 조회한다.
+        ids = [row["id"] for row in rows]
         member_rows = await pool.fetch(f"{self._MEMBER_SELECT} where gm.group_id = any($1::text[]) and gm.left_at is null order by gm.joined_at", ids)
         request_rows = await pool.fetch(f"{self._JOIN_REQUEST_SELECT} where r.group_id = any($1::text[]) order by r.created_at", ids)
         schedule_rows = await pool.fetch("select * from group_schedules where group_id = any($1::text[])", ids)
@@ -108,10 +117,11 @@ class GroupRepositoryMixin(RepositoryBase):
 
         members, requests, proposals = by_group(member_rows), by_group(request_rows), by_group(proposal_rows)
         schedules = {item["group_id"]: item for item in schedule_rows}
-        return [
+        items = [
             self._group_view(row, members.get(row["id"], []), requests.get(row["id"], []), [], schedules.get(row["id"]), proposals.get(row["id"], []), counts.get(row["id"]))
             for row in rows
         ]
+        return items, total
 
     async def comments(self, group_id: str, *, offset: int = 0, limit: int = 20) -> tuple[list[dict], int]:
         """Read comments from PostgreSQL with server-side pagination."""

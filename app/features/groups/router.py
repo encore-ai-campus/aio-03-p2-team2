@@ -46,7 +46,9 @@ def meeting_summary(group: dict) -> dict:
 
 @router.get("", operation_id="listGroups")
 async def list_groups(request: Request, festival_id: str | None = Query(default=None, alias="festivalId"), status: str | None = None, keyword: str | None = None, page: int = Query(default=1, ge=1), page_size: int = Query(default=20, ge=1, le=100, alias="pageSize")):
-    groups = await get_repository(request).list_groups(festival_id=festival_id, status=status, keyword=keyword)
+    groups, total = await get_repository(request).list_groups(
+        festival_id=festival_id, status=status, keyword=keyword, offset=(page - 1) * page_size, limit=page_size,
+    )
     items = []
     for group in groups:
         item = dict(group)
@@ -57,8 +59,7 @@ async def list_groups(request: Request, festival_id: str | None = Query(default=
         item.pop("schedule", None)
         item.pop("messages", None)
         items.append(item)
-    start = (page - 1) * page_size
-    return success({"items": items[start : start + page_size], "page": page, "pageSize": page_size, "total": len(items)}, request)
+    return success({"items": items, "page": page, "pageSize": page_size, "total": total}, request)
 
 
 @router.post("", operation_id="createGroup", status_code=201, dependencies=[Depends(require_current_user)])
