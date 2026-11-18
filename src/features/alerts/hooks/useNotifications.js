@@ -3,6 +3,7 @@
 // 「모두 읽음」 API는 없어서 제공하지 않음
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listAlertsPage, markAlertRead } from "../api/alertsApi.js";
+import { isVisibleAlert } from "../lib/alertStatus.js";
 
 const PAGE_SIZE = 10;
 
@@ -15,6 +16,7 @@ export function useNotifications({ userId, refreshKey }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [reload, setReload] = useState(0);
+  const [lastFull, setLastFull] = useState(false);
   const seq = useRef(0); // 늦게 도착한 이전 요청이 최신 목록을 덮어쓰지 않게
 
   const fetchPage = useCallback((p) => listAlertsPage({ page: p, pageSize: PAGE_SIZE, status: tab === "unread" ? "unread" : undefined }), [tab]);
@@ -35,8 +37,9 @@ export function useNotifications({ userId, refreshKey }) {
     fetchPage(1)
       .then((r) => {
         if (id !== seq.current) return;
-        setItems(r.items);
+        setItems(r.items.filter(isVisibleAlert)); // 거절(dismiss)한 알림은 숨김
         setTotal(r.total);
+        setLastFull(r.items.length === PAGE_SIZE);
         setPage(1);
         setStatus("ready");
       })
@@ -65,16 +68,17 @@ export function useNotifications({ userId, refreshKey }) {
         if (id !== seq.current) return;
         setItems((prev) => {
           const seen = new Set(prev.map((x) => x.id));
-          return [...prev, ...r.items.filter((x) => !seen.has(x.id))];
+          return [...prev, ...r.items.filter((x) => isVisibleAlert(x) && !seen.has(x.id))];
         });
         setTotal(r.total);
+        setLastFull(r.items.length === PAGE_SIZE);
         setPage((n) => n + 1);
       })
       .catch(() => {})
       .finally(() => setLoadingMore(false));
   };
-  // total이 없으면 마지막 페이지가 꽉 찼는지로 판단
-  const hasMore = total != null ? items.length < total : items.length >= page * PAGE_SIZE;
+  // 숨긴 알림이 있어도 끝을 정확히 알도록 받은 페이지 수 기준 (total이 없으면 마지막 페이지가 꽉 찼는지로)
+  const hasMore = total != null ? page * PAGE_SIZE < total : lastFull;
 
   // 읽음 처리: unread만, 즉시 화면 반영 → 실패하면 되돌림
   const markRead = (item) => {

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAlerts } from "../hooks/useAlerts.js";
 import { formatAlertDate } from "../lib/alertDates.js";
+import { needsWeatherResponse } from "../lib/alertStatus.js";
 import AlertForecast from "./AlertForecast.jsx";
 import AlertWorkflowPanel from "./AlertWorkflowPanel.jsx";
 
@@ -11,7 +12,7 @@ export default function LiveAlerts({ festivals, onFail }) {
   const navigate = useNavigate();
   const panelRef = useRef(null);
   const {
-    loading, memberAlerts, myGroups, selectedGroupId, detail, schedule, selectedFestival, items, day, startTime, endTime,
+    loading, visibleAlerts, myGroups, selectedGroupId, detail, schedule, selectedFestival, items, day, startTime, endTime,
     forecast, forecastStatus, weatherPrompt, outcome, alternativeRun, chosen, scheduleRun, showAllAlternatives,
     riskOn, busy, notice,
     selectGroup, reviewWeather, decideWeather, recommendAlternatives, chooseAlternative, decideScheduleChange,
@@ -40,8 +41,8 @@ export default function LiveAlerts({ festivals, onFail }) {
       detail={detail}
     />
   );
-  const memberSection = memberAlerts.length > 0 && (
-    <MemberAlerts memberAlerts={memberAlerts} festivals={festivals} busy={busy} answerAsMember={answerAsMember} />
+  const inbox = visibleAlerts.length > 0 && (
+    <AlertInbox alerts={visibleAlerts} myGroups={myGroups} festivals={festivals} busy={busy} answerAsMember={answerAsMember} />
   );
 
   // 모임장인 모임이 없으면 참여자 화면만
@@ -49,10 +50,10 @@ export default function LiveAlerts({ festivals, onFail }) {
     return (
       <div className="al-v3">
         {header}
-        {memberSection || (
+        {inbox || (
           <div className="sc-lock">
             <i className="ti ti-cloud-check" aria-hidden="true" />
-            <b>받은 위험 알림이 없어요</b>
+            <b>받은 알림이 없어요</b>
             <span>모임 날짜에 비가 예보되면 여기로 알려 드려요. 날씨 확인은 모임장이 할 수 있어요.</span>
           </div>
         )}
@@ -124,7 +125,7 @@ export default function LiveAlerts({ festivals, onFail }) {
         </section>
       </div>
 
-      {memberSection}
+      {inbox}
     </div>
   );
 }
@@ -198,23 +199,25 @@ function AlertsHeader({ curCount, myGroups, selectedGroupId, selectGroup, day, s
   );
 }
 
-function MemberAlerts({ memberAlerts, festivals, busy, answerAsMember }) {
+function AlertInbox({ alerts, myGroups, festivals, busy, answerAsMember }) {
   return (
     <section className="al-member">
       <h2 className="sc-h">받은 알림</h2>
-      {memberAlerts.map((a) => (
+      {alerts.map((a) => (
         <div className="al-alert" key={a.id}>
           <span className="al-alert-ico">
-            <i className="ti ti-cloud-rain" aria-hidden="true" />
+            <i className={a.type === "rain" ? "ti ti-cloud-rain" : "ti ti-bell"} aria-hidden="true" />
           </span>
           <div className="al-alert-body">
             <b>{a.title}</b>
             <p>
               {festivals.find((festival) => festival.id === a.festivalId)?.name || "참여 예정 축제"} · {a.message}
             </p>
-            {a.choice ? (
-              <div className="cm-state ok">{a.choice === "continue" ? "참여 유지 의사를 전달했어요" : "모임장에게 대체 축제 요청을 전달했어요"}</div>
-            ) : (
+            {a.type === "rain" && (a.status === "answered" || a.choice) ? (
+              <div className="cm-state ok">
+                {a.choice === "continue" ? "참여 유지 의사를 전달했어요" : a.choice === "find_alternative" ? "모임장에게 대체 축제 요청을 전달했어요" : "응답을 전달했어요"}
+              </div>
+            ) : needsWeatherResponse(a) && !myGroups.some((group) => group.id === a.groupId) ? (
               <div className="al-alert-btns">
                 <button type="button" className="btn" disabled={!!busy} onClick={() => answerAsMember(a, "continue")}>
                   네, 예정대로 참여할게요
@@ -223,7 +226,7 @@ function MemberAlerts({ memberAlerts, festivals, busy, answerAsMember }) {
                   다른 축제를 원해요
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       ))}

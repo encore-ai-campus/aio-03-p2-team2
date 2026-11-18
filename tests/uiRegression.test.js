@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { build } from "esbuild";
 import React from "react";
 import { act, create } from "react-test-renderer";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { initialState } from "../src/app/appState.js";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -19,6 +19,7 @@ after(() => rm(temporary, { recursive: true, force: true }));
 await build({
   stdin: { contents: `export { default as App } from './src/app/App.jsx';
     export { default as LiveAlerts } from './src/features/alerts/components/LiveAlerts.jsx';
+    export { default as NotificationDropdown } from './src/features/alerts/components/NotificationDropdown.jsx';
     export { default as LiveChat } from './src/features/chat/components/LiveChat.jsx';
     export { default as LiveSchedule } from './src/features/schedules/components/LiveSchedule.jsx';
     export { default as ProfilePage } from './src/features/auth/pages/ProfilePage.jsx';
@@ -45,7 +46,7 @@ await build({
     });
   } }],
 });
-const { App, MatchingPage, MatchingResults, AgentChatPanel, CreatePostBox, ActualProvider, useActualState, LiveAlerts, LiveChat, LiveSchedule, ProfilePage } = await import(pathToFileURL(join(temporary, "components.mjs")));
+const { App, MatchingPage, MatchingResults, AgentChatPanel, CreatePostBox, ActualProvider, useActualState, LiveAlerts, LiveChat, LiveSchedule, NotificationDropdown, ProfilePage } = await import(pathToFileURL(join(temporary, "components.mjs")));
 const h = React.createElement;
 const festival = { id: "fst_tour_1", name: "실제 축제", start: "2099-11-19", end: "2099-11-22" };
 
@@ -58,6 +59,58 @@ async function mount(element, path = "/matching") {
 const change = (renderer, label, value) => renderer.root.findByProps({ "aria-label": label }).props.onChange({ target: { value } });
 const textOf = (value) => typeof value === "string" ? value : Array.isArray(value) ? value.map(textOf).join("") : textOf(value?.props?.children || "");
 const button = (renderer, text) => renderer.root.findAllByType("button").find((b) => textOf(b.props.children).includes(text));
+
+const inboxAlerts = [
+  { id: "approval", type: "festival_changed", status: "unread", title: "참여 신청이 승인되었습니다", message: "모임 채팅에 참여할 수 있습니다." },
+  { id: "rain", type: "rain", status: "unread", title: "비 예보가 있어요" },
+  { id: "answered", type: "rain", status: "answered", choice: "continue", title: "응답한 날씨 알림" },
+  { id: "dismissed", type: "rain", status: "dismissed", title: "닫은 날씨 알림" },
+];
+
+test("notification preview counts only pending weather responses", async (t) => {
+  globalThis.document = new EventTarget();
+  globalThis.testApi = async () => ({ items: inboxAlerts });
+  const renderer = await mount(h(NotificationDropdown, { userId: "inbox" }));
+  t.after(async () => {
+    await act(async () => renderer.unmount());
+    delete globalThis.document;
+  });
+
+  const trigger = renderer.root.findByProps({ "aria-label": "AI 알림" });
+  await act(async () => trigger.props.onClick());
+  assert.equal(renderer.root.findByProps({ className: "gnb-badge" }).props.children, 1);
+  const approval = renderer.root.findAllByType("li").find((row) => textOf(row.props.children).includes(inboxAlerts[0].title));
+  assert.ok(approval);
+  assert.match(textOf(approval.props.children), /안내/);
+  assert.doesNotMatch(textOf(approval.props.children), /응답 대기/);
+});
+
+test("view all from the notification preview shows approval notices and weather actions", async (t) => {
+  globalThis.document = new EventTarget();
+  t.after(() => delete globalThis.document);
+  globalThis.testAuth = { user: { id: "inbox_auth" } };
+  globalThis.testApi = async (path) => {
+    if (path === "/me") return { id: "inbox" };
+    if (path.startsWith("/groups?")) return { items: [], total: 0 };
+    if (path.startsWith("/alerts?")) return { items: inboxAlerts };
+    throw new Error(`Unexpected request: ${path}`);
+  };
+  const renderer = await mount(h(Routes, null,
+    h(Route, { path: "/", element: h(NotificationDropdown, { userId: "inbox" }) }),
+    h(Route, { path: "/alerts", element: h(LiveAlerts, { festivals: [] }) }),
+  ), "/");
+  t.after(() => act(async () => renderer.unmount()));
+
+  await act(async () => renderer.root.findByProps({ "aria-label": "AI 알림" }).props.onClick());
+  const link = renderer.root.findByType("a");
+  await act(async () => link.props.onClick({ button: 0, preventDefault() {} }));
+  assert.equal(renderer.root.findByType("output").props["data-location"], "/alerts");
+  const approval = renderer.root.findAllByProps({ className: "al-alert" }).find((row) => textOf(row.props.children).includes(inboxAlerts[0].title));
+  assert.ok(approval);
+  assert.match(textOf(approval.props.children), /모임 채팅에 참여할 수 있습니다/);
+  assert.equal(approval.findAllByType("button").length, 0);
+  assert.ok(button(renderer, "네, 예정대로 참여할게요"));
+});
 
 test("a delayed chat send never changes the room opened after sending", async (t) => {
   const chooseRoom = (renderer, title) => button(renderer, title).props.onClick();
@@ -397,7 +450,7 @@ test("live matching still loads API festivals and sends selected date, time and 
   delete globalThis.localStorage;
 });
 
-test("weather simulation still asks for consent, offers alternatives, and confirms a replacement schedule", async () => {
+test("weather simulation confirms a replacement festival without changing the meeting date", async () => {
   globalThis.testAuth = { user: { id: "weather_auth" } };
   const calls = [];
   const weather = { data: { date: "2099-11-20", weatherCode: 61, precipitationProbability: 90 }, source: "simulation", mode: "simulation" };
@@ -411,10 +464,11 @@ test("weather simulation still asks for consent, offers alternatives, and confir
     if (path.endsWith("/weather-check")) return { weather, risk: true };
     if (path.endsWith("/weather-review")) return { weatherCheck: { weather, risk: true, isTest: true },
       run: { runId: "wx_run", checkpointId: "cp_1", status: "waiting_input", interrupt: { type: "weather_confirmation", message: "비가 오는데 괜찮으세요?" } } };
-    if (path === "/agents/runs/wx_run/resume") return { runId: "risk_run", status: "completed", weatherDecision: "alternatives",
+    if (path === "/agents/runs/wx_run/resume") return { runId: "risk_run", status: "completed", weatherDecision: "alternatives", conditions: { date: "2099-11-20" },
       candidate: { items: [{ id: "alternative", name: "대체 축제", startDate: "2099-11-19", endDate: "2099-11-22" }] } };
     if (path === "/workflow/risk-runs/risk_run/select") return {
       runId: "new_schedule", checkpointId: "cp_schedule", status: "waiting_approval",
+      conditions: { date: options.body.conditions?.date ?? "2099-11-20" },
       comparison: { before: { items: [{ time: "15:00", label: "기존 관람" }] }, after: { items: [{ time: "16:00", label: "새 축제 관람" }] } },
     };
     if (path === "/agents/runs/new_schedule/resume") return { runId: "new_schedule", status: "completed" };
@@ -428,7 +482,8 @@ test("weather simulation still asks for consent, offers alternatives, and confir
   assert.equal(calls.find((c) => c.path.endsWith("/resume")).body.weatherDecision, "alternatives");
   assert.match(JSON.stringify(renderer.toJSON()), /대체 축제/);
   await act(async () => button(renderer, "일정 보기").props.onClick());
-  assert.deepEqual(calls.find((c) => c.path.endsWith("/select")).body, { festivalId: "alternative", conditions: { date: "2099-11-19" } });
+  assert.deepEqual(calls.find((c) => c.path.endsWith("/select")).body, { festivalId: "alternative" });
+  assert.match(JSON.stringify(renderer.toJSON()), /11\/20\([^)]*\) 기준으로 다시 만든 일정/);
   assert.match(JSON.stringify(renderer.toJSON()), /새 축제 관람/);
   await act(async () => button(renderer, "이 축제·일정으로 변경 확정").props.onClick());
   const approval = calls.find((c) => c.path === "/agents/runs/new_schedule/resume").body;

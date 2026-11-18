@@ -6,7 +6,7 @@ import { decideSchedule, getSchedule } from "../../schedules/api/scheduleApi.js"
 import { fetchFestival } from "../../festivals/api/festivalsApi.js";
 import { resumeAgentRun } from "../../matching/api/agentsApi.js";
 import { answerAlert, listAlerts, riskResponseForGroup, selectAlternative, setRiskAlert, weatherCheck, weatherReview } from "../api/alertsApi.js";
-import { alternativeDate } from "../lib/alertDates.js";
+import { isVisibleAlert } from "../lib/alertStatus.js";
 
 const ERROR_TEXT = {
   LEADER_ONLY: "모임장만 할 수 있어요.",
@@ -199,7 +199,7 @@ export function useAlerts({ festivals, onFail }) {
 
   const chooseAlternative = (f) =>
     act(`choose:${f.id}`, async () => {
-      const r = await selectAlternative(alternativeRun.runId, f.id, alternativeDate(f));
+      const r = await selectAlternative(alternativeRun.runId, f.id);
       setChosen(f);
       setScheduleRun(r);
       return r;
@@ -219,7 +219,7 @@ export function useAlerts({ festivals, onFail }) {
     resetFlow();
   }
 
-  const memberAlerts = alerts.filter((a) => a.type === "rain" && a.status !== "dismissed" && !myGroups.some((g) => g.id === a.groupId));
+  const visibleAlerts = alerts.filter(isVisibleAlert);
   const answerAsMember = (alert, choice) => act(`ans:${alert.id}`, () => answerAlert(alert.id, choice).then(loadAlerts));
   const reloadSchedule = () => setReloadKey((key) => key + 1);
   const returnToAlternatives = () => setScheduleRun(null);
@@ -227,7 +227,7 @@ export function useAlerts({ festivals, onFail }) {
 
   return {
     loading: groups === null,
-    memberAlerts, myGroups, selectedGroupId, detail, schedule, selectedFestival, items, day, startTime, endTime,
+    visibleAlerts, myGroups, selectedGroupId, detail, schedule, selectedFestival, items, day, startTime, endTime,
     forecast, forecastStatus, weatherPrompt, outcome, alternativeRun, chosen, scheduleRun, showAllAlternatives,
     riskOn, busy, notice,
     selectGroup, reviewWeather, decideWeather, recommendAlternatives, chooseAlternative, decideScheduleChange,

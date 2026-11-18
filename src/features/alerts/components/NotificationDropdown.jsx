@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useNotifications } from "../hooks/useNotifications.js";
+import { needsWeatherResponse } from "../lib/alertStatus.js";
 import "../notificationDropdown.css";
 
 // 승인 알림도 festival_changed로 오므로 승인/변경을 제목으로 추측하지 않는다.
@@ -14,8 +15,6 @@ const DEFAULT_TYPE = { label: "소식", icon: "ti-bell" };
 const enc = encodeURIComponent;
 const targetOf = (item) =>
   !item.groupId ? null : item.type === "rain" ? `/alerts?groupId=${enc(item.groupId)}` : item.type === "festival_changed" ? `/groups?groupId=${enc(item.groupId)}` : null;
-// 응답이 필요한 날씨 알림만 표시
-const needsAnswer = (item) => item.type === "rain" && item.status !== "dismissed" && item.status !== "answered" && !item.choice;
 
 // 상대 시간: 방금 / n분 전 / n시간 전 / 어제 / 11.16
 const rtf = new Intl.RelativeTimeFormat("ko", { numeric: "auto" });
@@ -198,7 +197,7 @@ export default function NotificationDropdown({ userId, hidden = false }) {
                               <span className="nd-copy">
                                 <span className="nd-title">
                                   {item.title || "모임 알림"}
-                                  {needsAnswer(item) ? <em className="nd-chip">응답 필요</em> : null}
+                                  {needsWeatherResponse(item) ? <em className="nd-chip">응답 필요</em> : null}
                                 </span>
                                 {item.message ? <span className="nd-msg">{item.message}</span> : null}
                               </span>
