@@ -179,7 +179,7 @@ export default function LiveNewGroupModal({ festivals, onClose, onCreated }) {
             <label htmlFor="ng-time">
               합류 시간 <span>선택</span>
             </label>
-            <TimeSelect id="ng-time" value={startTime} disabled={!date} onChange={(e) => setStartTime(e.target.value)} />
+            <TimeSelect id="ng-time" label="합류 시간" value={startTime} disabled={!date} onChange={(e) => setStartTime(e.target.value)} />
           </div>
         </div>
         {fest ? <p className="ng-hint">축제 기간 {md(minDate)}–{md(maxDate)} 안에서 고를 수 있어요</p> : null}

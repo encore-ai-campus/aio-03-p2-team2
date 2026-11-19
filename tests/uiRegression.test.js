@@ -650,7 +650,7 @@ test("the actual UI provider persists filters and matching inputs without demo d
   delete globalThis.localStorage;
 });
 
-test("live matching still loads API festivals and sends selected date, time and party size", async () => {
+test("live matching labels the time controls and sends the selected date, time and party size", async (t) => {
   const storage = new Map();
   globalThis.localStorage = { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) };
   globalThis.testAuth = { session: null, user: null, loading: false };
@@ -664,19 +664,27 @@ test("live matching still loads API festivals and sends selected date, time and 
   };
   function Harness() { globalThis.testDemo = useActualState(); return h(MatchingPage); }
   const renderer = await mount(h(ActualProvider, null, h(Harness)));
+  t.after(async () => {
+    await act(async () => renderer.unmount());
+    delete globalThis.localStorage;
+  });
   assert.ok(renderer.root.findByProps({ id: "match-festival" }).findAllByType("option").some((option) => textOf(option.props.children).includes("실제 축제")));
   await act(async () => renderer.root.findByProps({ id: "match-festival" }).props.onChange({ target: { value: festival.id } }));
   await act(async () => renderer.root.findByProps({ id: "match-date" }).props.onChange({ target: { value: "2099-11-20" } }));
-  await act(async () => renderer.root.findByProps({ id: "match-start" }).props.onChange({ target: { value: "15:00" } }));
+  const timeControls = renderer.root.findAllByType("select");
+  const hour = timeControls.find((control) => control.props.id === "match-start");
+  const minute = timeControls.find((control) => control.props.id === "match-start-min");
+  assert.equal(hour.props["aria-label"], "합류 가능 시각 시");
+  assert.equal(minute.props["aria-label"], "합류 가능 시각 분");
+  await act(async () => hour.props.onChange({ target: { value: "15" } }));
+  await act(async () => minute.props.onChange({ target: { value: "20" } }));
   await act(async () => renderer.root.findByProps({ id: "match-cap" }).props.onChange({ target: { value: "4" } }));
   await act(async () => button(renderer, "이 조건으로 매칭하기").props.onClick());
   const request = calls.find((c) => c.path === "/matching/runs");
   assert.equal(request.body.festivalId, festival.id);
   assert.equal(request.body.conditions.date, "2099-11-20");
-  assert.equal(request.body.conditions.startTime, "15:00");
+  assert.equal(request.body.conditions.startTime, "15:20");
   assert.equal(request.body.conditions.partySize, 4);
-  await act(async () => renderer.unmount());
-  delete globalThis.localStorage;
 });
 
 test("weather simulation confirms a replacement festival without changing the meeting date", async () => {

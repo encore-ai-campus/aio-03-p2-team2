@@ -43,7 +43,7 @@ export default function MatchingConditionsForm({ festivals, festival, profile, f
         </div>
         <div className="field">
           <label htmlFor="match-start">합류 가능 시각</label>
-          <TimeSelect id="match-start" {...form.fields.start} />
+          <TimeSelect id="match-start" label="합류 가능 시각" {...form.fields.start} />
         </div>
         <div className="field">
           <label htmlFor="match-cap">모임 정원</label>

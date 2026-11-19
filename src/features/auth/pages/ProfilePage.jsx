@@ -164,7 +164,7 @@ export default function ProfilePage() {
                 {emoji} {label} {value}
               </button>
             ))}
-            <TimeSelect className="onb-time-select" value={form.availableFrom} onChange={(e) => set("availableFrom", e.target.value)} />
+            <TimeSelect label="합류 가능 시각" className="onb-time-select" value={form.availableFrom} onChange={(e) => set("availableFrom", e.target.value)} />
           </div>
         </div>
 
