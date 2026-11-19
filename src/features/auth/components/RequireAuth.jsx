@@ -31,7 +31,7 @@ export default function RequireAuth({ optional = false }) {
   if (!session && optional) return <Outlet />;
   if (!session) {
     // 원래 가려던 주소를 기억해 두었다가 로그인 후 그곳으로 보낸다
-    return <Navigate to="/login" replace state={{ from: createPath(location) }} />;
+    return <Navigate to="/login" replace state={{ from: createPath(location), reason: "required" }} />;
   }
   if (!metaDone && location.pathname !== "/onboarding") {
     if (server.userId !== userId) return <div className="auth-loading">프로필을 확인하고 있어요…</div>;

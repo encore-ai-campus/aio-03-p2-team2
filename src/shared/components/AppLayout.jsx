@@ -51,6 +51,7 @@ export default function AppLayout() {
   const isHome = location.pathname === "/";
   const hidden = useHideOnScroll(isHome);
   useScrollTopOnNavigate(location.pathname);
+  const authFrom = location.pathname === "/login" ? { from: location.state?.from, reason: location.state?.reason } : { from: createPath(location) };
   const right = user ? (
     <>
       <span className="gnb-user" title={user?.email}>
@@ -65,10 +66,15 @@ export default function AppLayout() {
       <NotificationDropdown key={user.id} userId={user.id} hidden={hidden} />
     </>
   ) : (
-    // 비로그인: 로그인 버튼 → 로그인 후 지금 보던 화면으로 돌아옴
-    <Link to="/login" state={{ from: createPath(location) }} className="gnb-login">
-      로그인
-    </Link>
+    // 비로그인: 로그인 · 회원가입 → 로그인 후 지금 보던 화면으로 돌아옴 (로그인 화면에서는 원래 돌아갈 곳 유지)
+    <>
+      <Link to="/login" state={{ ...authFrom, mode: "login" }} className="gnb-txt">
+        로그인
+      </Link>
+      <Link to="/login" state={{ ...authFrom, mode: "signup" }} className="gnb-login">
+        회원가입
+      </Link>
+    </>
   );
 
   return (

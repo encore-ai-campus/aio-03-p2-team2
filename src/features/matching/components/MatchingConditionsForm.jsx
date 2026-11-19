@@ -1,4 +1,5 @@
 import { Button } from "../../../shared/components/Primitives.jsx";
+import TimeSelect from "../../../shared/components/TimeSelect.jsx";
 
 const INTERESTS = ["미식", "사진", "산책", "음악", "문화", "전통", "자연", "카페", "액티비티"];
 // 온보딩과 같은 이모지로 통일
@@ -42,7 +43,7 @@ export default function MatchingConditionsForm({ festivals, festival, profile, f
         </div>
         <div className="field">
           <label htmlFor="match-start">합류 가능 시각</label>
-          <input id="match-start" type="time" {...form.fields.start} />
+          <TimeSelect id="match-start" {...form.fields.start} />
         </div>
         <div className="field">
           <label htmlFor="match-cap">모임 정원</label>

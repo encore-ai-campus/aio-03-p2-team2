@@ -2637,3 +2637,14 @@ h3 {
 @keyframes mpTabIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes mpOptFlash{0%{box-shadow:0 0 0 0 rgba(232,103,74,0)}30%{box-shadow:0 0 0 4px rgba(232,103,74,.2);border-color:#f2b5a3}100%{box-shadow:0 0 0 0 rgba(232,103,74,0)}}
 @media (prefers-reduced-motion:reduce){.mp-v3 .tab-form>.form-v3,.mp-v3 .opt-fold>*,.mp-v3 .opt-fold.opt-flash{animation:none}}
+/* 추천 동행 적합도 % (11/19) */
+.mp-v3 .pick-score{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:auto;min-width:52px;text-align:right;line-height:1}
+.mp-v3 .pick-score b{font-size:20px;font-weight:800;color:var(--coral);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.mp-v3 .pick-score b small{font-size:12px;font-weight:700;margin-left:1px}
+.mp-v3 .pick-score>span{font-size:11px;font-weight:500;color:#9a908a}
+/* 긴 일정·축제 이름 두 줄까지 보이기 (11/19) */
+.sc-mini li{align-items:flex-start}
+.sc-mini span{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.4}
+.al-row-main b,.al-alt-main b{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}
+/* 한국어 줄바꿈: 단어 중간에서 끊지 않기 (11/19) */
+.main{word-break:keep-all;overflow-wrap:break-word}

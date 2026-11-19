@@ -78,3 +78,4 @@
   .ft-top{grid-template-columns:1fr;gap:28px;padding:40px 0 28px}
   .site-footer{margin-bottom:68px}
 }
+.gnb-util .gnb-txt+.gnb-login{margin-left:6px}

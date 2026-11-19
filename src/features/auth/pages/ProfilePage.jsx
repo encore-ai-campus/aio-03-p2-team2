@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../../shared/lib/apiClient.js";
 import { useAuth } from "../AuthProvider.jsx";
+import TimeSelect from "../../../shared/components/TimeSelect.jsx";
 import {
   AGE_BANDS, BUDGETS, EMPTY_FORM, GENDERS, INTERESTS, JOIN_MODES, MBTIS, PARTY_SIZES, STYLES, TIMES,
   fromProfile, toProfileBody, toggleInList,
@@ -163,7 +164,7 @@ export default function ProfilePage() {
                 {emoji} {label} {value}
               </button>
             ))}
-            <input className="onb-time" type="time" value={form.availableFrom} onChange={(e) => set("availableFrom", e.target.value)} />
+            <TimeSelect className="onb-time-select" value={form.availableFrom} onChange={(e) => set("availableFrom", e.target.value)} />
           </div>
         </div>
 

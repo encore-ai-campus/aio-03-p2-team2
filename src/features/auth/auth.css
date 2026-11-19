@@ -67,3 +67,12 @@
 .onb-nav .btn { padding: 14px; font-size: 15px; border-radius: 12px; }
 .onb-prev { flex: 1; }
 .onb-next { flex: 2; }
+/* 로그인 화면을 상단 메뉴 레이아웃 안에서 보여 줄 때 (11/19) */
+.main .auth-page { min-height: 0; padding: 64px 24px 96px; background: transparent; }
+.main .auth-card { animation: authIn 0.35s ease both; }
+@keyframes authIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .main .auth-card { animation: none; } }
+.auth-need { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #fff4f1; border: 1px solid #f6cfc4; }
+.auth-need i { font-size: 18px; color: var(--coral); margin-top: 1px; }
+.auth-need b { display: block; font-size: 13.5px; color: var(--ink); }
+.auth-need span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--sub); }
