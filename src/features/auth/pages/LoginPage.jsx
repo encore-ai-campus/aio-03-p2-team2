@@ -1,5 +1,5 @@
 // 로그인 / 회원가입 화면 (Supabase Auth)
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthProvider.jsx";
 import "../auth.css";
@@ -15,19 +15,41 @@ function toKoreanError(error) {
   return `문제가 생겼어요: ${msg}`;
 }
 
+// 로그인이 필요한 화면에서 넘어왔을 때 안내 문구
+const NEED_LABEL = [
+  ["/matching", "AI 동행 매칭"],
+  ["/groups", "동행 커뮤니티"],
+  ["/chat", "모임 채팅방"],
+  ["/schedules", "공동 일정"],
+  ["/alerts", "AI 알림·대체 축제"],
+  ["/profile", "내 프로필"],
+];
+
 export default function LoginPage() {
   const { session, signIn, signUp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const goTo = location.state?.from || "/festivals";
+  const from = location.state?.from;
+  const goTo = from && !from.startsWith("/login") ? from : "/festivals";
+  const needLabel = location.state?.reason === "required" ? NEED_LABEL.find(([p]) => goTo.startsWith(p))?.[1] : null;
 
-  const [mode, setMode] = useState("login"); // "login" | "signup"
+  const [mode, setMode] = useState(location.state?.mode === "signup" ? "signup" : "login"); // "login" | "signup"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  // 상단 메뉴의 로그인 / 회원가입을 로그인 화면에서 다시 누르면 탭만 바꾼다
+  const wantMode = location.state?.mode;
+  useEffect(() => {
+    if (wantMode === "login" || wantMode === "signup") {
+      setMode(wantMode);
+      setError("");
+      setNotice("");
+    }
+  }, [wantMode, location.key]);
 
   // 이미 로그인돼 있으면 로그인 화면을 보여 줄 필요가 없다
   if (session) return <Navigate to={goTo} replace />;
@@ -88,6 +110,16 @@ export default function LoginPage() {
             <small>FESROAM · 축제 동행 매칭</small>
           </div>
         </div>
+
+        {needLabel && (
+          <div className="auth-need" role="status">
+            <i className="ti ti-lock" aria-hidden="true" />
+            <div>
+              <b>{needLabel} 이용을 위해 로그인이 필요해요</b>
+              <span>로그인하면 보던 흐름 그대로 이어서 시작할 수 있어요</span>
+            </div>
+          </div>
+        )}
 
         <div className="auth-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={!isSignup} className={!isSignup ? "active" : ""} onClick={() => switchMode("login")}>

@@ -18,11 +18,12 @@ export default function App() {
     <AuthProvider>
       <AppStateProvider>
         <Routes>
-          <Route path="login" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
             <Route path="onboarding" element={<OnboardingPage />} />
           </Route>
           <Route element={<AppLayout />}>
+            {/* 로그인·회원가입도 상단 메뉴가 있는 레이아웃 안에서 보여 준다 (갑자기 다른 화면으로 넘어가는 느낌 완화) */}
+            <Route path="login" element={<LoginPage />} />
             {/* 메인: 로그인 없이 볼 수 있는 화면 (로그인했는데 온보딩 전이면 온보딩으로) */}
             {/* `/` = 홈(서비스 소개·이용 흐름). 로그인 여부와 상관없이 홈을 보여 준다 */}
             <Route element={<RequireAuth optional />}>

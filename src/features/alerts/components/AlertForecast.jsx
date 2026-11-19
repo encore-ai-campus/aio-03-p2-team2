@@ -75,8 +75,14 @@ export default function AlertForecast({ forecast, forecastStatus, day, startTime
               <div className="al-chip">
                 <small>최대 바람</small>
                 <b>
-                  {maxWind >= 0 ? maxWind : "–"}
-                  <em>{data?.windSpeedUnit || "m/s"}</em>
+                  {maxWind >= 0 ? (
+                    <>
+                      {maxWind}
+                      <em>{data?.windSpeedUnit || "m/s"}</em>
+                    </>
+                  ) : (
+                    "–"
+                  )}
                 </b>
               </div>
               <div className="al-chip">

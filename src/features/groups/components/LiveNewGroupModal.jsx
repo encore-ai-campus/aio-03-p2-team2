@@ -2,6 +2,7 @@
 // 축제는 참여 가능한 것만(종료·취소 제외), 날짜는 축제 기간 안에서만, 합류 시간은 선택
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createGroup } from "../api/groupsApi.js";
+import TimeSelect from "../../../shared/components/TimeSelect.jsx";
 import "./newGroup.css";
 
 const ERROR_TEXT = {
@@ -178,7 +179,7 @@ export default function LiveNewGroupModal({ festivals, onClose, onCreated }) {
             <label htmlFor="ng-time">
               합류 시간 <span>선택</span>
             </label>
-            <input id="ng-time" type="time" step="600" value={startTime} disabled={!date} onClick={openPicker} onChange={(e) => setStartTime(e.target.value)} />
+            <TimeSelect id="ng-time" value={startTime} disabled={!date} onChange={(e) => setStartTime(e.target.value)} />
           </div>
         </div>
         {fest ? <p className="ng-hint">축제 기간 {md(minDate)}–{md(maxDate)} 안에서 고를 수 있어요</p> : null}

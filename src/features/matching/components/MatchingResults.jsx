@@ -106,6 +106,12 @@ export default function MatchingResults({ run, festival, profile, summary, joinL
                     ))}
                   </span>
                 </span>
+                {o.score != null && Number.isFinite(Number(o.score)) && (
+                  <span className="pick-score" aria-label={`적합도 ${Math.round(Number(o.score))}%`}>
+                    <b>{Math.round(Number(o.score))}<small>%</small></b>
+                    <span>적합도</span>
+                  </span>
+                )}
                 <span className="pick-box" aria-hidden="true"><i className="ti ti-check" /></span>
               </button>
             );
@@ -158,9 +164,11 @@ function candidateTags(o, mine = {}) {
   if (p.ageBand) tags.push(["ti-user", p.ageBand, /같은 나이대/.test(text)]);
   // 강조 기준: 이번 검색 조건과 겹침(추천 이유) 또는 내 프로필(온보딩 선호)과 같음
   if (p.travelStyle) tags.push(["ti-route", p.travelStyle, /여행 스타일 같음/.test(text) || (!!mine.style && (String(mine.style).includes(p.travelStyle) || p.travelStyle.includes(mine.style)))]);
-  // 관심사는 한 태그로 묶어 줄바꿈을 줄임 (예: 음악 · 미식)
-  const ints = (p.interests || []).slice(0, 2);
+  // 관심사는 한 태그로 묶어 줄바꿈을 줄임 (예: 음악 · 미식 · 카페) — 이번 조건과 겹치는 관심사를 앞에, 최대 3개
   const myInts = mine.interests || [];
+  const allInts = p.interests || [];
+  const hitInts = allInts.filter((x) => hitInterests.includes(x) || myInts.includes(x));
+  const ints = [...hitInts, ...allInts.filter((x) => !hitInts.includes(x))].slice(0, 3);
   if (ints.length) tags.push(["ti-heart", ints.join(" · "), ints.some((x) => hitInterests.includes(x) || myInts.includes(x))]);
   if (!tags.length) (o.reasons || []).forEach((r) => tags.push([REASON_ICON(r), r, true]));
   return tags;
