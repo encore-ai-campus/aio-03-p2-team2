@@ -15,7 +15,7 @@
 | 에이전트 시험 결과 보고서 | [docs/agent-test-report.md](docs/agent-test-report.md) |
 | 성찰 OFF/ON 평가 결과(11/19 재실행) | [docs/agent-evaluation.json](docs/agent-evaluation.json) |
 | 실행 기록 원본 | [docs/runs/](docs/runs/) (실제 매칭 1건 · 성찰 사례 1건) |
-| 발표 자료 | ⚠️ |
+| 발표 자료 | [발표 자료 보기](https://joel10195.github.io/aio-03-p2-ppt/) |
 
 이전 시험 기록은 `backend/docs/agent-test-report.md`에 과거 기록으로 보존합니다. 최종본은 `docs/agent-test-report.md`입니다.
 
