@@ -1,0 +1,78 @@
+/* 로그인 화면 전용 스타일 (웹 기준, 가운데 카드) */
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: var(--bg); }
+.auth-card { width: 100%; max-width: 420px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 32px; display: grid; gap: 20px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand b { display: block; font-size: 18px; }
+.auth-brand small { color: var(--sub); font-size: 11px; letter-spacing: 0.04em; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; background: #f1f4f8; border-radius: 12px; padding: 4px; }
+.auth-tabs button { border: 0; background: transparent; padding: 9px; border-radius: 9px; font-weight: 800; color: var(--sub); }
+.auth-tabs button.active { background: var(--white); color: var(--ink); box-shadow: 0 2px 8px rgba(35, 48, 70, 0.08); }
+.auth-form { display: grid; gap: 14px; }
+.auth-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 800; color: #4a5d73; }
+.auth-form input { border: 1px solid #dfe5ed; border-radius: 10px; padding: 11px 12px; background: var(--white); color: var(--ink); font-size: 14px; font-weight: 400; }
+.auth-form .btn { padding: 12px; margin-top: 4px; }
+.auth-msg { margin: 0; font-size: 12.5px; padding: 10px 12px; border-radius: 10px; }
+.auth-msg.error { background: #fff1ed; color: #d34a41; }
+.auth-msg.notice { background: #eaf8f2; color: var(--green); }
+.auth-loading { min-height: 100vh; display: grid; place-items: center; color: var(--sub); }
+.auth-user { font-size: 12px; color: var(--sub); white-space: nowrap; }
+
+/* 온보딩 (단계형) */
+.auth-card.wide { max-width: 560px; }
+.onb { gap: 22px; }
+.onb-top { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.onb-back { border: 0; background: transparent; font-size: 18px; color: var(--sub); padding: 4px; }
+.onb-back:disabled { visibility: hidden; }
+.onb-progress { height: 6px; background: #eef1f6; border-radius: 99px; overflow: hidden; }
+.onb-progress > div { height: 100%; background: var(--coral); border-radius: 99px; transition: width 0.3s ease; }
+.onb-skipall { border: 0; background: transparent; color: var(--sub); font-size: 12px; font-weight: 700; }
+.onb-step { display: grid; gap: 12px; animation: onbIn 0.25s ease; }
+.onb-step h2 { font-size: 22px; line-height: 1.35; margin: 0; }
+.onb-step > p { color: var(--sub); margin: 0 0 6px; }
+@keyframes onbIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.onb-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+.onb-tiles.four { grid-template-columns: repeat(4, 1fr); }
+.onb-tile { display: grid; justify-items: center; gap: 6px; padding: 16px 8px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--white); font-weight: 800; color: var(--ink); transition: transform 0.12s ease; }
+.onb-tile small { color: var(--sub); font-weight: 600; }
+.onb-tile:hover { transform: translateY(-2px); }
+.onb-tile.on, .onb-card.on { border-color: var(--coral); background: #fff4f1; box-shadow: 0 0 0 3px #ffe3dc; }
+.onb-cards { display: grid; gap: 10px; }
+.onb-cards.two { grid-template-columns: 1fr 1fr; }
+.onb-card { display: grid; grid-template-columns: 40px 1fr; grid-template-rows: auto auto; column-gap: 10px; text-align: left; align-items: center; padding: 14px 16px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--white); color: var(--ink); }
+.onb-card .emo { grid-row: span 2; font-size: 26px; }
+.onb-card small { color: var(--sub); }
+.emo { font-size: 28px; line-height: 1; }
+.onb-label { font-size: 12.5px; font-weight: 800; color: #4a5d73; margin-top: 6px; }
+.onb-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.onb-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--sub); }
+.onb-inline input, .onb-time { border: 1px solid #dfe5ed; border-radius: 9px; padding: 6px 8px; font-size: 13px; width: 90px; }
+.onb-inline input[type="time"], .onb-time { width: 120px; }
+.onb-mbti { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.onb-bottom { display: flex; justify-content: space-between; align-items: center; }
+.onb-bottom .btn { min-width: 160px; padding: 12px 18px; }
+.onb-count { color: var(--sub); font-size: 12px; font-weight: 700; }
+.onb-title { font-size: 18px; margin-bottom: 4px; }
+.onb-sub { color: var(--sub); font-size: 12.5px; margin: 0; }
+
+/* 마이페이지 */
+.profile-page { display: grid; justify-items: center; padding: 8px 0 24px; }
+.profile-page .auth-card { gap: 18px; }
+.pf-section { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+@media (max-width: 560px) { .onb-tiles.four, .onb-cards.two { grid-template-columns: 1fr 1fr; } .onb-step h2 { font-size: 19px; } }
+.onb-card.single { grid-template-columns: 40px 1fr; }
+.pf-group { display: grid; gap: 2px; margin-top: 8px; }
+.pf-group b { font-size: 15px; }
+.pf-group small { color: var(--sub); font-size: 12px; }
+.onb-nav { display: flex; gap: 8px; }
+.onb-nav .btn { padding: 14px; font-size: 15px; border-radius: 12px; }
+.onb-prev { flex: 1; }
+.onb-next { flex: 2; }
+/* 로그인 화면을 상단 메뉴 레이아웃 안에서 보여 줄 때 (11/19) */
+.main .auth-page { min-height: 0; padding: 64px 24px 96px; background: transparent; }
+.main .auth-card { animation: authIn 0.35s ease both; }
+@keyframes authIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .main .auth-card { animation: none; } }
+.auth-need { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: #fff4f1; border: 1px solid #f6cfc4; }
+.auth-need i { font-size: 18px; color: var(--coral); margin-top: 1px; }
+.auth-need b { display: block; font-size: 13.5px; color: var(--ink); }
+.auth-need span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--sub); }

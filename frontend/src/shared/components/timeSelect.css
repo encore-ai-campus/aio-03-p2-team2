@@ -1,0 +1,11 @@
+/* 시각 선택 (시 · 분 10분 단위) — TimeSelect.jsx 전용 (11/19) */
+.time-select{display:flex;gap:6px;width:100%;min-width:0}
+.time-select select{flex:1 1 0;min-width:0;cursor:pointer}
+.time-select select:disabled{cursor:not-allowed}
+/* 직접 모임 만들기 창: 기존 입력칸과 같은 모양 */
+.ng-field .time-select select{width:100%;border:1px solid #EAE3DF;border-radius:10px;padding:10px 12px;font:inherit;font-size:13.5px;color:#2A2421;background:#fff}
+.ng-field .time-select select:focus{outline:none;border-color:#F06A55;box-shadow:0 0 0 3px #FFEAE4}
+.ng-field .time-select select:disabled{background:#FCFAF9;color:#B0A59F}
+/* 마이페이지 합류 가능 시각 칩 옆 */
+.time-select.onb-time-select{width:auto}
+.time-select.onb-time-select select{width:78px;flex:none;border:1px solid #dfe5ed;border-radius:9px;padding:6px 8px;font-size:13px;background:#fff}
