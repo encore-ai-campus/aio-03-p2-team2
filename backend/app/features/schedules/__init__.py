@@ -1,0 +1,1 @@
+"""Group schedule domain package."""

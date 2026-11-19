@@ -1,0 +1,220 @@
+# FestaMate Backend
+
+React 프론트와 별도 레포로 관리하는 FastAPI 백엔드입니다. 기능별 API와 LangGraph 에이전트를 함께 제공합니다.
+
+## 기술 스택
+
+Python 3.12+, FastAPI, uv, Supabase PostgreSQL/Auth, LangGraph를 사용합니다. OpenAI·Open-Meteo·TourAPI는 설정에 따라 사용합니다.
+
+## 실행
+
+기존 `.env`가 없을 때만 `.env.example`을 복사하고 설정을 입력합니다.
+
+```powershell
+uv sync
+uv run python -m app --reload --host 127.0.0.1 --port 8000
+```
+
+- 상태: http://127.0.0.1:8000/health
+- DB 상태: http://127.0.0.1:8000/health/db
+- Swagger: http://127.0.0.1:8000/docs
+- OpenAPI: http://127.0.0.1:8000/openapi.json
+
+Windows에서는 위 실행 명령으로 psycopg에 필요한 Selector 이벤트 루프를 사용합니다.
+
+## DB·인증 설정
+
+DB 담당자가 기존 스키마를 준비한 뒤 `db/supabase_auth_rls.sql`과 `docs/sql/001_agent_postgres.sql`을 검토·적용해야 합니다. SQL 파일 수정만으로 원격 Supabase가 변경되지는 않습니다. 기존 테이블 생성 SQL 전체를 다시 실행하지 않습니다.
+
+- `DATABASE_URL`: Supabase PostgreSQL Direct 또는 Session pooler 연결 문자열. Transaction pooler(6543)는 지원하지 않습니다.
+- 동시성 RPC: 기본 스키마와 `db/supabase_auth_rls.sql` 적용 후 `db/concurrency_rpc.sql`도 적용해야 합니다. 정원 변경·참여 승인·일정 승인은 이 migration의 PostgreSQL RPC에서 행 잠금, 트랜잭션, 낙관적 버전 검사를 함께 수행합니다.
+- 모임 인원·대기 수: 같은 DB에 `db/003_group_counts.sql`을 적용해야 비로그인 사용자도 공개 모임의 실제 인원·대기 수를 볼 수 있습니다. 함수 미적용 시 서버는 기존 계산을 유지하지만, RLS 때문에 다른 사람의 대기 수가 적게 보일 수 있습니다. 각 실행 환경에서 SQL 적용 여부를 확인하세요.
+- `SUPABASE_URL`: 해당 프로젝트의 Project URL. DB 연결 문자열과 다릅니다.
+- `SUPABASE_JWT_ISSUER`: 미설정 시 Project URL에서 계산합니다.
+- `SUPABASE_JWT_SECRET`: HS256 레거시 프로젝트만 설정합니다. JWKS signing key 프로젝트는 비워 둡니다. DB 비밀번호·API key와 다른 값입니다.
+
+보호된 API는 `Authorization: Bearer <access-token>`을 사용합니다. Swagger의 **Authorize**에 로그인 access token을 입력합니다. JWT의 `sub`를 `public.users.auth_user_id`에 연결하며 `X-Demo-User-Id`는 지원하지 않습니다.
+
+일반 repository는 요청 claims와 `anon`/`authenticated` 역할을 사용합니다. 에이전트 체크포인트·기억은 서버 전용 `agent_storage`에 저장합니다. 서버는 테이블을 자동 생성하지 않으며 SQLite·인메모리로 자동 전환하지 않습니다.
+
+도구 선택 한도는 `AGENT_MAX_TOOL_ROUNDS=8`, 논리적 호출 한도는 `AGENT_MAX_TOOL_CALLS=12`가 기본값입니다. `.env`에 추가하지 않아도 기본값을 사용합니다.
+
+자세한 안내: [인증 전환](docs/auth-migration.md), [에이전트 DB 설정](docs/agent-postgres.md).
+
+## 에이전트 흐름
+
+```text
+요청 → 기억·조건 확인 → OpenAI 도구 선택 ⇄ 도구 실행·결과 전달 → 후보 생성 → 독립 검증
+                             ↑                ↓ 오류
+                             └─ 재조회·수정 ──┘
+정상 일정 → 초안 → 모임장 승인 대기 → 최신 조건 재검증 → 트랜잭션 반영
+```
+
+OpenAI 모드에서는 `choose_tools`가 Function Calling으로 다음 도구를 선택하고 결과를 확인하며 반복합니다. 서버는 필수 조회·인자·접근 범위·호출 한도를 검증합니다. 승인 단계의 최신 정보 조회는 기존대로 서버가 강제합니다.
+
+입력·승인 대기는 LangGraph interrupt/resume과 PostgreSQL 체크포인트를 사용합니다. 승인 전 확정 일정은 유지하고, 조건이 달라지면 새 초안으로 다시 승인받습니다. 기존 일정 API도 같은 그래프를 호출하며 생성·승인 응답은 실행 객체입니다.
+
+## 실제 연동과 시뮬레이션
+
+| 설정 | 동작 |
+| --- | --- |
+| `AGENT_MODEL_PROVIDER=rules` | LLM 호출 없는 규칙 기반 생성 |
+| `AGENT_MODEL_PROVIDER=openai` | OpenAI로 조건 해석·도구 선택·일정 생성·수정 전략 생성 |
+| `AGENT_WEATHER_PROVIDER=demo` | 고정 시험 날씨 |
+| `AGENT_WEATHER_PROVIDER=openmeteo` | 실제 예보 조회 |
+| `TOUR_API_SERVICE_KEY` 설정 | 외부 동기화 워커의 TourAPI 축제 수집 |
+
+축제 탐색과 에이전트 매칭·일정·대체 축제 검색은 DB에 저장한 축제 정보를 사용합니다.
+초기 축제 데이터를 미리 적재하면 API를 단독으로 배포할 수 있습니다.
+
+가상 축제 정보와 실제 날씨는 함께 사용할 수 있습니다. `AGENT_WEATHER_PROVIDER=openmeteo`이면
+축제의 `venue.latitude/longitude`와 모임 날짜·시작/종료 시간으로 Open-Meteo 시간별 예보를 조회합니다.
+종료 시간이 없는 초기 요청은 시작부터 90분을 사용하며 응답에 적용 시간을 표시합니다.
+저장된 일정의 날씨 확인과 자동 알림은 전체 일정의 시작~종료 시간을 사용합니다.
+강수확률은 해당 시간 구간의 최대값, 날씨 코드는 악천후 코드 우선으로 집계하며 풍속은 m/s로 제공합니다.
+좌표·예보 누락이나 조회 실패를 맑은 날씨로 처리하지 않습니다.
+시간별 강수확률은 직전 한 시간 기준이므로 15:30~17:00 모임에는 16시·17시 예보를 사용합니다.
+참고: [Open-Meteo API 문서](https://open-meteo.com/en/docs).
+
+기존 `POST /api/v1/workflow/groups/{group_id}/weather-check`의 `{"simulateRisk":true}`는
+개발 환경에서 외부 날씨 API 호출 없이 악천후 알림을 생성하는 기능으로 유지됩니다.
+설정 변경 후 백엔드를 재시작하세요. 실제 축제 API 키는 이 날씨 연동에 필요하지 않습니다.
+
+OpenAI 모드에는 `OPENAI_API_KEY`, `OPENAI_MODEL`이 필요합니다. 매칭 점수·대체 후보 정렬은 규칙 기반입니다. `DemoRepository`와 인메모리 체크포인터는 테스트에서만 명시적으로 주입합니다. 프론트의 DemoProvider/localStorage는 별도 실제 API 연동이 필요합니다.
+
+## 폴더 구조
+
+```text
+app/
+├── main.py                    # 앱 팩토리·시작·종료
+├── __main__.py                # Windows 호환 실행
+├── core/                      # 설정·JWT 인증·응답·DB·repository 구성
+└── features/
+    ├── agents/                # graph·state·policy·providers·tools·memory·service
+    ├── auth/
+    ├── festivals/
+    ├── matching/
+    ├── groups/
+    ├── chat/
+    ├── schedules/             # 그래프 연결 API·일정 저장
+    └── alerts/
+db/supabase_auth_rls.sql        # 인증 정책·회원가입 트리거
+docs/sql/001_agent_postgres.sql # 체크포인트·기억 저장소
+scripts/                       # HTTP 시연·격리 평가
+tests/                         # 그래프·인증·저장소 테스트
+```
+
+## 터미널 대화형 LangGraph 시험 (Auth 불필요)
+
+```powershell
+uv run python -m scripts.agent_console
+```
+
+`.env`의 모델 설정을 사용합니다. OpenAI 모드는 실제 API를 호출하며 비용이 발생합니다. 서버나 로그인 토큰은 필요하지 않습니다. API 호출 없이 연습하려면 다음 명령을 사용합니다.
+
+```powershell
+uv run python -m scripts.agent_console --provider rules
+```
+
+`일정 만들어줘` 입력 → 모임은 Enter로 `demo` 선택 → 표시된 시험 날짜 선택 → 시작 `15:00`, 종료 `18:00` 입력 → 초안 확인 후 `approve` 입력으로 중단·재개·승인 흐름을 확인합니다. `reject`는 거절, `cancel`은 취소입니다. `/memory`로 세션 기억 확인, `/new`로 새 세션, `/exit`로 종료합니다.
+
+실제 AgentService·StateGraph를 사용하되 사용자·축제·날씨·저장소는 시험용으로 주입합니다. 공유 Supabase와 실제 일정은 변경하지 않습니다. 실행 기록·기억은 프로세스 종료 시 사라집니다. API 서버의 JWT·PostgreSQL 설정은 그대로 유지합니다. 실제 로그인·RLS·외부 축제/날씨 연동을 검증하는 명령은 아닙니다.
+
+대화형 입력 시험: 규칙 모드에서 추가 질문 후 승인, 거절, 취소, 잘못된 시간 수정, 입력 종료(EOF) 처리 5개 시나리오를 확인했습니다.
+
+## 전체 워크플로우 터미널 대화 테스트
+
+```powershell
+uv run python -m scripts.workflow_console
+```
+
+가상 축제·계정을 유지하면서 실제 Open-Meteo 예보와 악천후 시뮬레이션을 차례로 시험하려면:
+
+```powershell
+uv run python -m scripts.workflow_console --mode demo --provider rules --weather-provider openmeteo
+```
+
+별도 서버와 Supabase 로그인 없이 실제 FastAPI 경로·LangGraph를 실행합니다. 날씨는 실제 외부 API,
+축제·계정·알림 저장소는 격리 시험 데이터이며 종료 시 사라집니다. `rules`는 LLM 호출 없는 모드입니다.
+화면 안내에 따라 값을 입력하고, 시간 질문에는 `오후 3시부터 가능해`, 참여·일정 승인에는 `approve`를 입력하세요.
+날씨 단계에서 `both`를 선택하면 실제 예보(좌표·적용 시간·시간별 강수확률·풍속)를 표시한 다음
+악천후를 별도로 재현합니다. 대체 축제를 고르면 해당 축제의 좌표로도 실제 예보를 다시 조회합니다.
+Enter는 표시된 기본값을 사용하며, 모임 정원은 2~8명을 선택할 수 있습니다.
+Open-Meteo 연결 실패는 오류로 표시하며 가짜 예보로 대체하지 않습니다.
+
+비 예보 확인은 `POST /api/v1/workflow/groups/{group_id}/weather-review`로 시작합니다.
+요청 본문은 기존 날씨 확인처럼 `{"simulateRisk":false}`이며, 응답은 `weatherCheck`와 `run`을 포함합니다.
+비 또는 악천후 예보가 있으면 LangGraph가 `weather_confirmation` 입력 대기로 멈춥니다.
+`POST /api/v1/agents/runs/{runId}/resume`에 `checkpointId`와 `weatherDecision`을 보내세요.
+`keep`은 기존 축제·일정을 유지하고, `alternatives`는 같은 실행에서 대체 축제 추천으로 이어집니다.
+`message`에 `네`/`아니요`로 답할 수도 있습니다. 모호한 답변은 다시 묻고, 조회 이후 일정이 바뀌면 재확인을 요구합니다.
+대체 축제 선택 후에는 기존 일정 초안·모임장 승인 절차를 거쳐야 변경됩니다.
+터미널도 비 예보가 있으면 `y/네` 또는 `n/아니요`를 묻습니다. `아니요` 뒤에는 추가 추천 확인 없이 후보가 나옵니다.
+약한 비의 날씨 코드도 질문 대상으로 삼으며 기존 강수확률 60% 이상 등의 알림 기준은 유지됩니다.
+기존 `weather-check`와 직접 `risk-response` API도 계속 사용할 수 있습니다.
+
+기본값은 공유 DB와 별도 서버가 필요 없는 격리 데모입니다. 단계마다 입력 형식과 예시를 보여주며 축제 선택 → 시간 되묻기 → 매칭 후보 → 모집글 → B 계정 참여 신청 → A 계정 승인 → 공동 일정 → 악천후 알림 → 대체 축제·수정 전후 비교까지 진행합니다. Enter는 표시된 기본값, `/exit` 또는 Ctrl+C는 종료입니다.
+
+데모의 두 계정·JWT·날씨·저장소는 시험용이지만 실제 FastAPI 경로와 에이전트 그래프를 실행합니다. 자가 수정 재현 질문에 `y`를 입력하면 첫 초안에만 시험용 시간 오류를 주입하고 실제 검증·성찰 루프가 수정합니다. 기본 `rules`는 OpenAI 호출이 없으며, `--provider openai`를 추가하면 `.env` 모델로 실제 OpenAI를 호출합니다.
+
+실행 중인 백엔드에 두 실제 계정으로 접속하려면:
+
+```powershell
+uv run python -m scripts.workflow_console --mode live --base-url http://127.0.0.1:8000
+```
+
+`login`·`signup`·`token` 중 인증 방법을 선택합니다. 비밀번호와 토큰은 숨겨 입력하며 파일에 저장하지 않습니다. A와 B는 서로 다른 계정이어야 합니다. 실제 모드는 프로필·모집글·참여·일정 변경을 서버 DB에 반영하고 서버의 모델·날씨 설정을 사용합니다. 이메일 인증이 켜져 있으면 인증 후 로그인합니다. 개발 서버에서는 `simulate`로 악천후를 재현하고, 운영 서버에서는 `actual`을 선택합니다.
+
+## 테스트·시연
+
+```powershell
+uv run python -m pytest tests -q
+uv run python -m scripts.agent_demo --group-id YOUR_GROUP_ID
+uv run python -m scripts.evaluate_agent --output data/agent-evaluation.json
+```
+
+외부 축제·날씨 동기화 Worker는 API 서버와 별도 프로세스로 실행합니다. `DATABASE_URL`과
+`TOUR_API_SERVICE_KEY`를 설정하고 `db/external_sync_worker.sql`을 적용한 뒤 다음 명령을 실행합니다.
+
+Before starting the worker, apply both `db/supabase_auth_rls.sql` and
+`db/external_sync_worker.sql` in Supabase SQL Editor. The queue table is named
+`external_sync_runs`; there is no separate `sync_jobs` table.
+
+```powershell
+uv run python -m app.sync_worker
+```
+
+시연 스크립트는 `SUPABASE_ACCESS_TOKEN` 환경변수로 로그인 토큰을 받습니다. `--approve` 옵션은 실제 일정을 변경합니다. 토큰을 Git이나 문서에 저장하지 않습니다.
+
+DB 통합 테스트는 별도로 준비한 시험 DB의 `TEST_AGENT_DATABASE_URL`이 필요합니다. 공유 서비스 DB를 시험 DB로 지정하지 않습니다. HTTP RLS 시험에는 테스트 사용자의 Auth 연결도 필요합니다.
+
+현재 병합 검증 범위와 미확인 항목은 [PR 통합 검증](docs/pr2-integration.md)에 정리했습니다. 과거 시험 결과는 각 시험 보고서에 기록되어 있습니다.
+
+## 팀에서 이어갈 작업
+
+- 프론트: Supabase 로그인, JWT API 요청, 추가 질문·승인·실패 화면 연결.
+- 백엔드: 실제 로그인 통합 검증, 참여·위험 이벤트의 실행 연결, API 계약 조율.
+- DB: 인증·에이전트 SQL 검토 및 적용, 역할 권한·RLS 검증, 기억 보존 정책.
+- 에이전트: 실제 모델·축제 데이터 시험, 이동시간·비용 검증 확장.
+
+OpenAI 도구 선택 변경·시험 결과: [Function Calling 통합](docs/agent-tool-calling.md).
+
+상세 노드·API 계약: [에이전트 워크플로우](docs/agent-workflow.md).
+
+TourAPI 수집에서 `includeDetails=true`이면 상세 `playtime`의 명확한 일일 운영시간
+(예: `10:00~18:00`, `매일 10시~18시`)을 축제 기간의 날짜별 `operatingHours`로 저장합니다.
+일별 상이·휴무 조건·여러 시간대·야간 등 복잡한 표현은 추정하지 않으며, 재수집 시 기존에
+확인된 운영시간은 유지합니다. 새 축제에 확정 운영시간이 없으면 기존 검증대로 추가 확인이 필요합니다.
+TourAPI 키를 설정하지 않은 환경에서도 기존 날씨 도구·가상 축제 테스트는 계속 사용할 수 있습니다.
+
+축제 수집 API의 `202`는 작업 등록만 의미합니다. 별도 터미널에서
+`uv run python -m app.sync_worker`를 실행해야 대기 작업이 처리됩니다.
+등록된 특정 작업만 한 번 처리하려면 아래 명령을 사용하세요.
+
+```powershell
+uv run python -m app.sync_worker --once --job-id job_등록된작업ID
+```
+
+전국 축제 수집 예시: `{"startDate":"2026-11-17","endDate":"2026-12-31","pageSize":10,"maxPages":1,"includeDetails":true}`.
+전국 조회에서는 `areaCode`, `sigunguCode`를 생략합니다. 지역 필터를 지정할 때에는 실제 숫자 코드 문자열을 사용하며,
+Swagger 예시값 `"string"`은 허용하지 않습니다. 작업 결과의 `status=succeeded`, `accepted`, `rejected`를 확인하세요.

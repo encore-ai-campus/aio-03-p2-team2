@@ -1,0 +1,1 @@
+"""Group management domain package."""

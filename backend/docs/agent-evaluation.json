@@ -1,0 +1,1216 @@
+{
+  "measuredAt": "2026-11-13T13:54:54.546681+00:00",
+  "mode": "controlled_fault_injection_rules_demo",
+  "limits": "Not live OpenAI/API performance; identical six cases, same providers and tool retry cap. Only reflect policy changes.",
+  "before": {
+    "metrics": {
+      "taskCompletionRate": 0.16666666666666666,
+      "toolSelectionAccuracy": 1.0,
+      "consistencyScore": 0.16666666666666666,
+      "averageReasoningReruns": 0.0
+    },
+    "cases": [
+      {
+        "case": "normal",
+        "status": "waiting_approval",
+        "completed": true,
+        "correctTools": true,
+        "consistent": true,
+        "reasoningReruns": 0,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:54.929144+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:54.931140+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:54.932141+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:54.932141+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:54.933647+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:54.934652+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "save_proposal",
+            "at": "2026-11-13T13:54:54.935659+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "too_early",
+        "status": "failed",
+        "completed": false,
+        "correctTools": true,
+        "consistent": false,
+        "reasoningReruns": 0,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:55.323406+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:55.324414+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:55.325412+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:55.326414+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:55.327414+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:55.328414+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TIME_CONFLICT"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:55.329412+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "stop",
+              "reason": "비교 기준: 성찰 후 재실행 비활성화"
+            }
+          },
+          {
+            "node": "finalize",
+            "at": "2026-11-13T13:54:55.330414+00:00",
+            "iteration": 1
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "wrong_date",
+        "status": "failed",
+        "completed": false,
+        "correctTools": true,
+        "consistent": false,
+        "reasoningReruns": 0,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:55.693592+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:55.694600+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:55.695599+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:55.695599+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:55.696598+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:55.697599+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "DATE_MISMATCH"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:55.698599+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "stop",
+              "reason": "비교 기준: 성찰 후 재실행 비활성화"
+            }
+          },
+          {
+            "node": "finalize",
+            "at": "2026-11-13T13:54:55.699598+00:00",
+            "iteration": 1
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "overlap",
+        "status": "failed",
+        "completed": false,
+        "correctTools": true,
+        "consistent": false,
+        "reasoningReruns": 0,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:56.080890+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:56.081890+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:56.081890+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:56.084407+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:56.086413+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:56.099488+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TIMELINE_ORDER"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:56.100487+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "stop",
+              "reason": "비교 기준: 성찰 후 재실행 비활성화"
+            }
+          },
+          {
+            "node": "finalize",
+            "at": "2026-11-13T13:54:56.101488+00:00",
+            "iteration": 1
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "transient",
+        "status": "failed",
+        "completed": false,
+        "correctTools": true,
+        "consistent": false,
+        "reasoningReruns": 0,
+        "toolRetries": 1,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:56.498192+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:56.499194+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:56.500193+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:56.567481+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TOOL_NETWORK_ERROR"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:56.568480+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "stop",
+              "reason": "비교 기준: 성찰 후 재실행 비활성화"
+            }
+          },
+          {
+            "node": "finalize",
+            "at": "2026-11-13T13:54:56.569479+00:00",
+            "iteration": 1
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 2,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          }
+        ]
+      },
+      {
+        "case": "outage",
+        "status": "failed",
+        "completed": false,
+        "correctTools": true,
+        "consistent": false,
+        "reasoningReruns": 0,
+        "toolRetries": 1,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:57.014192+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:57.015204+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:57.017228+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:57.084308+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TOOL_NETWORK_ERROR"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:57.085308+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "stop",
+              "reason": "비교 기준: 성찰 후 재실행 비활성화"
+            }
+          },
+          {
+            "node": "finalize",
+            "at": "2026-11-13T13:54:57.086306+00:00",
+            "iteration": 1
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 2,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "metrics": {
+      "taskCompletionRate": 0.8333333333333334,
+      "toolSelectionAccuracy": 1.0,
+      "consistencyScore": 0.8333333333333334,
+      "averageReasoningReruns": 0.5
+    },
+    "cases": [
+      {
+        "case": "normal",
+        "status": "waiting_approval",
+        "completed": true,
+        "correctTools": true,
+        "consistent": true,
+        "reasoningReruns": 0,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:57.561730+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:57.561730+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:57.562728+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:57.563728+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:57.564235+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:57.565239+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "save_proposal",
+            "at": "2026-11-13T13:54:57.566242+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "too_early",
+        "status": "waiting_approval",
+        "completed": true,
+        "correctTools": true,
+        "consistent": true,
+        "reasoningReruns": 1,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:57.964679+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:57.965688+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:57.966686+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:57.967686+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:57.968690+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:57.969683+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TIME_CONFLICT"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:57.970688+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "regenerate",
+              "reason": "검증에서 확인한 누락 조건을 생성 입력에 명시해 후보를 재생성합니다."
+            }
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:57.972687+00:00",
+            "iteration": 1
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:57.974189+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          },
+          {
+            "node": "save_proposal",
+            "at": "2026-11-13T13:54:57.975197+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "wrong_date",
+        "status": "waiting_approval",
+        "completed": true,
+        "correctTools": true,
+        "consistent": true,
+        "reasoningReruns": 1,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:58.360130+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:58.361134+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:58.362132+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:58.362132+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:58.363638+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:58.364644+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "DATE_MISMATCH"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:58.365651+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "regenerate",
+              "reason": "검증에서 확인한 누락 조건을 생성 입력에 명시해 후보를 재생성합니다."
+            }
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:58.366652+00:00",
+            "iteration": 1
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:58.368659+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          },
+          {
+            "node": "save_proposal",
+            "at": "2026-11-13T13:54:58.370651+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "overlap",
+        "status": "waiting_approval",
+        "completed": true,
+        "correctTools": true,
+        "consistent": true,
+        "reasoningReruns": 1,
+        "toolRetries": 0,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:58.769868+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:58.770876+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:58.771888+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:58.772895+00:00",
+            "iteration": 0,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:58.773401+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:58.774407+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TIMELINE_ORDER"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:58.775407+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "regenerate",
+              "reason": "검증에서 확인한 누락 조건을 생성 입력에 명시해 후보를 재생성합니다."
+            }
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:58.776413+00:00",
+            "iteration": 1
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:58.778413+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          },
+          {
+            "node": "save_proposal",
+            "at": "2026-11-13T13:54:58.780420+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "transient",
+        "status": "waiting_approval",
+        "completed": true,
+        "correctTools": true,
+        "consistent": true,
+        "reasoningReruns": 0,
+        "toolRetries": 1,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:59.164754+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:59.165756+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:59.166757+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:59.222188+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TOOL_NETWORK_ERROR"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:59.222188+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "refresh_tools",
+              "reason": "최신 도구 결과와 변경된 조건으로 다시 계획합니다."
+            }
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:59.223695+00:00",
+            "iteration": 1,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:59.224701+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          },
+          {
+            "node": "generate_candidate",
+            "at": "2026-11-13T13:54:59.225704+00:00",
+            "iteration": 1
+          },
+          {
+            "node": "validate_candidate",
+            "at": "2026-11-13T13:54:59.226703+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          },
+          {
+            "node": "save_proposal",
+            "at": "2026-11-13T13:54:59.227702+00:00",
+            "iteration": 1,
+            "errorCodes": []
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 2,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "ok",
+            "source": "demo_weather_fixture",
+            "mode": "demo"
+          }
+        ]
+      },
+      {
+        "case": "outage",
+        "status": "failed",
+        "completed": false,
+        "correctTools": true,
+        "consistent": false,
+        "reasoningReruns": 0,
+        "toolRetries": 3,
+        "trace": [
+          {
+            "node": "load_context",
+            "at": "2026-11-13T13:54:59.599758+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "parse_request",
+            "at": "2026-11-13T13:54:59.600759+00:00",
+            "iteration": 0
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:59.601758+00:00",
+            "iteration": 0,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:59.643830+00:00",
+            "iteration": 0,
+            "errorCodes": [
+              "TOOL_NETWORK_ERROR"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:59.646843+00:00",
+            "iteration": 0,
+            "repair": {
+              "action": "refresh_tools",
+              "reason": "최신 도구 결과와 변경된 조건으로 다시 계획합니다."
+            }
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:59.647839+00:00",
+            "iteration": 1,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:59.705829+00:00",
+            "iteration": 1,
+            "errorCodes": [
+              "TOOL_NETWORK_ERROR"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:59.706830+00:00",
+            "iteration": 1,
+            "repair": {
+              "action": "refresh_tools",
+              "reason": "최신 도구 결과와 변경된 조건으로 다시 계획합니다."
+            }
+          },
+          {
+            "node": "plan_tools",
+            "at": "2026-11-13T13:54:59.707827+00:00",
+            "iteration": 2,
+            "tools": [
+              "get_festival",
+              "get_availability",
+              "get_weather"
+            ]
+          },
+          {
+            "node": "execute_tools",
+            "at": "2026-11-13T13:54:59.768043+00:00",
+            "iteration": 2,
+            "errorCodes": [
+              "TOOL_NETWORK_ERROR"
+            ]
+          },
+          {
+            "node": "reflect_and_repair",
+            "at": "2026-11-13T13:54:59.769052+00:00",
+            "iteration": 2,
+            "repair": {
+              "action": "stop",
+              "reason": "판단 수정 횟수 한도에 도달했습니다."
+            }
+          },
+          {
+            "node": "finalize",
+            "at": "2026-11-13T13:54:59.770066+00:00",
+            "iteration": 2
+          }
+        ],
+        "toolCalls": [
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 2,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 2,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_festival",
+            "attempt": 1,
+            "status": "ok",
+            "source": "festival_repository",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_availability",
+            "attempt": 1,
+            "status": "ok",
+            "source": "member_profiles",
+            "mode": "demo"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 1,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          },
+          {
+            "tool": "get_weather",
+            "attempt": 2,
+            "status": "error",
+            "code": "TOOL_NETWORK_ERROR"
+          }
+        ]
+      }
+    ]
+  }
+}

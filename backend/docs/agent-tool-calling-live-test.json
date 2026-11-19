@@ -1,0 +1,812 @@
+{
+  "startedAt": "2026-11-15T19:35:18",
+  "scope": {
+    "openai": "live configured model",
+    "data": "isolated synthetic fixtures",
+    "authentication": "signed local test JWT, not Supabase login",
+    "storage": "injected in-memory test storage; no shared DB writes",
+    "weather": "fixed demo fixture"
+  },
+  "calls": [
+    {
+      "schema": "ParsedRequest",
+      "startedAt": "19:35:20",
+      "success": true,
+      "responseId": "resp_0eac1f3845244c38016af98aea4d6887d0bf185b915917c1ff",
+      "requestId": "req_97974bc6098f4be585fee57120a0a3ce",
+      "usage": {
+        "input_tokens": 401,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 79,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 480
+      },
+      "seconds": 2.98
+    },
+    {
+      "schema": "ToolDecision",
+      "startedAt": "19:35:23",
+      "success": true,
+      "responseId": "resp_0ccd3a21a2cb751d016af98aec820887d083edf2f9c4aebff9",
+      "requestId": "req_0ec2926bc9d04b80ab494b659715232c",
+      "selectedTools": [
+        "get_festival"
+      ],
+      "usage": {
+        "input_tokens": 675,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 22,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 697
+      },
+      "seconds": 1.27
+    },
+    {
+      "schema": "ToolDecision",
+      "startedAt": "19:35:25",
+      "success": true,
+      "responseId": "resp_0ccd3a21a2cb751d016af98aee06c087d0b47486a2f6dac386",
+      "requestId": "req_312c75f724f9464c83fee4f79c6a76d5",
+      "selectedTools": [
+        "get_availability"
+      ],
+      "usage": {
+        "input_tokens": 977,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 30,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1007
+      },
+      "seconds": 1.66
+    },
+    {
+      "schema": "ToolDecision",
+      "startedAt": "19:35:26",
+      "success": true,
+      "responseId": "resp_0ccd3a21a2cb751d016af98aef6d9087d08a8301397bc88d90",
+      "requestId": "req_278c4872d6244000b24704a5ba16afbb",
+      "selectedTools": [
+        "get_weather"
+      ],
+      "usage": {
+        "input_tokens": 1091,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 30,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1121
+      },
+      "seconds": 1.22
+    },
+    {
+      "schema": "ToolDecision",
+      "startedAt": "19:35:27",
+      "success": true,
+      "responseId": "resp_0ccd3a21a2cb751d016af98af0a4fc87d080073322dbfe5121",
+      "requestId": "req_76ff4d68089d47aea3bedb24a1676188",
+      "selectedTools": [],
+      "usage": {
+        "input_tokens": 1207,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 162,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 1369
+      },
+      "seconds": 1.61
+    },
+    {
+      "schema": "SchedulePlan",
+      "startedAt": "19:35:29",
+      "success": true,
+      "responseId": "resp_065098896790896a016af98af2405087d0bb5985fb2e346ff8",
+      "requestId": "req_8c0dba0bebbf4c1eabc35712585f6122",
+      "usage": {
+        "input_tokens": 693,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 168,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 861
+      },
+      "seconds": 1.88
+    },
+    {
+      "schema": "ParsedRequest",
+      "startedAt": "19:35:31",
+      "success": true,
+      "responseId": "resp_0eed7bf500ae7824016af98af42e3087d0b8bad6c567a59f12",
+      "requestId": "req_b63cb1e694f34c63a2423c2aec0aaf8e",
+      "usage": {
+        "input_tokens": 374,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 66,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 440
+      },
+      "seconds": 1.25
+    },
+    {
+      "schema": "RepairDecision",
+      "startedAt": "19:35:32",
+      "success": true,
+      "responseId": "resp_06bec9de4fb5f90b016af98af5671487d0bdd2f696f3520c79",
+      "requestId": "req_3cc53b7843f648f8a1e38c7d5719a15c",
+      "usage": {
+        "input_tokens": 177,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_write_tokens_details": {
+            "ttl_12h_tokens": 0,
+            "ttl_30m_tokens": 0
+          }
+        },
+        "output_tokens": 51,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 228
+      },
+      "seconds": 1.52
+    }
+  ],
+  "checks": {
+    "appHealthSwaggerOpenAPI": true,
+    "liveFunctionCallingToolSelection": true,
+    "naturalLanguageExtraction": true,
+    "proposalWithoutPrematureCommit": true,
+    "mandatoryApprovalRefresh": true,
+    "approvalRevalidationAndCommit": true,
+    "replayRejected": true,
+    "missingInputInterruptAndCancel": true,
+    "liveReflection": true
+  },
+  "configuration": {
+    "provider": "openai",
+    "model": "gpt-5.4-mini",
+    "apiKeyPresent": true,
+    "supabaseAuthConfigured": false
+  },
+  "initialRun": {
+    "runId": "run_758204b5352847e5a06e1967fc164928",
+    "sessionId": "ses_809b805a13da49d3a11ac2d87b588315",
+    "status": "waiting_approval",
+    "checkpointId": "1f1e0e04-83ff-6e36-800d-673712d21c33",
+    "modelProvider": "openai",
+    "repositoryMode": "demo",
+    "conditions": {
+      "date": "2026-11-16",
+      "start_time": "15:00",
+      "end_time": "18:00",
+      "budget_manwon": 10,
+      "interests": [
+        "음악 축제"
+      ]
+    },
+    "candidate": {
+      "summary": "조건에 맞는 음악 축제 일정입니다. 주어진 운영시간(10:00~21:00) 안에서, 요청한 참여 가능 시간(15:00~18:00) 전체를 사용하도록 구성했습니다. 예보상 강수확률 20%로 비교적 무난합니다.",
+      "items": [
+        {
+          "date": "2026-11-16",
+          "time": "15:00",
+          "endTime": "18:00",
+          "label": "바다빛 음악축제 관람",
+          "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+        }
+      ]
+    },
+    "proposalId": "prp_758204b5352847e5a06e_0",
+    "result": null,
+    "errors": [],
+    "interrupt": {
+      "type": "approval_required",
+      "proposalId": "prp_758204b5352847e5a06e_0",
+      "candidate": {
+        "summary": "조건에 맞는 음악 축제 일정입니다. 주어진 운영시간(10:00~21:00) 안에서, 요청한 참여 가능 시간(15:00~18:00) 전체를 사용하도록 구성했습니다. 예보상 강수확률 20%로 비교적 무난합니다.",
+        "items": [
+          {
+            "date": "2026-11-16",
+            "time": "15:00",
+            "endTime": "18:00",
+            "label": "바다빛 음악축제 관람",
+            "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+          }
+        ]
+      },
+      "groupVersion": 1,
+      "scheduleVersion": 1
+    },
+    "iteration": 0,
+    "trace": [
+      {
+        "node": "load_context",
+        "at": "2026-11-15T10:35:20.820752+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "parse_request",
+        "at": "2026-11-15T10:35:23.798057+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "plan_tools",
+        "at": "2026-11-15T10:35:23.800493+00:00",
+        "iteration": 0,
+        "tools": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:25.072503+00:00",
+        "iteration": 0,
+        "round": 1,
+        "selectedBy": "openai_function_calling",
+        "tools": [
+          "get_festival"
+        ],
+        "missingRequired": [
+          "get_festival",
+          "get_availability",
+          "get_weather"
+        ],
+        "summary": ""
+      },
+      {
+        "node": "execute_tools",
+        "at": "2026-11-15T10:35:25.074506+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:26.733012+00:00",
+        "iteration": 0,
+        "round": 2,
+        "selectedBy": "openai_function_calling",
+        "tools": [
+          "get_availability"
+        ],
+        "missingRequired": [
+          "get_availability",
+          "get_weather"
+        ],
+        "summary": ""
+      },
+      {
+        "node": "execute_tools",
+        "at": "2026-11-15T10:35:26.735526+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:27.965707+00:00",
+        "iteration": 0,
+        "round": 3,
+        "selectedBy": "openai_function_calling",
+        "tools": [
+          "get_weather"
+        ],
+        "missingRequired": [
+          "get_weather"
+        ],
+        "summary": ""
+      },
+      {
+        "node": "execute_tools",
+        "at": "2026-11-15T10:35:27.967708+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:29.580036+00:00",
+        "iteration": 0,
+        "round": 4,
+        "selectedBy": "openai_function_calling",
+        "tools": [],
+        "missingRequired": [],
+        "summary": "일정 만들기에 필요한 정보는 확인됐어요.\n\n- 축제: 바다빛 음악축제\n- 날짜/운영시간: 2026-11-16, 10:00~21:00\n- 장소: 해운대 이벤트광장(부산 해운대구)\n- 참가 가능 시간: 15:00~18:00 요청, 그룹 내 최소 1명은 13:00 이후 가능\n- 날씨: 강수확률 20%로 낮은 편\n- 예산: 10만원\n\n이제 이 조건을 바탕으로 일정 구성을 진행할 수 있어요.  \n원하시면 바로 15:00~18:00 기준의 축제 일정안을 만들어드릴게요."
+      },
+      {
+        "node": "generate_candidate",
+        "at": "2026-11-15T10:35:31.460555+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "validate_candidate",
+        "at": "2026-11-15T10:35:31.462548+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "save_proposal",
+        "at": "2026-11-15T10:35:31.463557+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      }
+    ],
+    "toolCalls": [
+      {
+        "tool": "get_festival",
+        "callId": "call_LVID5dEP4lxRCLAVQA7DwbSs",
+        "arguments": {
+          "festival_id": "fst_demo_music"
+        },
+        "selectedBy": "openai_function_calling",
+        "round": 1,
+        "attempt": 1,
+        "status": "ok",
+        "source": "festival_repository",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:25.074506+00:00"
+      },
+      {
+        "tool": "get_availability",
+        "callId": "call_9Tm8mYs6GOZPbzxT4tfUvNPe",
+        "arguments": {
+          "group_id": "grp_00d9b85e6dd6"
+        },
+        "selectedBy": "openai_function_calling",
+        "round": 2,
+        "attempt": 1,
+        "status": "ok",
+        "source": "member_profiles",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:26.735526+00:00"
+      },
+      {
+        "tool": "get_weather",
+        "callId": "call_ynyRk1j0eoY6lgQYo0aN6Aku",
+        "arguments": {
+          "festival_id": "fst_demo_music",
+          "date": "2026-11-16"
+        },
+        "selectedBy": "openai_function_calling",
+        "round": 3,
+        "attempt": 1,
+        "status": "ok",
+        "source": "demo_weather_fixture",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:27.967708+00:00"
+      }
+    ],
+    "sources": {
+      "get_festival": {
+        "source": "festival_repository",
+        "mode": "demo",
+        "url": null,
+        "fetchedAt": "2026-11-15T10:35:25.074506+00:00"
+      },
+      "get_availability": {
+        "source": "member_profiles",
+        "mode": "demo",
+        "url": null,
+        "fetchedAt": "2026-11-15T10:35:26.735526+00:00"
+      },
+      "get_weather": {
+        "source": "demo_weather_fixture",
+        "mode": "demo",
+        "url": null,
+        "fetchedAt": "2026-11-15T10:35:27.967708+00:00"
+      }
+    }
+  },
+  "approvedRun": {
+    "runId": "run_758204b5352847e5a06e1967fc164928",
+    "sessionId": "ses_809b805a13da49d3a11ac2d87b588315",
+    "status": "completed",
+    "checkpointId": "1f1e0e04-8416-6067-8010-32b8b10cfbf2",
+    "modelProvider": "openai",
+    "repositoryMode": "demo",
+    "conditions": {
+      "date": "2026-11-16",
+      "start_time": "15:00",
+      "end_time": "18:00",
+      "budget_manwon": 10,
+      "interests": [
+        "음악 축제"
+      ]
+    },
+    "candidate": {
+      "summary": "조건에 맞는 음악 축제 일정입니다. 주어진 운영시간(10:00~21:00) 안에서, 요청한 참여 가능 시간(15:00~18:00) 전체를 사용하도록 구성했습니다. 예보상 강수확률 20%로 비교적 무난합니다.",
+      "items": [
+        {
+          "date": "2026-11-16",
+          "time": "15:00",
+          "endTime": "18:00",
+          "label": "바다빛 음악축제 관람",
+          "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+        }
+      ]
+    },
+    "proposalId": "prp_758204b5352847e5a06e_0",
+    "result": {
+      "version": 2,
+      "current": {
+        "date": "2026-11-16",
+        "time": "15:00",
+        "endTime": "18:00",
+        "label": "바다빛 음악축제 관람",
+        "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+      },
+      "validation": {
+        "status": "valid",
+        "conflict": null
+      },
+      "proposals": [
+        {
+          "id": "prp_758204b5352847e5a06e_0",
+          "groupId": "grp_00d9b85e6dd6",
+          "items": [
+            {
+              "date": "2026-11-16",
+              "time": "15:00",
+              "endTime": "18:00",
+              "label": "바다빛 음악축제 관람",
+              "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+            }
+          ],
+          "summary": "조건에 맞는 음악 축제 일정입니다. 주어진 운영시간(10:00~21:00) 안에서, 요청한 참여 가능 시간(15:00~18:00) 전체를 사용하도록 구성했습니다. 예보상 강수확률 20%로 비교적 무난합니다.",
+          "schedule": {
+            "date": "2026-11-16",
+            "time": "15:00",
+            "endTime": "18:00",
+            "label": "바다빛 음악축제 관람",
+            "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+          },
+          "status": "approved",
+          "version": 1,
+          "createdAt": "2026-11-15T10:35:31Z"
+        }
+      ],
+      "items": [
+        {
+          "date": "2026-11-16",
+          "time": "15:00",
+          "endTime": "18:00",
+          "label": "바다빛 음악축제 관람",
+          "description": "부산 해운대구의 해운대 이벤트광장에서 진행되는 음악 축제를 관람합니다. 축제 운영시간(10:00~21:00)과 그룹 가능 시간(15:00~18:00)에 맞는 일정입니다."
+        }
+      ]
+    },
+    "errors": [],
+    "interrupt": null,
+    "iteration": 0,
+    "trace": [
+      {
+        "node": "load_context",
+        "at": "2026-11-15T10:35:20.820752+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "parse_request",
+        "at": "2026-11-15T10:35:23.798057+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "plan_tools",
+        "at": "2026-11-15T10:35:23.800493+00:00",
+        "iteration": 0,
+        "tools": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:25.072503+00:00",
+        "iteration": 0,
+        "round": 1,
+        "selectedBy": "openai_function_calling",
+        "tools": [
+          "get_festival"
+        ],
+        "missingRequired": [
+          "get_festival",
+          "get_availability",
+          "get_weather"
+        ],
+        "summary": ""
+      },
+      {
+        "node": "execute_tools",
+        "at": "2026-11-15T10:35:25.074506+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:26.733012+00:00",
+        "iteration": 0,
+        "round": 2,
+        "selectedBy": "openai_function_calling",
+        "tools": [
+          "get_availability"
+        ],
+        "missingRequired": [
+          "get_availability",
+          "get_weather"
+        ],
+        "summary": ""
+      },
+      {
+        "node": "execute_tools",
+        "at": "2026-11-15T10:35:26.735526+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:27.965707+00:00",
+        "iteration": 0,
+        "round": 3,
+        "selectedBy": "openai_function_calling",
+        "tools": [
+          "get_weather"
+        ],
+        "missingRequired": [
+          "get_weather"
+        ],
+        "summary": ""
+      },
+      {
+        "node": "execute_tools",
+        "at": "2026-11-15T10:35:27.967708+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "choose_tools",
+        "at": "2026-11-15T10:35:29.580036+00:00",
+        "iteration": 0,
+        "round": 4,
+        "selectedBy": "openai_function_calling",
+        "tools": [],
+        "missingRequired": [],
+        "summary": "일정 만들기에 필요한 정보는 확인됐어요.\n\n- 축제: 바다빛 음악축제\n- 날짜/운영시간: 2026-11-16, 10:00~21:00\n- 장소: 해운대 이벤트광장(부산 해운대구)\n- 참가 가능 시간: 15:00~18:00 요청, 그룹 내 최소 1명은 13:00 이후 가능\n- 날씨: 강수확률 20%로 낮은 편\n- 예산: 10만원\n\n이제 이 조건을 바탕으로 일정 구성을 진행할 수 있어요.  \n원하시면 바로 15:00~18:00 기준의 축제 일정안을 만들어드릴게요."
+      },
+      {
+        "node": "generate_candidate",
+        "at": "2026-11-15T10:35:31.460555+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "validate_candidate",
+        "at": "2026-11-15T10:35:31.462548+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "save_proposal",
+        "at": "2026-11-15T10:35:31.463557+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "await_approval",
+        "at": "2026-11-15T10:35:31.471613+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "revalidate_and_commit",
+        "at": "2026-11-15T10:35:31.472623+00:00",
+        "iteration": 0,
+        "errorCodes": []
+      },
+      {
+        "node": "finalize",
+        "at": "2026-11-15T10:35:31.473623+00:00",
+        "iteration": 0
+      }
+    ],
+    "toolCalls": [
+      {
+        "tool": "get_festival",
+        "callId": "call_LVID5dEP4lxRCLAVQA7DwbSs",
+        "arguments": {
+          "festival_id": "fst_demo_music"
+        },
+        "selectedBy": "openai_function_calling",
+        "round": 1,
+        "attempt": 1,
+        "status": "ok",
+        "source": "festival_repository",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:25.074506+00:00"
+      },
+      {
+        "tool": "get_availability",
+        "callId": "call_9Tm8mYs6GOZPbzxT4tfUvNPe",
+        "arguments": {
+          "group_id": "grp_00d9b85e6dd6"
+        },
+        "selectedBy": "openai_function_calling",
+        "round": 2,
+        "attempt": 1,
+        "status": "ok",
+        "source": "member_profiles",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:26.735526+00:00"
+      },
+      {
+        "tool": "get_weather",
+        "callId": "call_ynyRk1j0eoY6lgQYo0aN6Aku",
+        "arguments": {
+          "festival_id": "fst_demo_music",
+          "date": "2026-11-16"
+        },
+        "selectedBy": "openai_function_calling",
+        "round": 3,
+        "attempt": 1,
+        "status": "ok",
+        "source": "demo_weather_fixture",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:27.967708+00:00"
+      },
+      {
+        "tool": "get_festival",
+        "callId": "approval_get_festival",
+        "arguments": {
+          "festival_id": "fst_demo_music"
+        },
+        "selectedBy": "server_approval_revalidation",
+        "round": 4,
+        "attempt": 1,
+        "status": "ok",
+        "source": "festival_repository",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:31.472623+00:00"
+      },
+      {
+        "tool": "get_availability",
+        "callId": "approval_get_availability",
+        "arguments": {
+          "group_id": "grp_00d9b85e6dd6"
+        },
+        "selectedBy": "server_approval_revalidation",
+        "round": 4,
+        "attempt": 1,
+        "status": "ok",
+        "source": "member_profiles",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:31.472623+00:00"
+      },
+      {
+        "tool": "get_weather",
+        "callId": "approval_get_weather",
+        "arguments": {
+          "festival_id": "fst_demo_music",
+          "date": "2026-11-16"
+        },
+        "selectedBy": "server_approval_revalidation",
+        "round": 4,
+        "attempt": 1,
+        "status": "ok",
+        "source": "demo_weather_fixture",
+        "mode": "demo",
+        "fetchedAt": "2026-11-15T10:35:31.472623+00:00"
+      }
+    ],
+    "sources": {
+      "get_festival": {
+        "source": "festival_repository",
+        "mode": "demo",
+        "url": null,
+        "fetchedAt": "2026-11-15T10:35:31.472623+00:00"
+      },
+      "get_availability": {
+        "source": "member_profiles",
+        "mode": "demo",
+        "url": null,
+        "fetchedAt": "2026-11-15T10:35:31.472623+00:00"
+      },
+      "get_weather": {
+        "source": "demo_weather_fixture",
+        "mode": "demo",
+        "url": null,
+        "fetchedAt": "2026-11-15T10:35:31.472623+00:00"
+      }
+    }
+  },
+  "missingInputRun": {
+    "runId": "run_cab0ff310bde45629b62dbc27dfeeec6",
+    "sessionId": "ses_3e503d8779ac435e9ef01726106eb779",
+    "status": "waiting_input",
+    "checkpointId": "1f1e0e04-9019-6831-8002-6bbf4167da2c",
+    "modelProvider": "openai",
+    "repositoryMode": "demo",
+    "conditions": {},
+    "candidate": null,
+    "proposalId": null,
+    "result": null,
+    "errors": [],
+    "interrupt": {
+      "type": "input_required",
+      "missing": [
+        "groupId",
+        "festivalId",
+        "date"
+      ],
+      "errors": [],
+      "message": "누락 조건 또는 검증 오류를 확인하고 answers, groupId, festivalId로 응답해 주세요."
+    },
+    "iteration": 0,
+    "trace": [
+      {
+        "node": "load_context",
+        "at": "2026-11-15T10:35:31.480684+00:00",
+        "iteration": 0
+      },
+      {
+        "node": "parse_request",
+        "at": "2026-11-15T10:35:32.732338+00:00",
+        "iteration": 0
+      }
+    ],
+    "toolCalls": [],
+    "sources": {}
+  },
+  "reflection": {
+    "action": "regenerate",
+    "reason": "후보 일정이 참여자 가능 시간보다 이르다는 시간 충돌 오류이므로, 조건을 완화하지 않고 새 후보 일정을 다시 생성해야 합니다."
+  },
+  "result": "passed"
+}
