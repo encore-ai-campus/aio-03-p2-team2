@@ -7,7 +7,6 @@
 - 백엔드 API 문서: https://aio-03-p2-2team-backend.onrender.com/docs
 - 폴더별 상세 실행 안내: [프런트엔드](frontend/README.md) · [백엔드](backend/README.md) (설치, DB 설정, 테스트 절차)
 - 제출 저장소: https://github.com/encore-ai-campus/aio-03-p2-team2 (frontend·backend 커밋 이력 포함)
-- 원본 저장소(PR 기록): [Frontend](https://github.com/joel10195/aio-03-p2-2team-Frontend) / [Backend](https://github.com/joel10195/aio-03-p2-2team-Backend)
 
 ## 제출 산출물
 | 산출물 | 위치 |
@@ -90,7 +89,7 @@ cd frontend && npm test                                # 54 passed
 |---|---|---|
 | 김민철 (joel10195) | PM · AI 에이전트 · 통합 | LangGraph 에이전트 설계·구현(노드·도구·자가 성찰), 프론트·백엔드 PR 통합 merge·검토, 제출 저장소 구성, 참여 날짜 저장, TourAPI 운영시간·날씨 도구 연동, 비로그인 홈·모집글 초안 유지 |
 | 박은지 (ej-park-dev) | 프론트엔드 · 시연 영상 | 전 화면 구현·실서버 API 연결(인증·매칭·에이전트·채팅·날씨 알림)·디자인 개편·컴포넌트 분리, 온보딩 완료 API, 매칭 후보 조회 N+1 제거(54초→3.6초), 시연 영상 제작, 아키텍처 설계서·시험 보고서 정리 |
-| 김재현 (94JayKim) | 백엔드 구조 · API · 발표 | router/service/repository 계층 구조, Swagger 인증, TourAPI 조회·동기화, DB·백엔드 초기 통합, 정원·승인 동시성 처리(트랜잭션·RPC), 발표 |
-| 김수용 (power9869) | DB · 백엔드 품질 | DB 스키마·제약 정합(CHECK·KST 날짜·이미지 컬럼·집계 함수), 조회 일괄화·왕복 6→3회 등 DB 성능 개선, 매칭 점수 개편, AI 조건 추출 정규화, 자가 성찰 우선 적용 |
+| 김재현 (94JayKim) | 백엔드 구조 · API · 발표 | router/service/repository 계층 구조, Swagger 인증, TourAPI 조회·동기화, DB·백엔드 초기 통합, 정원·승인 동시성 처리(트랜잭션·RPC), 발표 및 발표자료 |
+| 김수용 (power9869) | DB · 백엔드 품질 | 시연용 데이터 구성(시연 계정·사용자·모임 데이터), DB 스키마·제약 정합(CHECK·KST 날짜·이미지 컬럼·집계 함수), 조회 일괄화·왕복 6→3회 등 DB 성능 개선, 매칭 점수 개편, AI 조건 추출 정규화, 자가 성찰 우선 적용 |
 
 상세 작업 이력: 이 저장소의 커밋 기록 참고 (frontend·backend 원본 커밋·PR 병합 이력 포함)
