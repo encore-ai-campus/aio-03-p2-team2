@@ -93,4 +93,4 @@ cd frontend && npm test                                # 54 passed
 | 김수용 (power9869) | 백엔드 · 에이전트 품질 | 매칭 점수 개편, AI 조건 추출 정규화, 자가 성찰 우선 적용(시간 충돌 시 재생성 먼저), DB 조회 최적화 |
 | 김재현 (94JayKim) | 백엔드 구조 · DB | router/service/repository 계층 구조, Swagger 인증, TourAPI 조회·동기화, 정원·승인 동시성 처리 |
 
-상세 PR 기록: 원본 저장소의 Pull requests 탭 참고
+상세 작업 이력: 이 저장소의 커밋 기록 참고 (frontend·backend 원본 커밋·PR 병합 이력 포함)
