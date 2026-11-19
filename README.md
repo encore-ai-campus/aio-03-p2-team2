@@ -16,6 +16,7 @@
 | 성찰 OFF/ON 평가 결과(11/19 재실행) | [docs/agent-evaluation.json](docs/agent-evaluation.json) |
 | 실행 기록 원본 | [docs/runs/](docs/runs/) (실제 매칭 1건 · 성찰 사례 1건) |
 | 발표 자료 | [발표 자료 보기](https://joel10195.github.io/aio-03-p2-ppt/) |
+| 발표 보충자료 | [docs/presentation-supplement.pdf](docs/presentation-supplement.pdf) — 발표 자료에서 다루지 못한 성찰 OFF/ON 시험 결과·오류 수정 사례, 남은 한계와 개선 계획 (팀원별 기여는 아래 「팀원별 역할·기여」 참고) |
 
 이전 시험 기록은 `backend/docs/agent-test-report.md`에 과거 기록으로 보존합니다. 최종본은 `docs/agent-test-report.md`입니다.
 
