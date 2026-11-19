@@ -1,0 +1,145 @@
+{
+  "case": "too_early",
+  "status": "waiting_approval",
+  "completed": true,
+  "correctTools": true,
+  "consistent": true,
+  "reasoningReruns": 1,
+  "toolRetries": 0,
+  "trace": [
+    {
+      "node": "load_context",
+      "at": "2026-11-19T04:09:40.442754+00:00",
+      "iteration": 0
+    },
+    {
+      "node": "parse_request",
+      "at": "2026-11-19T04:09:40.442754+00:00",
+      "iteration": 0
+    },
+    {
+      "node": "plan_tools",
+      "at": "2026-11-19T04:09:40.443767+00:00",
+      "iteration": 0,
+      "tools": []
+    },
+    {
+      "node": "choose_tools",
+      "at": "2026-11-19T04:09:40.444662+00:00",
+      "iteration": 0,
+      "round": 1,
+      "selectedBy": "rules",
+      "tools": [
+        "get_festival",
+        "get_availability",
+        "get_weather"
+      ],
+      "missingRequired": [
+        "get_festival",
+        "get_availability",
+        "get_weather"
+      ],
+      "summary": "규칙 기반 시험 모드: 필수 조회"
+    },
+    {
+      "node": "execute_tools",
+      "at": "2026-11-19T04:09:40.445748+00:00",
+      "iteration": 0,
+      "errorCodes": []
+    },
+    {
+      "node": "choose_tools",
+      "at": "2026-11-19T04:09:40.446661+00:00",
+      "iteration": 0,
+      "round": 2,
+      "selectedBy": "rules",
+      "tools": [],
+      "missingRequired": [],
+      "summary": "필수 조회 완료"
+    },
+    {
+      "node": "generate_candidate",
+      "at": "2026-11-19T04:09:40.447757+00:00",
+      "iteration": 0
+    },
+    {
+      "node": "validate_candidate",
+      "at": "2026-11-19T04:09:40.448983+00:00",
+      "iteration": 0,
+      "errorCodes": [
+        "TIME_CONFLICT"
+      ]
+    },
+    {
+      "node": "reflect_and_repair",
+      "at": "2026-11-19T04:09:40.449497+00:00",
+      "iteration": 0,
+      "repair": {
+        "action": "regenerate",
+        "reason": "검증에서 확인한 누락 조건을 생성 입력에 명시해 후보를 재생성합니다."
+      }
+    },
+    {
+      "node": "generate_candidate",
+      "at": "2026-11-19T04:09:40.449497+00:00",
+      "iteration": 1
+    },
+    {
+      "node": "validate_candidate",
+      "at": "2026-11-19T04:09:40.449497+00:00",
+      "iteration": 1,
+      "errorCodes": []
+    },
+    {
+      "node": "save_proposal",
+      "at": "2026-11-19T04:09:40.449497+00:00",
+      "iteration": 1,
+      "errorCodes": []
+    }
+  ],
+  "toolCalls": [
+    {
+      "tool": "get_festival",
+      "callId": "rules_0_get_festival",
+      "arguments": {
+        "festival_id": "fst_demo_music"
+      },
+      "selectedBy": "rules",
+      "round": 1,
+      "attempt": 1,
+      "status": "ok",
+      "source": "festival_repository",
+      "mode": "demo",
+      "fetchedAt": "2026-11-19T04:09:40.445748+00:00"
+    },
+    {
+      "tool": "get_availability",
+      "callId": "rules_0_get_availability",
+      "arguments": {
+        "group_id": "grp_6ac2fc036904"
+      },
+      "selectedBy": "rules",
+      "round": 1,
+      "attempt": 1,
+      "status": "ok",
+      "source": "member_profiles",
+      "mode": "demo",
+      "fetchedAt": "2026-11-19T04:09:40.445748+00:00"
+    },
+    {
+      "tool": "get_weather",
+      "callId": "rules_0_get_weather",
+      "arguments": {
+        "festival_id": "fst_demo_music",
+        "date": "2026-11-20"
+      },
+      "selectedBy": "rules",
+      "round": 1,
+      "attempt": 1,
+      "status": "ok",
+      "source": "demo_weather_fixture",
+      "mode": "demo",
+      "fetchedAt": "2026-11-19T04:09:40.445748+00:00"
+    }
+  ]
+}

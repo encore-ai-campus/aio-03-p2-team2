@@ -1,0 +1,148 @@
+{
+  "runId": "run_a988b28c129a403db61531f1ee93d677",
+  "status": "completed",
+  "intent": "matching",
+  "festivalId": "fst_tour_4098134",
+  "modelProvider": "openai",
+  "repositoryMode": "database",
+  "conditions": {
+    "date": "2026-11-22",
+    "start_time": "15:00"
+  },
+  "errors": [],
+  "iteration": 0,
+  "trace": [
+    {
+      "node": "load_context",
+      "at": "2026-11-19T04:04:48.765997+00:00",
+      "iteration": 0
+    },
+    {
+      "node": "parse_request",
+      "at": "2026-11-19T04:04:51.506403+00:00",
+      "iteration": 0
+    },
+    {
+      "node": "plan_tools",
+      "at": "2026-11-19T04:04:51.507984+00:00",
+      "iteration": 0,
+      "tools": []
+    },
+    {
+      "node": "choose_tools",
+      "at": "2026-11-19T04:04:53.031192+00:00",
+      "iteration": 0,
+      "round": 1,
+      "selectedBy": "openai_function_calling",
+      "tools": [
+        "get_festival"
+      ],
+      "missingRequired": [
+        "get_festival",
+        "get_candidates"
+      ],
+      "summary": ""
+    },
+    {
+      "node": "execute_tools",
+      "at": "2026-11-19T04:04:53.053794+00:00",
+      "iteration": 0,
+      "errorCodes": []
+    },
+    {
+      "node": "choose_tools",
+      "at": "2026-11-19T04:04:54.129799+00:00",
+      "iteration": 0,
+      "round": 2,
+      "selectedBy": "openai_function_calling",
+      "tools": [
+        "get_candidates"
+      ],
+      "missingRequired": [
+        "get_candidates"
+      ],
+      "summary": ""
+    },
+    {
+      "node": "execute_tools",
+      "at": "2026-11-19T04:04:54.167320+00:00",
+      "iteration": 0,
+      "errorCodes": []
+    },
+    {
+      "node": "choose_tools",
+      "at": "2026-11-19T04:04:56.657582+00:00",
+      "iteration": 0,
+      "round": 3,
+      "selectedBy": "openai_function_calling",
+      "tools": [],
+      "missingRequired": [],
+      "summary": "11/28 15:00 기준으로 매칭 가능한 후보가 충분히 있습니다.  \n축제 운영시간도 10:00~18:00이라 시간 조건에 맞고, 후보들 중 15:00 이후 가능자가 포함되어 있습니다.\n\n원하시면 다음으로:\n- 후보를 몇 명만 추려서 추천해드리거나\n- 성향/관심사 기준으로 더 좁혀드릴게요."
+    },
+    {
+      "node": "generate_candidate",
+      "at": "2026-11-19T04:04:56.659785+00:00",
+      "iteration": 0
+    },
+    {
+      "node": "validate_candidate",
+      "at": "2026-11-19T04:04:56.662176+00:00",
+      "iteration": 0,
+      "errorCodes": []
+    },
+    {
+      "node": "finalize",
+      "at": "2026-11-19T04:04:56.664615+00:00",
+      "iteration": 0
+    }
+  ],
+  "toolCalls": [
+    {
+      "tool": "get_festival",
+      "callId": "call_m90M9kG0SX5psTX0SnvV4Wi7",
+      "arguments": {
+        "festival_id": "fst_tour_4098134"
+      },
+      "selectedBy": "openai_function_calling",
+      "round": 1,
+      "attempt": 1,
+      "status": "ok",
+      "source": "festival_repository",
+      "mode": "repository",
+      "fetchedAt": "2026-11-19T04:04:53.053681+00:00"
+    },
+    {
+      "tool": "get_candidates",
+      "callId": "call_ed60cf142e3a4753bc25d1fa63f9332b",
+      "arguments": {
+        "festival_id": "fst_tour_4098134"
+      },
+      "selectedBy": "openai_function_calling",
+      "round": 2,
+      "attempt": 1,
+      "status": "ok",
+      "source": "user_profiles",
+      "mode": "database",
+      "fetchedAt": "2026-11-19T04:04:54.166986+00:00"
+    }
+  ],
+  "sources": {
+    "get_festival": {
+      "source": "festival_repository",
+      "mode": "repository",
+      "url": null,
+      "fetchedAt": "2026-11-19T04:04:53.053681+00:00"
+    },
+    "get_candidates": {
+      "source": "user_profiles",
+      "mode": "database",
+      "url": null,
+      "fetchedAt": "2026-11-19T04:04:54.166986+00:00"
+    }
+  },
+  "candidateSummary": {
+    "kind": "matching",
+    "count": 5,
+    "note": "추천 사용자 이름·ID는 개인정보 보호를 위해 제외"
+  }
+}
